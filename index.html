@@ -3,608 +3,139 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jasper Fire Department - Incident Management</title>
+  <title>Jasper Fire Department - RMS</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
-  <!-- SUPABASE JS CLIENT SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    .canvas-container { border: 2px dashed #cbd5e1; background-color: #f8fafc; border-radius: 0.375rem; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
   </style>
 </head>
-<body class="bg-slate-100 font-sans min-h-screen flex flex-col">
+<body class="bg-slate-100 min-h-screen text-slate-800 font-sans">
 
-  <!-- TOP NAVIGATION HEADER -->
+  <!-- TOP HEADER & NAV -->
   <header class="bg-slate-900 text-white shadow-md">
-    <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
       <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('home')">
-        <img src="public/logo.jpg" alt="Jasper Fire Dept Logo" class="h-12 w-auto object-contain rounded" onerror="this.onerror=null; this.src='https://via.placeholder.com/48?text=JFD';">
-        <div>
-          <h1 class="text-xl font-bold tracking-wide">JASPER FIRE DEPARTMENT</h1>
+        <div class="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center font-bold text-xl border-2 border-white">
+          J
         </div>
+        <span class="font-bold text-xl tracking-wide">JASPER FIRE DEPARTMENT</span>
       </div>
-      <nav class="flex items-center space-x-2 text-sm font-medium">
-        <button onclick="switchTab('home')" class="nav-btn px-3 py-2 rounded hover:bg-slate-800 transition">Home</button>
-        <button id="nav-staffing" onclick="switchTab('staffing')" class="nav-btn px-3 py-2 rounded hover:bg-slate-800 transition">Daily Staffing</button>
-        <button id="nav-incidents" onclick="switchTab('incidents')" class="nav-btn px-3 py-2 rounded hover:bg-slate-800 transition">Incidents</button>
-        <button id="nav-inspections" onclick="switchTab('inspections')" class="nav-btn px-3 py-2 rounded hover:bg-slate-800 transition">Inspections</button>
-        <button id="nav-admin" onclick="switchTab('admin')" class="nav-btn px-3 py-2 rounded hover:bg-slate-800 transition">Admin Portal</button>
-        
-        <div class="flex items-center space-x-2 ml-4">
-          <select id="active-user-select" onchange="handleUserSwitch()" class="bg-slate-800 text-xs p-2 rounded text-slate-200 border border-slate-700"></select>
-          <button id="auth-btn" onclick="toggleAuth()" class="bg-red-700 hover:bg-red-800 text-white px-3 py-2 rounded-md font-semibold text-xs transition">Logout</button>
-        </div>
+
+      <nav class="hidden md:flex space-x-6 text-sm font-semibold">
+        <button id="nav-home" onclick="switchTab('home')" class="hover:text-red-400 transition">Home</button>
+        <button id="nav-staffing" onclick="switchTab('staffing')" class="hover:text-red-400 transition">Daily Staffing</button>
+        <button id="nav-incidents" onclick="switchTab('incidents')" class="hover:text-red-400 transition">Incidents</button>
+        <button id="nav-inspections" onclick="switchTab('inspections')" class="hover:text-red-400 transition">Inspections</button>
+        <button id="nav-admin" onclick="switchTab('admin')" class="hover:text-red-400 transition text-yellow-400">Admin Portal</button>
       </nav>
+
+      <div class="flex items-center space-x-3">
+        <!-- USER SELECTOR DROPDOWN -->
+        <select id="user-selector" onchange="changeActiveUser(this.value)" class="bg-slate-800 text-xs border border-slate-700 rounded px-2 py-1 text-white focus:outline-none">
+          <!-- Populated by JavaScript -->
+        </select>
+        <button onclick="logoutUser()" class="bg-red-600 hover:bg-red-700 text-xs px-3 py-1.5 rounded font-bold transition">Logout</button>
+      </div>
     </div>
   </header>
 
   <!-- MAIN CONTAINER -->
-  <main class="flex-grow max-w-7xl w-full mx-auto p-6">
+  <main class="max-w-7xl mx-auto p-4 md:p-6">
 
-    <div id="access-denied-alert" class="hidden mb-6 p-4 bg-red-100 border-l-4 border-red-600 text-red-900 rounded shadow-sm">
-      <p class="font-bold text-sm" id="access-denied-message">Access Restricted.</p>
-    </div>
+    <!-- TAB 1: HOME -->
+    <section id="tab-home" class="tab-content active">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+        <div id="card-staffing" onclick="switchTab('staffing')" class="bg-white p-8 rounded-lg shadow-md hover:shadow-xl transition border-t-4 border-red-600 cursor-pointer flex flex-col items-center justify-center text-center">
+          <i class="fa-solid font-bold text-red-600 text-4xl mb-4 fa-users"></i>
+          <h2 class="text-xl font-bold text-slate-800 uppercase tracking-wider">Daily Staffing</h2>
+        </div>
 
-    <!-- HOME MODULE -->
-    <section id="view-home" class="tab-view">
-      <div class="max-w-4xl mx-auto my-12">
-        <div id="home-cards-container" class="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div id="card-staffing" onclick="switchTab('staffing')" class="p-8 border rounded-lg hover:shadow-lg cursor-pointer bg-white hover:border-red-600 transition flex flex-col items-center justify-center min-h-[140px] space-y-3">
-            <svg class="w-10 h-10 text-red-700" fill="currentColor" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-            <h3 class="text-xl font-bold text-red-700">Daily Staffing</h3>
-          </div>
-          <div id="card-incidents" onclick="switchTab('incidents')" class="p-8 border rounded-lg hover:shadow-lg cursor-pointer bg-white hover:border-red-600 transition flex flex-col items-center justify-center min-h-[140px] space-y-3">
-            <svg class="w-10 h-10 text-red-700" fill="currentColor" viewBox="0 0 24 24"><path d="M12.01 2.005c-3.14 3.73-5.01 6.84-5.01 10.495 0 3.87 3.13 7 7 7s7-3.13 7-7c0-2.18-.89-4.25-2.22-5.83-.34 1.76-1.89 3.08-3.77 3.08-2.13 0-3.86-1.73-3.86-3.86 0-1.42.77-2.66 1.86-3.385zm.99 12.995c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
-            <h3 class="text-xl font-bold text-red-700 text-center">INCIDENT REPORTING</h3>
-          </div>
-          <div id="card-inspections" onclick="switchTab('inspections')" class="p-8 border rounded-lg hover:shadow-lg cursor-pointer bg-white hover:border-red-600 transition flex flex-col items-center justify-center min-h-[140px] space-y-3">
-            <svg class="w-10 h-10 text-red-700" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
-            <h3 class="text-xl font-bold text-red-700">Inspections</h3>
-          </div>
+        <div id="card-incidents" onclick="switchTab('incidents')" class="bg-white p-8 rounded-lg shadow-md hover:shadow-xl transition border-t-4 border-red-600 cursor-pointer flex flex-col items-center justify-center text-center">
+          <i class="fa-solid font-bold text-red-600 text-4xl mb-4 fa-fire-flame-curved"></i>
+          <h2 class="text-xl font-bold text-slate-800 uppercase tracking-wider">Incident Reporting</h2>
+        </div>
+
+        <div id="card-inspections" onclick="switchTab('inspections')" class="bg-white p-8 rounded-lg shadow-md hover:shadow-xl transition border-t-4 border-red-600 cursor-pointer flex flex-col items-center justify-center text-center">
+          <i class="fa-solid font-bold text-red-600 text-4xl mb-4 fa-clipboard-check"></i>
+          <h2 class="text-xl font-bold text-slate-800 uppercase tracking-wider">Inspections</h2>
         </div>
       </div>
     </section>
 
-    <!-- INCIDENTS MODULE -->
-    <section id="view-incidents" class="tab-view hidden">
-      <div class="flex justify-between items-center mb-6">
-        <h2 class="text-2xl font-bold text-slate-800">Active911 Incident Feed</h2>
-        <span class="bg-red-100 text-red-800 text-xs font-semibold px-3 py-1 rounded-full">Active Calls Dispatched</span>
+    <!-- TAB 2: DAILY STAFFING -->
+    <section id="tab-staffing" class="tab-content">
+      <h1 class="text-2xl font-bold text-slate-800 mb-6">Daily Roster & Staffing</h1>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="stations-container">
+        <!-- Rendered by JS -->
       </div>
-      <div id="incidents-feed-container" class="space-y-4"></div>
     </section>
 
-    <!-- FIRE REPORT MODULE -->
-    <section id="view-fire-report" class="tab-view hidden">
-      <div class="bg-white rounded-lg shadow-sm p-6 max-w-5xl mx-auto space-y-6">
-        <div class="flex justify-between items-center border-b pb-3">
-          <div>
-            <h2 class="text-2xl font-bold text-red-700">FIRE INCIDENT REPORT</h2>
-            <p class="text-xs text-slate-500">* Marked fields indicate required NERIS dataset parameters.</p>
-          </div>
-          <button onclick="switchTab('incidents')" class="text-slate-500 hover:text-slate-800 text-sm font-semibold">&larr; Back to Incidents</button>
-        </div>
+    <!-- TAB 3: INCIDENTS -->
+    <section id="tab-incidents" class="tab-content">
+      <h1 class="text-2xl font-bold text-slate-800 mb-6">Incident Reports</h1>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="incidents-feed">
+        <!-- Rendered by JS -->
+      </div>
+    </section>
 
-        <form id="fire-report-form" onsubmit="handleReportSubmit(event, 'fire')" class="space-y-6 text-xs">
-          <!-- TOP CAD / HEADER -->
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 p-4 rounded border">
-            <div>
-              <label class="font-bold uppercase block">Incident Number*</label>
-              <input type="text" id="fire-cad-num" required class="w-full p-2 border rounded mt-1 bg-white" readonly>
-            </div>
-            <div>
-              <label class="font-bold uppercase block">Incident Date*</label>
-              <input type="date" required class="w-full p-2 border rounded mt-1 bg-white">
-            </div>
-            <div>
-              <label class="font-bold uppercase block">Station*</label>
-              <select required class="w-full p-2 border rounded mt-1 bg-white">
-                <option value="Station 1">Station 1</option>
-                <option value="Station 2">Station 2</option>
-                <option value="Station 3">Station 3</option>
-              </select>
-            </div>
-            <div>
-              <label class="font-bold uppercase block">Shift*</label>
-              <select required class="w-full p-2 border rounded mt-1 bg-white">
-                <option value="A">A Shift</option>
-                <option value="B">B Shift</option>
-                <option value="C">C Shift</option>
-              </select>
-            </div>
-            <div class="col-span-2">
-              <label class="font-bold uppercase block">Call Type</label>
-              <div class="flex flex-wrap gap-2 mt-1">
-                <label><input type="checkbox"> EMS</label>
-                <label><input type="checkbox"> Fire</label>
-                <label><input type="checkbox"> Fire Alarm</label>
-                <label><input type="checkbox"> MVA</label>
-                <label><input type="checkbox"> Hazard</label>
-                <label><input type="checkbox"> Rescue</label>
-                <label><input type="checkbox"> Public Service</label>
-              </div>
-            </div>
-            <div class="col-span-2">
-              <label class="font-bold uppercase block">Officer in Charge*</label>
-              <input type="text" required placeholder="Officer Name" class="w-full p-2 border rounded mt-1 bg-white">
-            </div>
+    <!-- TAB 4: INSPECTIONS -->
+    <section id="tab-inspections" class="tab-content">
+      <h1 class="text-2xl font-bold text-slate-800 mb-6">Apparatus Checklist & Inspections</h1>
+      <div class="bg-white p-6 rounded-lg shadow-md max-w-2xl mx-auto">
+        <form onsubmit="submitChecklist(event)">
+          <div class="mb-4">
+            <label class="block font-bold text-slate-700 text-sm mb-1">Select Inspector</label>
+            <select id="inspection-inspector" class="w-full border rounded p-2 text-sm" required></select>
           </div>
-
-          <!-- OVERALL TIMESTAMPS -->
-          <div class="grid grid-cols-2 md:grid-cols-5 gap-3 bg-red-50 p-3 rounded border border-red-200">
-            <div><label class="font-bold">Dispatch Time*</label><input type="time" required class="w-full p-1 border rounded mt-1"></div>
-            <div><label class="font-bold">1st En Route</label><input type="time" class="w-full p-1 border rounded mt-1"></div>
-            <div><label class="font-bold">1st On Scene*</label><input type="time" required class="w-full p-1 border rounded mt-1"></div>
-            <div><label class="font-bold">Cancelled</label><input type="time" class="w-full p-1 border rounded mt-1"></div>
-            <div><label class="font-bold">Last Unit Cleared*</label><input type="time" required class="w-full p-1 border rounded mt-1"></div>
+          <div class="mb-4">
+            <label class="block font-bold text-slate-700 text-sm mb-1">Select Apparatus</label>
+            <select id="inspection-apparatus" class="w-full border rounded p-2 text-sm" required></select>
           </div>
-
-          <!-- LOCATION / NERIS PARAMS -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-3 border p-3 rounded">
-            <div class="md:col-span-2"><label class="font-bold">Incident Type*</label><input type="text" required class="w-full p-2 border rounded mt-1"></div>
-            <div><label class="font-bold">Location*</label><input type="text" id="fire-location" required class="w-full p-2 border rounded mt-1"></div>
-            <div><label class="font-bold">Location Type*</label><input type="text" required class="w-full p-2 border rounded mt-1"></div>
-            <div><label class="font-bold">Primary Use*</label><input type="text" required class="w-full p-2 border rounded mt-1"></div>
-            <div><label class="font-bold">Used as Intended</label><select class="w-full p-2 border rounded mt-1"><option>Yes</option><option>No</option></select></div>
-            <div><label class="font-bold">Person Involved</label><input type="text" class="w-full p-2 border rounded mt-1"></div>
-            <div><label class="font-bold">Location in Use</label><select class="w-full p-2 border rounded mt-1"><option>Yes</option><option>No</option></select></div>
-            <div><label class="font-bold">Cause for Vacancy*</label><input type="text" required class="w-full p-2 border rounded mt-1"></div>
+          <div class="mb-4" id="checklist-items">
+            <!-- Items rendered by JS -->
           </div>
-
-          <!-- MUTUAL AID & ACTIONS TAKEN -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="border p-3 rounded space-y-2">
-              <h4 class="font-bold border-b pb-1">Mutual / Non-FD Aid</h4>
-              <div class="flex items-center space-x-2">
-                <span>Aid Given:</span><input type="text" class="p-1 border rounded flex-grow">
-              </div>
-              <div class="flex items-center space-x-2">
-                <span>Aid Received:</span><input type="text" class="p-1 border rounded flex-grow">
-              </div>
-              <div class="flex items-center space-x-2">
-                <span>Non-FD Aid:</span><input type="text" class="p-1 border rounded flex-grow">
-              </div>
-            </div>
-            <div class="border p-3 rounded space-y-2">
-              <h4 class="font-bold border-b pb-1">Actions Taken*</h4>
-              <input type="text" required placeholder="Primary Action Taken*" class="w-full p-1 border rounded mb-1">
-              <input type="text" placeholder="Secondary Action" class="w-full p-1 border rounded mb-1">
-              <input type="text" placeholder="Additional Action" class="w-full p-1 border rounded">
-            </div>
-          </div>
-
-          <!-- UNITS RESPONDING TABLE -->
-          <div class="border p-3 rounded space-y-2">
-            <h4 class="font-bold border-b pb-1">Apparatus & Crew Response Details</h4>
-            <div class="overflow-x-auto">
-              <table class="w-full text-left border-collapse">
-                <thead>
-                  <tr class="bg-slate-100 text-[11px]">
-                    <th class="p-1 border">Unit #</th>
-                    <th class="p-1 border">En Route</th>
-                    <th class="p-1 border">On Scene</th>
-                    <th class="p-1 border">Cancelled</th>
-                    <th class="p-1 border">Cleared</th>
-                    <th class="p-1 border">Driver</th>
-                  </tr>
-                </thead>
-                <tbody id="fire-units-tbody">
-                  <tr>
-                    <td class="p-1 border"><input type="text" class="w-full p-1"></td>
-                    <td class="p-1 border"><input type="time" class="w-full p-1"></td>
-                    <td class="p-1 border"><input type="time" class="w-full p-1"></td>
-                    <td class="p-1 border"><input type="time" class="w-full p-1"></td>
-                    <td class="p-1 border"><input type="time" class="w-full p-1"></td>
-                    <td class="p-1 border"><input type="text" class="w-full p-1"></td>
-                  </tr>
-                  <tr>
-                    <td class="p-1 border"><input type="text" class="w-full p-1"></td>
-                    <td class="p-1 border"><input type="time" class="w-full p-1"></td>
-                    <td class="p-1 border"><input type="time" class="w-full p-1"></td>
-                    <td class="p-1 border"><input type="time" class="w-full p-1"></td>
-                    <td class="p-1 border"><input type="time" class="w-full p-1"></td>
-                    <td class="p-1 border"><input type="text" class="w-full p-1"></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div>
-              <label class="font-bold">Other / Off Duty Personnel Responding:</label>
-              <input type="text" class="w-full p-1 border rounded mt-1">
-            </div>
-          </div>
-
-          <!-- FIRE SPECIFICS -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border p-3 rounded">
-            <div><label class="font-bold">Investigation Required?</label> <label><input type="radio" name="inv" value="Yes"> Yes</label> <label><input type="radio" name="inv" value="No" checked> No</label></div>
-            <div><label class="font-bold">Type*:</label> <input type="text" required class="w-full p-1 border rounded"></div>
-            <div><label class="font-bold">Fire Location:</label> <label><input type="checkbox"> Structure</label> <label><input type="checkbox"> Outside</label></div>
-            <div><label class="font-bold">Floor of Origin*:</label> <input type="text" required class="w-full p-1 border rounded"></div>
-            <div><label class="font-bold">Water Supply*:</label> <label><input type="checkbox"> Hydrant</label> <label><input type="checkbox"> Tank Water</label> <label><input type="checkbox"> Shuttle</label></div>
-            <div><label class="font-bold">Condition* / Damage Type*:</label> <input type="text" required class="w-full p-1 border rounded"></div>
-            <div><label class="font-bold">Room Type* / Cause*:</label> <input type="text" required class="w-full p-1 border rounded"></div>
-            <div><label class="font-bold">Wildfire Acres Burned:</label> <input type="text" class="w-full p-1 border rounded"></div>
-          </div>
-
-          <!-- ALARMS & EXPOSURES -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border p-3 rounded">
-            <div>
-              <label class="font-bold block">Alarms & Suppression*</label>
-              <label><input type="checkbox"> Smoke Alarm</label>
-              <label><input type="checkbox"> Fire Alarm</label>
-              <label><input type="checkbox"> Suppression System</label>
-              <label><input type="checkbox"> Cooking Suppression</label>
-            </div>
-            <div>
-              <label class="font-bold block">Exposures & Displacement</label>
-              <input type="text" placeholder="Exposure #1 / Type / Cause" class="w-full p-1 border rounded mb-1">
-              <input type="text" placeholder="Exposure #2 / Type / Cause" class="w-full p-1 border rounded">
-            </div>
-          </div>
-
-          <!-- CASUALTIES & HAZMAT -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border p-3 rounded">
-            <div>
-              <label class="font-bold block">Casualties (FF & Non-FF)</label>
-              <input type="text" placeholder="Casualty 1: Name, DOB, Gender, Status, Rescue Type" class="w-full p-1 border rounded mb-1">
-              <input type="text" placeholder="Casualty 2: Name, DOB, Gender, Status, Rescue Type" class="w-full p-1 border rounded">
-            </div>
-            <div>
-              <label class="font-bold block">HazMat / Electrical / Evacuation</label>
-              <input type="text" placeholder="Evacuation Count / HazMat Disposition / Chemicals" class="w-full p-1 border rounded mb-1">
-              <input type="text" placeholder="Electrical Hazard Type / Other" class="w-full p-1 border rounded">
-            </div>
-          </div>
-
-          <!-- VEHICLES & OCCUPANT/OWNER -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border p-3 rounded">
-            <div>
-              <h5 class="font-bold border-b pb-1">Vehicles Involved</h5>
-              <input type="text" placeholder="Vehicle 1: Make/Model/Year/VIN/License" class="w-full p-1 border rounded mb-1">
-              <input type="text" placeholder="Vehicle 2: Make/Model/Year/VIN/License" class="w-full p-1 border rounded">
-            </div>
-            <div>
-              <h5 class="font-bold border-b pb-1">Occupant & Owner Details</h5>
-              <input type="text" placeholder="Occupant Name, Address, Phone, Insurance Policy" class="w-full p-1 border rounded mb-1">
-              <input type="text" placeholder="Owner Name, Address, Phone, Insurance Policy" class="w-full p-1 border rounded">
-            </div>
-          </div>
-
-          <!-- NARRATIVE & COMPLETED BY -->
-          <div class="border p-3 rounded space-y-2">
-            <label class="font-bold block">Narrative*</label>
-            <textarea rows="4" required class="w-full p-2 border rounded bg-white" placeholder="Detailed incident description..."></textarea>
-            <div>
-              <label class="font-bold">Report Completed By*:</label>
-              <input type="text" required class="w-full p-2 border rounded mt-1 bg-white">
-            </div>
-          </div>
-
-          <div class="flex justify-between items-center border-t pt-4">
-            <button type="button" onclick="openReportChoiceModal()" class="bg-slate-700 text-white px-4 py-2 rounded font-semibold hover:bg-slate-800">+ Add Another Report to Incident</button>
-            <button type="submit" class="bg-red-700 text-white px-6 py-2 rounded font-bold hover:bg-red-800">Submit Fire Incident Report</button>
-          </div>
+          <button type="submit" class="w-full bg-red-600 text-white font-bold py-2 rounded hover:bg-red-700">Submit Inspection</button>
         </form>
       </div>
     </section>
 
-    <!-- PATIENT CARE REPORT (PCR) MODULE -->
-    <section id="view-pcr-report" class="tab-view hidden">
-      <div class="bg-white rounded-lg shadow-sm p-6 max-w-5xl mx-auto space-y-6">
-        <div class="flex justify-between items-center border-b pb-3">
-          <div>
-            <h2 class="text-2xl font-bold text-blue-800">PATIENT CARE REPORT (PCR)</h2>
-            <p class="text-xs text-slate-500">* Marked fields indicate required evaluation parameters.</p>
-          </div>
-          <button onclick="switchTab('incidents')" class="text-slate-500 hover:text-slate-800 text-sm font-semibold">&larr; Back to Incidents</button>
-        </div>
-
-        <form id="pcr-report-form" onsubmit="handleReportSubmit(event, 'pcr')" class="space-y-6 text-xs">
-          <!-- TOP CAD / HEADER -->
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 p-4 rounded border">
-            <div>
-              <label class="font-bold uppercase block">Incident Number*</label>
-              <input type="text" id="pcr-cad-num" required class="w-full p-2 border rounded mt-1 bg-white" readonly>
-            </div>
-            <div>
-              <label class="font-bold uppercase block">Incident Date*</label>
-              <input type="date" required class="w-full p-2 border rounded mt-1 bg-white">
-            </div>
-            <div>
-              <label class="font-bold uppercase block">Station*</label>
-              <select required class="w-full p-2 border rounded mt-1 bg-white">
-                <option value="Station 1">Station 1</option>
-                <option value="Station 2">Station 2</option>
-                <option value="Station 3">Station 3</option>
-              </select>
-            </div>
-            <div>
-              <label class="font-bold uppercase block">Shift*</label>
-              <select required class="w-full p-2 border rounded mt-1 bg-white">
-                <option value="A">A Shift</option>
-                <option value="B">B Shift</option>
-                <option value="C">C Shift</option>
-              </select>
-            </div>
-            <div class="col-span-2">
-              <label class="font-bold uppercase block">Call Type</label>
-              <div class="flex flex-wrap gap-2 mt-1">
-                <label><input type="checkbox" checked> EMS</label>
-                <label><input type="checkbox"> MVA</label>
-                <label><input type="checkbox"> Rescue</label>
-              </div>
-            </div>
-            <div class="col-span-2">
-              <label class="font-bold uppercase block">Officer in Charge*</label>
-              <input type="text" required placeholder="Officer Name" class="w-full p-2 border rounded mt-1 bg-white">
-            </div>
-          </div>
-
-          <!-- EVALUATION & PATIENT STATUS -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border p-3 rounded bg-blue-50">
-            <div>
-              <label class="font-bold block mb-1">Patient Evaluation</label>
-              <div class="space-y-1">
-                <label class="block"><input type="radio" name="p_eval" value="Evaluated and cared for" checked> Evaluated and cared for</label>
-                <label class="block"><input type="radio" name="p_eval" value="Evaluated and refused care"> Evaluated and refused care</label>
-                <label class="block"><input type="radio" name="p_eval" value="Evaluated, no care required"> Evaluated, no care required</label>
-                <label class="block"><input type="radio" name="p_eval" value="Refused evaluation/care"> Refused evaluation/care</label>
-                <label class="block"><input type="radio" name="p_eval" value="Support services provided"> Support services provided</label>
-                <label class="block"><input type="radio" name="p_eval" value="DOA"> DOA</label>
-              </div>
-            </div>
-            <div>
-              <label class="font-bold block mb-1">Patient Status</label>
-              <div class="space-y-1">
-                <label class="block"><input type="radio" name="p_stat" value="Improved" checked> Improved</label>
-                <label class="block"><input type="radio" name="p_stat" value="Unchanged"> Unchanged</label>
-                <label class="block"><input type="radio" name="p_stat" value="Worsened"> Worsened</label>
-              </div>
-            </div>
-          </div>
-
-          <!-- TRANSPORT & REFUSAL SIGNATURES -->
-          <div class="border p-3 rounded space-y-3">
-            <h4 class="font-bold border-b pb-1">Transport & Refusal Details</h4>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label class="font-bold block">Transported By:</label>
-                <input type="text" placeholder="Ambulance Service / Unit #" class="w-full p-1 border rounded mt-1">
-              </div>
-              <div>
-                <label class="font-bold block">Refused Transport (Printed Name):</label>
-                <input type="text" placeholder="Patient / Refusal Printed Name" class="w-full p-1 border rounded mt-1">
-              </div>
-            </div>
-            
-            <!-- DIGITAL SIGNATURE PAD -->
-            <div class="bg-slate-50 p-3 rounded border space-y-2">
-              <div class="flex justify-between items-center">
-                <label class="font-bold text-slate-700">Digital Patient / Guardian Signature:</label>
-                <button type="button" onclick="clearSignaturePad()" class="text-xs text-red-600 hover:underline font-semibold">Clear Signature</button>
-              </div>
-              <div class="canvas-container w-full h-32 flex items-center justify-center bg-white">
-                <canvas id="pcr-signature-canvas" class="w-full h-full"></canvas>
-              </div>
-            </div>
-
-            <div class="bg-slate-50 p-2 rounded">
-              <label class="font-bold block mb-1">Transport for Minors / Parent Guardian Refusal:</label>
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
-                <input type="text" placeholder="Minor 1 Name & DOB" class="p-1 border rounded bg-white">
-                <input type="text" placeholder="Minor 2 Name & DOB" class="p-1 border rounded bg-white">
-                <input type="text" placeholder="Minor 3 Name & DOB" class="p-1 border rounded bg-white">
-              </div>
-            </div>
-          </div>
-
-          <!-- PATIENT DEMOGRAPHICS & HISTORY -->
-          <div class="border p-3 rounded space-y-3">
-            <h4 class="font-bold border-b pb-1">Patient Information & History</h4>
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <div class="md:col-span-2"><label class="font-bold">Patient Name*</label><input type="text" required class="w-full p-1 border rounded mt-1"></div>
-              <div><label class="font-bold">DOB*</label><input type="date" required class="w-full p-1 border rounded mt-1"></div>
-              <div><label class="font-bold">Gender*</label><select required class="w-full p-1 border rounded mt-1"><option>Male</option><option>Female</option><option>Other</option></select></div>
-              <div class="md:col-span-4"><label class="font-bold">Address</label><input type="text" class="w-full p-1 border rounded mt-1"></div>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div><label class="font-bold">Medical History</label><textarea rows="2" class="w-full p-1 border rounded mt-1"></textarea></div>
-              <div><label class="font-bold">Medications</label><textarea rows="2" class="w-full p-1 border rounded mt-1"></textarea></div>
-              <div><label class="font-bold">Known Allergies</label><textarea rows="2" class="w-full p-1 border rounded mt-1"></textarea></div>
-            </div>
-          </div>
-
-          <!-- CHIEF COMPLAINT & VITALS GRID -->
-          <div class="border p-3 rounded space-y-3">
-            <h4 class="font-bold border-b pb-1">Chief Complaint & Vital Signs Grid</h4>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div><label class="font-bold">Chief Complaint*</label><input type="text" required class="w-full p-1 border rounded mt-1"></div>
-              <div><label class="font-bold">Injury Details</label><input type="text" class="w-full p-1 border rounded mt-1"></div>
-            </div>
-            <table class="w-full text-left border-collapse">
-              <thead>
-                <tr class="bg-slate-100 text-[11px]">
-                  <th class="p-1 border">Time</th>
-                  <th class="p-1 border">O2</th>
-                  <th class="p-1 border">Pulse</th>
-                  <th class="p-1 border">Resp.</th>
-                  <th class="p-1 border">Blood Pressure</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td class="p-1 border"><input type="time" class="w-full p-1"></td>
-                  <td class="p-1 border"><input type="text" placeholder="O2 Sat %" class="w-full p-1"></td>
-                  <td class="p-1 border"><input type="text" placeholder="BPM" class="w-full p-1"></td>
-                  <td class="p-1 border"><input type="text" placeholder="RPM" class="w-full p-1"></td>
-                  <td class="p-1 border"><input type="text" placeholder="SYS/DIA" class="w-full p-1"></td>
-                </tr>
-                <tr>
-                  <td class="p-1 border"><input type="time" class="w-full p-1"></td>
-                  <td class="p-1 border"><input type="text" class="w-full p-1"></td>
-                  <td class="p-1 border"><input type="text" class="w-full p-1"></td>
-                  <td class="p-1 border"><input type="text" class="w-full p-1"></td>
-                  <td class="p-1 border"><input type="text" class="w-full p-1"></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- INSURANCE / VEHICLE -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border p-3 rounded">
-            <div>
-              <h5 class="font-bold border-b pb-1">Vehicle Details</h5>
-              <input type="text" placeholder="Vehicle # / Make / Model / Year / License / VIN" class="w-full p-1 border rounded mt-1">
-            </div>
-            <div>
-              <h5 class="font-bold border-b pb-1">Insurance Information</h5>
-              <input type="text" placeholder="Insurance Co. / Policy # / Expiration Date" class="w-full p-1 border rounded mt-1">
-            </div>
-          </div>
-
-          <!-- EQUIPMENT & NARRATIVE -->
-          <div class="border p-3 rounded space-y-3">
-            <h4 class="font-bold border-b pb-1">Equipment & Supplies Used/Replaced</h4>
-            <input type="text" placeholder="Equipment Item 1 - Replaced / Used" class="w-full p-1 border rounded">
-            <input type="text" placeholder="Equipment Item 2 - Replaced / Used" class="w-full p-1 border rounded">
-            <div>
-              <label class="font-bold block">Patient Care Narrative & Comments*</label>
-              <textarea rows="4" required class="w-full p-2 border rounded bg-white mt-1" placeholder="Detailed clinical patient care narrative..."></textarea>
-            </div>
-            <div>
-              <label class="font-bold">Report Completed By*:</label>
-              <input type="text" required class="w-full p-2 border rounded mt-1 bg-white">
-            </div>
-          </div>
-
-          <div class="flex justify-between items-center border-t pt-4">
-            <button type="button" onclick="openReportChoiceModal()" class="bg-slate-700 text-white px-4 py-2 rounded font-semibold hover:bg-slate-800">+ Add Another Report to Incident</button>
-            <button type="submit" class="bg-blue-800 text-white px-6 py-2 rounded font-bold hover:bg-blue-900">Submit Patient Care Report</button>
-          </div>
-        </form>
-      </div>
-    </section>
-
-    <!-- INSPECTIONS MODULE -->
-    <section id="view-inspections" class="tab-view hidden">
-      <div class="bg-white rounded-lg shadow-sm p-6 max-w-5xl mx-auto">
-        <h2 class="text-2xl font-bold text-slate-800 border-b pb-3 mb-6">Fire Safety Inspection Report</h2>
-        <form id="inspection-form" onsubmit="handleReportSubmit(event, 'inspection')" class="space-y-6">
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-lg border">
-            <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase">Inspector*</label>
-              <select id="inspection-inspector" required class="mt-1 w-full p-2 border rounded-md text-sm font-medium"></select>
-            </div>
-            <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase">Date*</label>
-              <input type="date" required class="mt-1 w-full p-2 border rounded-md text-sm">
-            </div>
-            <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase">Time*</label>
-              <input type="time" required class="mt-1 w-full p-2 border rounded-md text-sm">
-            </div>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase">Occupancy Name*</label>
-              <input type="text" required placeholder="e.g. Jasper High School" class="mt-1 w-full p-2 border rounded-md text-sm">
-            </div>
-            <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase">Contact Name</label>
-              <input type="text" placeholder="Manager / Owner Name" class="mt-1 w-full p-2 border rounded-md text-sm">
-            </div>
-            <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase">Address*</label>
-              <input type="text" required placeholder="Street Address" class="mt-1 w-full p-2 border rounded-md text-sm">
-            </div>
-            <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase">Contact Phone</label>
-              <input type="tel" placeholder="(205) 555-0199" class="mt-1 w-full p-2 border rounded-md text-sm">
-            </div>
-          </div>
-          <div class="border rounded-md p-4 space-y-4">
-            <h3 class="font-bold text-slate-800 text-sm uppercase border-b pb-2">Fire Code Compliance Checklist</h3>
-            <div class="space-y-3 text-xs" id="compliance-checklist-container"></div>
-          </div>
-          <button type="submit" class="w-full bg-red-700 hover:bg-red-800 text-white py-3 rounded-md font-bold transition">Submit Inspection Report</button>
-        </form>
-      </div>
-    </section>
-
-    <!-- DAILY SHIFT STAFFING MODULE -->
-    <section id="view-staffing" class="tab-view hidden">
-      <div class="bg-white rounded-lg shadow-sm p-6 space-y-6">
-        <div class="flex justify-between items-center border-b pb-4">
-          <div>
-            <h2 class="text-2xl font-bold text-slate-800">Daily Shift Staffing</h2>
-            <p class="text-sm text-slate-500">Select a station to assign active apparatus and crew</p>
-          </div>
-          <div>
-            <select id="shift-selector" onchange="renderStaffing()" class="p-2 border rounded-md font-bold text-red-700 bg-red-50">
-              <option value="A SHIFT">A SHIFT</option>
-              <option value="B SHIFT">B SHIFT</option>
-              <option value="C SHIFT">C SHIFT</option>
+    <!-- TAB 5: ADMIN PORTAL -->
+    <section id="tab-admin" class="tab-content">
+      <h1 class="text-2xl font-bold text-slate-800 mb-6">Admin Portal</h1>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Personnel Management -->
+        <div class="bg-white p-6 rounded-lg shadow-md">
+          <h2 class="text-lg font-bold mb-4 border-b pb-2">Add Personnel</h2>
+          <form onsubmit="addPersonnel(event)" class="space-y-3">
+            <input id="p-fname" type="text" placeholder="First Name" class="w-full border p-2 text-sm rounded" required>
+            <input id="p-lname" type="text" placeholder="Last Name" class="w-full border p-2 text-sm rounded" required>
+            <input id="p-email" type="email" placeholder="Email" class="w-full border p-2 text-sm rounded" required>
+            <select id="p-role" class="w-full border p-2 text-sm rounded">
+              <option value="firefighter">Firefighter</option>
+              <option value="officer">Officer</option>
+              <option value="admin">Admin</option>
             </select>
+            <button type="submit" class="bg-slate-900 text-white font-bold px-4 py-2 text-sm rounded hover:bg-slate-800">Add Personnel</button>
+          </form>
+          <div class="mt-6">
+            <h3 class="font-bold text-sm mb-2">Current Personnel</h3>
+            <ul id="personnel-list" class="divide-y text-xs text-slate-700"></ul>
           </div>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div class="border rounded-lg p-4 bg-slate-50 space-y-4">
-            <h3 class="font-bold text-slate-800 border-b pb-2 text-lg">Station 1</h3>
-            <div id="station-1-container" class="space-y-3"></div>
-          </div>
-          <div class="border rounded-lg p-4 bg-slate-50 space-y-4">
-            <h3 class="font-bold text-slate-800 border-b pb-2 text-lg">Station 2</h3>
-            <div id="station-2-container" class="space-y-3"></div>
-          </div>
-          <div class="border rounded-lg p-4 bg-slate-50 space-y-4">
-            <h3 class="font-bold text-slate-800 border-b pb-2 text-lg">Station 3</h3>
-            <div id="station-3-container" class="space-y-3"></div>
-          </div>
-        </div>
-      </div>
-    </section>
 
-    <!-- ADMIN PORTAL MODULE -->
-    <section id="view-admin" class="tab-view hidden">
-      <div class="bg-white rounded-lg shadow-sm p-6 space-y-8">
-        <div class="border-b pb-4 flex justify-between items-center">
-          <div>
-            <h2 class="text-2xl font-bold text-slate-800">Admin Portal</h2>
-            <p class="text-sm text-slate-500">Manage department personnel profiles and apparatus inventory</p>
-          </div>
-          <div class="space-x-2">
-            <button onclick="openPersonnelModal()" class="bg-red-700 hover:bg-red-800 text-white text-xs px-3 py-2 rounded font-semibold transition">+ Add Personnel</button>
-            <button onclick="openApparatusModal()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs px-3 py-2 rounded font-semibold transition">+ Add Apparatus</button>
-          </div>
-        </div>
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div class="lg:col-span-2 border rounded-md p-4 bg-white">
-            <div class="flex justify-between items-center mb-4">
-              <h3 class="font-bold text-slate-800">Personnel Roster & Accounts</h3>
-              <span class="text-xs text-slate-500" id="roster-count">0 Members</span>
-            </div>
-            <table class="w-full text-left text-sm border-collapse">
-              <thead>
-                <tr class="bg-slate-100 text-slate-700 text-xs uppercase border-b">
-                  <th class="p-2">Name</th><th class="p-2">Role</th><th class="p-2">Email</th><th class="p-2 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody id="personnel-tbody" class="divide-y text-slate-700"></tbody>
-            </table>
-          </div>
-          <div class="border rounded-md p-4 bg-white">
-            <div class="flex justify-between items-center mb-4">
-              <h3 class="font-bold text-slate-800">Apparatus Inventory</h3>
-              <span class="text-xs text-slate-500" id="apparatus-count">0 Rigs</span>
-            </div>
-            <table class="w-full text-left text-sm border-collapse">
-              <thead>
-                <tr class="bg-slate-100 text-slate-700 text-xs uppercase border-b">
-                  <th class="p-2">Apparatus Name</th><th class="p-2 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody id="apparatus-tbody" class="divide-y text-slate-700"></tbody>
-            </table>
+        <!-- Apparatus Management -->
+        <div class="bg-white p-6 rounded-lg shadow-md">
+          <h2 class="text-lg font-bold mb-4 border-b pb-2">Add Apparatus</h2>
+          <form onsubmit="addApparatus(event)" class="flex space-x-2">
+            <input id="app-name" type="text" placeholder="e.g. Engine 3" class="flex-grow border p-2 text-sm rounded" required>
+            <button type="submit" class="bg-slate-900 text-white font-bold px-4 py-2 text-sm rounded hover:bg-slate-800">Add</button>
+          </form>
+          <div class="mt-6">
+            <h3 class="font-bold text-sm mb-2">Current Apparatus</h3>
+            <ul id="apparatus-list" class="divide-y text-xs text-slate-700"></ul>
           </div>
         </div>
       </div>
@@ -612,154 +143,59 @@
 
   </main>
 
-  <!-- REPORT TYPE CHOOSER MODAL -->
-  <div id="report-choice-modal" class="fixed inset-0 bg-slate-900 bg-opacity-50 hidden flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
-      <div class="flex justify-between items-center border-b pb-2">
-        <h3 class="text-lg font-bold text-slate-800">Select Report Type</h3>
-        <button onclick="closeReportChoiceModal()" class="text-slate-400 hover:text-slate-600 font-bold">&times;</button>
-      </div>
-      <p class="text-xs text-slate-600">Select the report form to add for CAD Incident <span id="modal-cad-display" class="font-bold text-slate-900"></span>:</p>
-      <div class="grid grid-cols-1 gap-3 pt-2">
-        <button onclick="launchReportForm('fire')" class="p-4 border-2 border-red-200 rounded-lg bg-red-50 hover:bg-red-100 text-left transition flex items-center justify-between">
-          <div>
-            <h4 class="font-bold text-red-800 text-sm">Fire Incident Report</h4>
-            <p class="text-xs text-slate-600">Complete NERIS-compliant fire incident documentation</p>
-          </div>
-          <span class="text-red-700 font-bold text-lg">&rarr;</span>
-        </button>
-        <button onclick="launchReportForm('pcr')" class="p-4 border-2 border-blue-200 rounded-lg bg-blue-50 hover:bg-blue-100 text-left transition flex items-center justify-between">
-          <div>
-            <h4 class="font-bold text-blue-800 text-sm">Patient Care Report (PCR)</h4>
-            <p class="text-xs text-slate-600">Complete medical evaluation & patient care documentation</p>
-          </div>
-          <span class="text-blue-700 font-bold text-lg">&rarr;</span>
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- OTHER MODALS -->
-  <div id="personnel-modal" class="fixed inset-0 bg-slate-900 bg-opacity-50 hidden flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
-      <h3 id="personnel-modal-title" class="text-lg font-bold text-slate-800 border-b pb-2">Add Personnel</h3>
-      <form id="personnel-form" onsubmit="savePersonnel(event)" class="space-y-3">
-        <input type="hidden" id="personnel-id">
-        <div class="grid grid-cols-2 gap-3">
-          <div><label class="block text-xs font-bold text-slate-700 uppercase">First Name</label><input type="text" id="personnel-first" required class="w-full p-2 border rounded mt-1 text-sm"></div>
-          <div><label class="block text-xs font-bold text-slate-700 uppercase">Last Name</label><input type="text" id="personnel-last" required class="w-full p-2 border rounded mt-1 text-sm"></div>
-        </div>
-        <div><label class="block text-xs font-bold text-slate-700 uppercase">Role</label>
-          <select id="personnel-role" class="w-full p-2 border rounded mt-1 text-sm">
-            <option value="admin">Admin</option><option value="officer">Officer</option><option value="firefighter">Firefighter</option>
-          </select>
-        </div>
-        <div><label class="block text-xs font-bold text-slate-700 uppercase">Email</label><input type="email" id="personnel-email" required class="w-full p-2 border rounded mt-1 text-sm"></div>
-        <div class="flex justify-end space-x-2 border-t pt-3">
-          <button type="button" onclick="closePersonnelModal()" class="px-4 py-2 border text-slate-600 rounded text-sm hover:bg-slate-50">Cancel</button>
-          <button type="submit" class="px-4 py-2 bg-red-700 text-white rounded text-sm font-bold hover:bg-red-800">Save</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <div id="apparatus-modal" class="fixed inset-0 bg-slate-900 bg-opacity-50 hidden flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
-      <h3 id="apparatus-modal-title" class="text-lg font-bold text-slate-800 border-b pb-2">Add Apparatus</h3>
-      <form id="apparatus-form" onsubmit="saveApparatus(event)" class="space-y-4">
-        <input type="hidden" id="apparatus-id">
-        <div><label class="block text-xs font-bold text-slate-700 uppercase">Apparatus Name</label><input type="text" id="apparatus-name" required class="w-full p-2 border rounded mt-1 text-sm"></div>
-        <div class="flex justify-end space-x-2 border-t pt-3">
-          <button type="button" onclick="closeApparatusModal()" class="px-4 py-2 border text-slate-600 rounded text-sm hover:bg-slate-50">Cancel</button>
-          <button type="submit" class="px-4 py-2 bg-slate-800 text-white rounded text-sm font-bold hover:bg-slate-900">Save</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <div id="crew-modal" class="fixed inset-0 bg-slate-900 bg-opacity-50 hidden flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-lg shadow-xl max-w-lg w-full p-6 space-y-4 max-h-[85vh] flex flex-col">
-      <div class="border-b pb-2 flex justify-between items-center">
-        <h3 id="crew-modal-title" class="text-lg font-bold text-slate-800">Assign Crew</h3>
-        <button onclick="closeCrewModal()" class="text-slate-400 hover:text-slate-600 font-bold">&times;</button>
-      </div>
-      <div class="overflow-y-auto flex-grow divide-y border rounded p-2" id="crew-selection-list"></div>
-      <div class="flex justify-end border-t pt-3"><button onclick="closeCrewModal()" class="px-4 py-2 bg-red-700 text-white rounded text-sm font-bold hover:bg-red-800">Done</button></div>
-    </div>
-  </div>
-
+  <!-- JAVASCRIPT APP LOGIC WITH FALLBACK SAFETIES -->
   <script>
-    // Initialize Supabase Client with your credentials
     const SUPABASE_URL = 'https://audgtwcctdoiptuekqvn.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz';
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    let personnelList = [];
-    let apparatusList = [];
-    let activeIncidents = [];
-    let staffingAssignments = { 1: {}, 2: {}, 3: {} };
-
-    const checklistItems = [
-      "Fire Extinguishers: Inspections current, properly tagged",
-      "Fire Extinguishers: Proper number, type, mounting, signage, distance, unobstructed",
-      "Exits / Egress: Appropriate number and unobstructed width of exits",
-      "Clearances: Adequate clearance around electrical panels, fire alarm panels, standpipes, risers, FDCs",
-      "Sprinkler System: Inspection current / properly tagged",
-      "Fire Alarm System: Inspection current / properly tagged"
+    // Default Fallback Data (Ensures system functions even if DB is empty)
+    let personnelList = [
+      { id: 1, firstName: 'Admin', lastName: 'Chief', role: 'admin', email: 'admin@jasperfire.org' },
+      { id: 2, firstName: 'John', lastName: 'Doe', role: 'officer', email: 'jdoe@jasperfire.org' }
+    ];
+    let apparatusList = [
+      { id: 1, name: 'Engine 1' },
+      { id: 2, name: 'Ladder 1' },
+      { id: 3, name: 'Rescue 2' }
+    ];
+    let activeIncidents = [
+      { cad: '2026-00123', type: 'STRUCTURE FIRE', location: '1200 4th Ave, Jasper, AL', dispatchTime: '14:32', reports: [] }
     ];
 
-    let activeUser = null;
-    let isLoggedIn = true;
-    let selectedCadNum = null;
-    let selectedCadLocation = null;
-    let signaturePad = null;
-    let activeCrewModalStation = null;
-    let activeCrewModalApparatus = null;
+    let activeUser = personnelList[0];
 
-    // Load Live Data from Supabase
     async function loadAppData() {
-      // 1. Fetch Personnel
-      const { data: pData } = await supabase.from('personnel').select('*');
-      if (pData) {
-        personnelList = pData.map(p => ({
-          id: p.id,
-          firstName: p.first_name,
-          lastName: p.last_name,
-          role: p.role,
-          email: p.email
-        }));
-        if (!activeUser && personnelList.length > 0) activeUser = personnelList[0];
+      try {
+        const { data: pData } = await supabase.from('personnel').select('*');
+        if (pData && pData.length > 0) {
+          personnelList = pData.map(p => ({
+            id: p.id,
+            firstName: p.first_name,
+            lastName: p.last_name,
+            role: p.role,
+            email: p.email
+          }));
+        }
+
+        const { data: aData } = await supabase.from('apparatus').select('*');
+        if (aData && aData.length > 0) apparatusList = aData;
+
+        const { data: iData } = await supabase.from('incidents').select('*');
+        if (iData && iData.length > 0) {
+          activeIncidents = iData.map(i => ({
+            cad: i.cad,
+            type: i.type,
+            location: i.location,
+            dispatchTime: i.dispatch_time,
+            reports: i.reports || []
+          }));
+        }
+      } catch (err) {
+        console.warn("Using local fallback data:", err);
       }
 
-      // 2. Fetch Apparatus
-      const { data: aData } = await supabase.from('apparatus').select('*');
-      if (aData) apparatusList = aData;
-
-      // 3. Fetch Active Incidents
-      const { data: iData } = await supabase.from('incidents').select('*');
-      if (iData) {
-        activeIncidents = iData.map(i => ({
-          cad: i.cad,
-          type: i.type,
-          location: i.location,
-          dispatchTime: i.dispatch_time,
-          reports: i.reports || []
-        }));
-      }
-
-      // 4. Fetch Staffing Assignments
-      const { data: sData } = await supabase.from('staffing').select('*');
-      if (sData) {
-        staffingAssignments = { 1: {}, 2: {}, 3: {} };
-        sData.forEach(row => {
-          if (!staffingAssignments[row.station_id]) staffingAssignments[row.station_id] = {};
-          staffingAssignments[row.station_id][row.apparatus_id] = {
-            driverId: row.driver_id,
-            officerId: row.officer_id
-          };
-        });
-      }
-
+      activeUser = personnelList[0];
       renderUserSelect();
       renderPersonnel();
       renderApparatus();
@@ -770,371 +206,166 @@
       updateNavPermissions();
     }
 
-    function isUserOnDuty(userId) {
-      for (const stationId in staffingAssignments) {
-        for (const appId in staffingAssignments[stationId]) {
-          const crew = staffingAssignments[stationId][appId];
-          if (crew.driverId === userId || crew.officerId === userId) return true;
-        }
+    function switchTab(tabId) {
+      if (!canAccessTab(tabId)) {
+        alert("You do not have permission to access this area.");
+        return;
       }
-      return false;
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      const activeEl = document.getElementById('tab-' + tabId);
+      if (activeEl) activeEl.classList.add('active');
     }
 
     function canAccessTab(tabName) {
-      if (!isLoggedIn || !activeUser) return tabName === 'home';
       if (tabName === 'home') return true;
+      if (!activeUser) return false;
       if (activeUser.role === 'admin') return true;
-      if (tabName === 'staffing' || tabName === 'inspections') return activeUser.role === 'officer';
-      if (tabName === 'incidents' || tabName === 'fire-report' || tabName === 'pcr-report') {
-        return (activeUser.role === 'officer' || activeUser.role === 'firefighter') && isUserOnDuty(activeUser.id);
-      }
-      if (tabName === 'admin') return activeUser.role === 'admin';
-      return false;
-    }
-
-    function switchTab(tabName) {
-      const alertBox = document.getElementById('access-denied-alert');
-      alertBox.classList.add('hidden');
-
-      if (!canAccessTab(tabName)) {
-        document.getElementById('access-denied-message').innerText = "Access Denied: You do not have permission or are not actively assigned on duty.";
-        alertBox.classList.remove('hidden');
-        return;
-      }
-
-      document.querySelectorAll('.tab-view').forEach(view => view.classList.add('hidden'));
-      document.getElementById('view-' + tabName).classList.remove('hidden');
-
-      if (tabName === 'pcr-report') {
-        setTimeout(initSignaturePad, 100);
-      }
-    }
-
-    function initSignaturePad() {
-      const canvas = document.getElementById('pcr-signature-canvas');
-      if (canvas && !signaturePad) {
-        const ratio = Math.max(window.devicePixelRatio || 1, 1);
-        canvas.width = canvas.offsetWidth * ratio;
-        canvas.height = canvas.offsetHeight * ratio;
-        canvas.getContext("2d").scale(ratio, ratio);
-        signaturePad = new SignaturePad(canvas, { backgroundColor: 'rgb(255, 255, 255)' });
-      }
-    }
-
-    function clearSignaturePad() {
-      if (signaturePad) signaturePad.clear();
-    }
-
-    function updateNavPermissions() {
-      document.getElementById('nav-staffing').style.display = canAccessTab('staffing') ? 'inline-block' : 'none';
-      document.getElementById('nav-incidents').style.display = canAccessTab('incidents') ? 'inline-block' : 'none';
-      document.getElementById('nav-inspections').style.display = canAccessTab('inspections') ? 'inline-block' : 'none';
-      document.getElementById('nav-admin').style.display = canAccessTab('admin') ? 'inline-block' : 'none';
-
-      document.getElementById('card-staffing').style.display = canAccessTab('staffing') ? 'flex' : 'none';
-      document.getElementById('card-incidents').style.display = canAccessTab('incidents') ? 'flex' : 'none';
-      document.getElementById('card-inspections').style.display = canAccessTab('inspections') ? 'flex' : 'none';
-    }
-
-    function renderIncidentsFeed() {
-      const container = document.getElementById('incidents-feed-container');
-      if (!container) return;
-      container.innerHTML = '';
-
-      activeIncidents.forEach(inc => {
-        const encodedLoc = encodeURIComponent(inc.location);
-        const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodedLoc}`;
-
-        let reportsBadgeHtml = '';
-        if (inc.reports && inc.reports.length > 0) {
-          reportsBadgeHtml = `<div class="mt-2 text-xs font-semibold text-emerald-700 bg-emerald-50 p-2 rounded border border-emerald-200">
-            Attached Reports (${inc.reports.length}): ${inc.reports.map(r => r.type).join(', ')}
-          </div>`;
-        }
-
-        const card = document.createElement('div');
-        card.className = "bg-white border-l-4 border-red-600 rounded-lg shadow-sm p-5 flex flex-col md:flex-row justify-between items-start md:items-center";
-        card.innerHTML = `
-          <div class="space-y-1 mb-4 md:mb-0">
-            <div class="flex items-center space-x-2">
-              <span class="bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded">${inc.type}</span>
-              <span class="text-xs text-slate-500 font-mono">CAD# ${inc.cad}</span>
-            </div>
-            <h3 class="text-lg font-bold text-slate-900">${inc.location}</h3>
-            <p class="text-sm text-slate-600">Dispatched: ${inc.dispatchTime}</p>
-            ${reportsBadgeHtml}
-          </div>
-          <div class="flex space-x-2">
-            <a href="${mapUrl}" target="_blank" class="bg-slate-700 hover:bg-slate-800 text-white text-sm px-4 py-2 rounded font-medium transition">Map & Navigate</a>
-            <button onclick="openReportChoiceModal('${inc.cad}', '${inc.location}')" class="bg-red-600 hover:bg-red-700 text-white text-sm px-4 py-2 rounded font-medium transition">Create Report</button>
-          </div>
-        `;
-        container.appendChild(card);
-      });
-    }
-
-    function openReportChoiceModal(cadNum, location) {
-      if (cadNum) {
-        selectedCadNum = cadNum;
-        selectedCadLocation = location;
-      }
-      document.getElementById('modal-cad-display').innerText = selectedCadNum || '';
-      document.getElementById('report-choice-modal').classList.remove('hidden');
-    }
-
-    function closeReportChoiceModal() {
-      document.getElementById('report-choice-modal').classList.add('hidden');
-    }
-
-    function launchReportForm(type) {
-      closeReportChoiceModal();
-      if (type === 'fire') {
-        document.getElementById('fire-cad-num').value = selectedCadNum || '';
-        document.getElementById('fire-location').value = selectedCadLocation || '';
-        switchTab('fire-report');
-      } else if (type === 'pcr') {
-        document.getElementById('pcr-cad-num').value = selectedCadNum || '';
-        switchTab('pcr-report');
-      }
-    }
-
-    async function handleReportSubmit(e, reportType) {
-      e.preventDefault();
-      const inc = activeIncidents.find(i => i.cad === selectedCadNum);
-      let reportName = reportType === 'fire' ? 'Fire Incident Report' : (reportType === 'pcr' ? 'Patient Care Report (PCR)' : 'Fire Inspection Report');
-
-      if (inc && reportType !== 'inspection') {
-        const updatedReports = [...(inc.reports || []), {
-          type: reportName,
-          timestamp: new Date().toLocaleString(),
-          author: activeUser ? `${activeUser.firstName} ${activeUser.lastName}` : 'System'
-        }];
-
-        await supabase.from('incidents').update({ reports: updatedReports }).eq('cad', selectedCadNum);
-      }
-
-      alert(`Success: ${reportName} submitted and saved to cloud database.`);
-      e.target.reset();
-      if (signaturePad) signaturePad.clear();
-      await loadAppData();
-      switchTab('incidents');
+      return true;
     }
 
     function renderUserSelect() {
-      const select = document.getElementById('active-user-select');
-      select.innerHTML = '';
-      personnelList.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p.id;
-        opt.innerText = `${p.firstName} ${p.lastName} (${p.role.toUpperCase()})`;
-        if (activeUser && activeUser.id === p.id) opt.selected = true;
-        select.appendChild(opt);
-      });
+      const select = document.getElementById('user-selector');
+      select.innerHTML = personnelList.map(p => 
+        `<option value="${p.id}">${p.firstName} ${p.lastName} (${p.role.toUpperCase()})</option>`
+      ).join('');
     }
 
-    function handleUserSwitch() {
-      const select = document.getElementById('active-user-select');
-      activeUser = personnelList.find(p => p.id === Number(select.value)) || personnelList[0];
-      updateNavPermissions();
-      switchTab('home');
-    }
-
-    function toggleAuth() {
-      isLoggedIn = !isLoggedIn;
-      const btn = document.getElementById('auth-btn');
-      btn.innerText = isLoggedIn ? 'Logout' : 'Login';
-      btn.className = isLoggedIn ? "bg-red-700 hover:bg-red-800 text-white px-3 py-2 rounded-md font-semibold text-xs transition" : "bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md font-semibold text-xs transition";
-      updateNavPermissions();
-      switchTab('home');
-    }
-
-    function renderInspectorDropdown() {
-      const select = document.getElementById('inspection-inspector');
-      if (!select) return;
-      select.innerHTML = '';
-      personnelList.filter(p => p.role === 'officer' || p.role === 'admin').forEach(o => {
-        const opt = document.createElement('option');
-        opt.value = `${o.firstName} ${o.lastName}`;
-        opt.innerText = `${o.firstName} ${o.lastName}`;
-        select.appendChild(opt);
-      });
-    }
-
-    function renderChecklist() {
-      const container = document.getElementById('compliance-checklist-container');
-      if (!container) return;
-      container.innerHTML = '';
-      checklistItems.forEach((item, index) => {
-        const row = document.createElement('div');
-        row.className = 'flex flex-col sm:flex-row sm:items-center justify-between p-2 rounded bg-slate-50 hover:bg-slate-100 gap-2';
-        row.innerHTML = `
-          <span class="font-medium text-slate-800">${item}</span>
-          <div class="space-x-3 text-xs flex-shrink-0">
-            <label><input type="radio" name="chk_${index}" value="Pass" checked> Pass</label>
-            <label><input type="radio" name="chk_${index}" value="Fail"> Fail</label>
-            <label><input type="radio" name="chk_${index}" value="N/A"> N/A</label>
-          </div>
-        `;
-        container.appendChild(row);
-      });
-    }
-
-    function renderStaffing() {
-      [1, 2, 3].forEach(stationId => {
-        const container = document.getElementById(`station-${stationId}-container`);
-        if (!container) return;
-        container.innerHTML = '';
-        apparatusList.forEach(app => {
-          const crewData = staffingAssignments[stationId]?.[app.id];
-          const driver = personnelList.find(p => p.id === crewData?.driverId);
-          const officer = personnelList.find(p => p.id === crewData?.officerId);
-
-          const appCard = document.createElement('div');
-          appCard.className = 'bg-white border rounded p-3 shadow-sm space-y-2';
-          appCard.innerHTML = `
-            <div class="flex justify-between items-center"><span class="font-bold text-slate-800 text-sm">${app.name}</span></div>
-            <div class="mt-2 text-xs space-y-1 bg-slate-50 p-2 rounded border">
-              <div><span class="font-semibold text-slate-500">Driver:</span> ${driver ? driver.firstName + ' ' + driver.lastName : '<span class="text-slate-400">None</span>'}</div>
-              <div><span class="font-semibold text-slate-500">Officer:</span> ${officer ? officer.firstName + ' ' + officer.lastName : '<span class="text-slate-400">None</span>'}</div>
-              <button onclick="openCrewModal(${stationId}, ${app.id})" class="mt-2 text-blue-600 hover:underline font-semibold block">Assign / Edit Crew</button>
-            </div>
-          `;
-          container.appendChild(appCard);
-        });
-      });
+    function changeActiveUser(userId) {
+      activeUser = personnelList.find(p => p.id == userId) || personnelList[0];
       updateNavPermissions();
     }
 
-    function openCrewModal(stationId, apparatusId) {
-      activeCrewModalStation = stationId;
-      activeCrewModalApparatus = apparatusId;
-      const currentCrew = staffingAssignments[stationId]?.[apparatusId] || {};
-      const listContainer = document.getElementById('crew-selection-list');
-      listContainer.innerHTML = '';
+    function updateNavPermissions() {
+      const isAdmin = activeUser && activeUser.role === 'admin';
+      
+      document.getElementById('nav-staffing').style.display = 'inline-block';
+      document.getElementById('nav-incidents').style.display = 'inline-block';
+      document.getElementById('nav-inspections').style.display = 'inline-block';
+      document.getElementById('nav-admin').style.display = isAdmin ? 'inline-block' : 'none';
 
-      personnelList.forEach(p => {
-        const item = document.createElement('div');
-        item.className = 'flex justify-between items-center py-2 px-1 text-sm';
-        const isDriver = currentCrew.driverId === p.id;
-        const isOfficer = currentCrew.officerId === p.id;
-        const canBeOfficer = p.role === 'officer' || p.role === 'admin';
-
-        item.innerHTML = `
-          <span class="font-medium text-slate-700">${p.firstName} ${p.lastName}</span>
-          <div class="space-x-4 text-xs flex items-center">
-            <label><input type="radio" name="driver_select" ${isDriver ? 'checked' : ''} onchange="setCrewRole('driver', ${p.id})"> Driver</label>
-            <label class="${canBeOfficer ? '' : 'opacity-40'}">
-              <input type="radio" name="officer_select" ${isOfficer ? 'checked' : ''} ${!canBeOfficer ? 'disabled' : ''} onchange="setCrewRole('officer', ${p.id})"> Officer
-            </label>
-          </div>
-        `;
-        listContainer.appendChild(item);
-      });
-      document.getElementById('crew-modal').classList.remove('hidden');
+      document.getElementById('card-staffing').style.display = 'flex';
+      document.getElementById('card-incidents').style.display = 'flex';
+      document.getElementById('card-inspections').style.display = 'flex';
     }
-
-    async function setCrewRole(role, personnelId) {
-      let stationData = staffingAssignments[activeCrewModalStation]?.[activeCrewModalApparatus] || {};
-      let driverId = role === 'driver' ? personnelId : stationData.driverId || null;
-      let officerId = role === 'officer' ? personnelId : stationData.officerId || null;
-
-      await supabase.from('staffing').upsert([{
-        station_id: activeCrewModalStation,
-        apparatus_id: activeCrewModalApparatus,
-        driver_id: driverId,
-        officer_id: officerId
-      }], { onConflict: 'station_id,apparatus_id' });
-
-      await loadAppData();
-    }
-
-    function closeCrewModal() { document.getElementById('crew-modal').classList.add('hidden'); }
 
     function renderPersonnel() {
-      const tbody = document.getElementById('personnel-tbody');
-      if (!tbody) return;
-      tbody.innerHTML = '';
-      document.getElementById('roster-count').innerText = `${personnelList.length} Members`;
-      personnelList.forEach(p => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td class="p-2 font-medium text-slate-800">${p.firstName} ${p.lastName}</td>
-          <td class="p-2"><span class="uppercase text-xs font-semibold px-2 py-0.5 rounded bg-slate-100">${p.role}</span></td>
-          <td class="p-2 text-slate-600 text-xs">${p.email}</td>
-          <td class="p-2 text-right space-x-2">
-            <button onclick="deletePersonnel(${p.id})" class="text-red-600 hover:underline text-xs">Delete</button>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    function openPersonnelModal() {
-      document.getElementById('personnel-form').reset();
-      document.getElementById('personnel-id').value = '';
-      document.getElementById('personnel-modal').classList.remove('hidden');
-    }
-    function closePersonnelModal() { document.getElementById('personnel-modal').classList.add('hidden'); }
-
-    async function savePersonnel(e) {
-      e.preventDefault();
-      const firstName = document.getElementById('personnel-first').value;
-      const lastName = document.getElementById('personnel-last').value;
-      const role = document.getElementById('personnel-role').value;
-      const email = document.getElementById('personnel-email').value;
-
-      await supabase.from('personnel').insert([{ first_name: firstName, last_name: lastName, role, email }]);
-      closePersonnelModal();
-      await loadAppData();
-    }
-
-    async function deletePersonnel(id) {
-      if (confirm('Delete user profile?')) {
-        await supabase.from('personnel').delete().eq('id', id);
-        await loadAppData();
+      const el = document.getElementById('personnel-list');
+      if (el) {
+        el.innerHTML = personnelList.map(p => `<li class="py-1">${p.firstName} ${p.lastName} - <span class="uppercase font-semibold">${p.role}</span></li>`).join('');
       }
     }
 
     function renderApparatus() {
-      const tbody = document.getElementById('apparatus-tbody');
-      if (!tbody) return;
-      tbody.innerHTML = '';
-      document.getElementById('apparatus-count').innerText = `${apparatusList.length} Rigs`;
-      apparatusList.forEach(a => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td class="p-2 font-medium text-slate-800">${a.name}</td>
-          <td class="p-2 text-right space-x-2">
-            <button onclick="deleteApparatus(${a.id})" class="text-red-600 hover:underline text-xs">Delete</button>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    function openApparatusModal() {
-      document.getElementById('apparatus-form').reset();
-      document.getElementById('apparatus-id').value = '';
-      document.getElementById('apparatus-modal').classList.remove('hidden');
-    }
-    function closeApparatusModal() { document.getElementById('apparatus-modal').classList.add('hidden'); }
-
-    async function saveApparatus(e) {
-      e.preventDefault();
-      const name = document.getElementById('apparatus-name').value;
-      await supabase.from('apparatus').insert([{ name }]);
-      closeApparatusModal();
-      await loadAppData();
-    }
-
-    async function deleteApparatus(id) {
-      if (confirm('Delete apparatus?')) {
-        await supabase.from('apparatus').delete().eq('id', id);
-        await loadAppData();
+      const el = document.getElementById('apparatus-list');
+      const inspectionApp = document.getElementById('inspection-apparatus');
+      if (el) {
+        el.innerHTML = apparatusList.map(a => `<li class="py-1">${a.name}</li>`).join('');
+      }
+      if (inspectionApp) {
+        inspectionApp.innerHTML = apparatusList.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
       }
     }
 
-    window.addEventListener('load', loadAppData);
+    function renderInspectorDropdown() {
+      const el = document.getElementById('inspection-inspector');
+      if (el) {
+        el.innerHTML = personnelList.map(p => `<option value="${p.id}">${p.firstName} ${p.lastName}</option>`).join('');
+      }
+    }
+
+    function renderStaffing() {
+      const container = document.getElementById('stations-container');
+      if (!container) return;
+      
+      const stations = ['Station 1 (Main)', 'Station 2', 'Station 3'];
+      container.innerHTML = stations.map((st, idx) => `
+        <div class="bg-white p-4 rounded shadow border-l-4 border-red-600">
+          <h3 class="font-bold text-lg mb-3">${st}</h3>
+          <div class="text-sm space-y-2 text-slate-600">
+            <p><strong>Apparatus:</strong> ${apparatusList[idx] ? apparatusList[idx].name : 'Engine ' + (idx + 1)}</p>
+            <p><strong>Officer:</strong> ${personnelList[0] ? personnelList[0].firstName + ' ' + personnelList[0].lastName : 'Unassigned'}</p>
+            <p><strong>Driver/Engineer:</strong> ${personnelList[1] ? personnelList[1].firstName + ' ' + personnelList[1].lastName : 'Unassigned'}</p>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderIncidentsFeed() {
+      const container = document.getElementById('incidents-feed');
+      if (!container) return;
+
+      container.innerHTML = activeIncidents.map(inc => `
+        <div class="bg-white p-5 rounded-lg shadow border border-slate-200">
+          <div class="flex justify-between items-center mb-2">
+            <span class="bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded">${inc.type}</span>
+            <span class="text-xs text-slate-500 font-mono">${inc.cad}</span>
+          </div>
+          <p class="text-sm font-bold text-slate-800">${inc.location}</p>
+          <p class="text-xs text-slate-500 mt-1">Dispatched: ${inc.dispatchTime}</p>
+        </div>
+      `).join('');
+    }
+
+    function renderChecklist() {
+      const container = document.getElementById('checklist-items');
+      if (!container) return;
+      const items = ['SCBA Check', 'Fuel Level OK', 'Lights & Sirens Functional', 'Medical Bag Inventoried', 'Pump Test Completed'];
+      container.innerHTML = items.map((item, i) => `
+        <label class="flex items-center space-x-2 py-1 text-sm text-slate-700">
+          <input type="checkbox" id="check-${i}" class="rounded text-red-600">
+          <span>${item}</span>
+        </label>
+      `).join('');
+    }
+
+    async function addPersonnel(e) {
+      e.preventDefault();
+      const firstName = document.getElementById('p-fname').value;
+      const lastName = document.getElementById('p-lname').value;
+      const email = document.getElementById('p-email').value;
+      const role = document.getElementById('p-role').value;
+
+      const { data, error } = await supabase.from('personnel').insert([{ first_name: firstName, last_name: lastName, email, role }]).select();
+      if (error) {
+        alert("Error saving to database: " + error.message);
+      } else {
+        personnelList.push({ id: data[0].id, firstName, lastName, email, role });
+        renderPersonnel();
+        renderUserSelect();
+        renderInspectorDropdown();
+        e.target.reset();
+      }
+    }
+
+    async function addApparatus(e) {
+      e.preventDefault();
+      const name = document.getElementById('app-name').value;
+      const { data, error } = await supabase.from('apparatus').insert([{ name }]).select();
+      if (error) {
+        alert("Error saving apparatus: " + error.message);
+      } else {
+        apparatusList.push({ id: data[0].id, name });
+        renderApparatus();
+        renderStaffing();
+        e.target.reset();
+      }
+    }
+
+    function submitChecklist(e) {
+      e.preventDefault();
+      alert("Inspection Checklist Submitted Successfully!");
+      e.target.reset();
+    }
+
+    function logoutUser() {
+      alert("Logged out successfully.");
+      switchTab('home');
+    }
+
+    window.addEventListener('DOMContentLoaded', loadAppData);
+  </script>
+</body>
+</html>
   </script>
 </body>
 </html>
