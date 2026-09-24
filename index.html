@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     .tab-content { display: none; }
-    .tab-content.active { display: block; }
+    .tab-content.active { display: block !important; }
   </style>
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800 font-sans">
@@ -25,19 +25,19 @@
       </div>
 
       <nav class="hidden md:flex space-x-6 text-sm font-semibold">
-        <button id="nav-home" onclick="switchTab('home')" class="hover:text-red-400 transition">Home</button>
-        <button id="nav-staffing" onclick="switchTab('staffing')" class="hover:text-red-400 transition">Daily Staffing</button>
-        <button id="nav-incidents" onclick="switchTab('incidents')" class="hover:text-red-400 transition">Incidents</button>
-        <button id="nav-inspections" onclick="switchTab('inspections')" class="hover:text-red-400 transition">Inspections</button>
-        <button id="nav-admin" onclick="switchTab('admin')" class="hover:text-red-400 transition text-yellow-400">Admin Portal</button>
+        <button type="button" onclick="switchTab('home')" class="hover:text-red-400 transition">Home</button>
+        <button type="button" onclick="switchTab('staffing')" class="hover:text-red-400 transition">Daily Staffing</button>
+        <button type="button" onclick="switchTab('incidents')" class="hover:text-red-400 transition">Incidents</button>
+        <button type="button" onclick="switchTab('inspections')" class="hover:text-red-400 transition">Inspections</button>
+        <button type="button" onclick="switchTab('admin')" class="hover:text-red-400 transition text-yellow-400">Admin Portal</button>
       </nav>
 
       <div class="flex items-center space-x-3">
-        <!-- USER SELECTOR DROPDOWN -->
         <select id="user-selector" onchange="changeActiveUser(this.value)" class="bg-slate-800 text-xs border border-slate-700 rounded px-2 py-1 text-white focus:outline-none">
-          <!-- Populated by JavaScript -->
+          <option value="1">Chief Admin (ADMIN)</option>
+          <option value="2">John Doe (OFFICER)</option>
         </select>
-        <button onclick="logoutUser()" class="bg-red-600 hover:bg-red-700 text-xs px-3 py-1.5 rounded font-bold transition">Logout</button>
+        <button type="button" onclick="logoutUser()" class="bg-red-600 hover:bg-red-700 text-xs px-3 py-1.5 rounded font-bold transition">Logout</button>
       </div>
     </div>
   </header>
@@ -48,18 +48,18 @@
     <!-- TAB 1: HOME -->
     <section id="tab-home" class="tab-content active">
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-        <div id="card-staffing" onclick="switchTab('staffing')" class="bg-white p-8 rounded-lg shadow-md hover:shadow-xl transition border-t-4 border-red-600 cursor-pointer flex flex-col items-center justify-center text-center">
-          <i class="fa-solid font-bold text-red-600 text-4xl mb-4 fa-users"></i>
+        <div onclick="switchTab('staffing')" class="bg-white p-8 rounded-lg shadow-md hover:shadow-xl transition border-t-4 border-red-600 cursor-pointer flex flex-col items-center justify-center text-center">
+          <i class="fa-solid fa-users text-red-600 text-4xl mb-4"></i>
           <h2 class="text-xl font-bold text-slate-800 uppercase tracking-wider">Daily Staffing</h2>
         </div>
 
-        <div id="card-incidents" onclick="switchTab('incidents')" class="bg-white p-8 rounded-lg shadow-md hover:shadow-xl transition border-t-4 border-red-600 cursor-pointer flex flex-col items-center justify-center text-center">
-          <i class="fa-solid font-bold text-red-600 text-4xl mb-4 fa-fire-flame-curved"></i>
+        <div onclick="switchTab('incidents')" class="bg-white p-8 rounded-lg shadow-md hover:shadow-xl transition border-t-4 border-red-600 cursor-pointer flex flex-col items-center justify-center text-center">
+          <i class="fa-solid fa-fire-flame-curved text-red-600 text-4xl mb-4"></i>
           <h2 class="text-xl font-bold text-slate-800 uppercase tracking-wider">Incident Reporting</h2>
         </div>
 
-        <div id="card-inspections" onclick="switchTab('inspections')" class="bg-white p-8 rounded-lg shadow-md hover:shadow-xl transition border-t-4 border-red-600 cursor-pointer flex flex-col items-center justify-center text-center">
-          <i class="fa-solid font-bold text-red-600 text-4xl mb-4 fa-clipboard-check"></i>
+        <div onclick="switchTab('inspections')" class="bg-white p-8 rounded-lg shadow-md hover:shadow-xl transition border-t-4 border-red-600 cursor-pointer flex flex-col items-center justify-center text-center">
+          <i class="fa-solid fa-clipboard-check text-red-600 text-4xl mb-4"></i>
           <h2 class="text-xl font-bold text-slate-800 uppercase tracking-wider">Inspections</h2>
         </div>
       </div>
@@ -68,17 +68,13 @@
     <!-- TAB 2: DAILY STAFFING -->
     <section id="tab-staffing" class="tab-content">
       <h1 class="text-2xl font-bold text-slate-800 mb-6">Daily Roster & Staffing</h1>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="stations-container">
-        <!-- Rendered by JS -->
-      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="stations-container"></div>
     </section>
 
     <!-- TAB 3: INCIDENTS -->
     <section id="tab-incidents" class="tab-content">
       <h1 class="text-2xl font-bold text-slate-800 mb-6">Incident Reports</h1>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="incidents-feed">
-        <!-- Rendered by JS -->
-      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="incidents-feed"></div>
     </section>
 
     <!-- TAB 4: INSPECTIONS -->
@@ -94,9 +90,7 @@
             <label class="block font-bold text-slate-700 text-sm mb-1">Select Apparatus</label>
             <select id="inspection-apparatus" class="w-full border rounded p-2 text-sm" required></select>
           </div>
-          <div class="mb-4" id="checklist-items">
-            <!-- Items rendered by JS -->
-          </div>
+          <div class="mb-4" id="checklist-items"></div>
           <button type="submit" class="w-full bg-red-600 text-white font-bold py-2 rounded hover:bg-red-700">Submit Inspection</button>
         </form>
       </div>
@@ -106,7 +100,6 @@
     <section id="tab-admin" class="tab-content">
       <h1 class="text-2xl font-bold text-slate-800 mb-6">Admin Portal</h1>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Personnel Management -->
         <div class="bg-white p-6 rounded-lg shadow-md">
           <h2 class="text-lg font-bold mb-4 border-b pb-2">Add Personnel</h2>
           <form onsubmit="addPersonnel(event)" class="space-y-3">
@@ -126,7 +119,6 @@
           </div>
         </div>
 
-        <!-- Apparatus Management -->
         <div class="bg-white p-6 rounded-lg shadow-md">
           <h2 class="text-lg font-bold mb-4 border-b pb-2">Add Apparatus</h2>
           <form onsubmit="addApparatus(event)" class="flex space-x-2">
@@ -143,13 +135,15 @@
 
   </main>
 
-  <!-- JAVASCRIPT APP LOGIC WITH FALLBACK SAFETIES -->
   <script>
     const SUPABASE_URL = 'https://audgtwcctdoiptuekqvn.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let supabase = null;
 
-    // Default Fallback Data (Ensures system functions even if DB is empty)
+    if (window.supabase) {
+      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
+
     let personnelList = [
       { id: 1, firstName: 'Admin', lastName: 'Chief', role: 'admin', email: 'admin@jasperfire.org' },
       { id: 2, firstName: 'John', lastName: 'Doe', role: 'officer', email: 'jdoe@jasperfire.org' }
@@ -163,39 +157,50 @@
       { cad: '2026-00123', type: 'STRUCTURE FIRE', location: '1200 4th Ave, Jasper, AL', dispatchTime: '14:32', reports: [] }
     ];
 
-    let activeUser = personnelList[0];
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => {
+        el.classList.remove('active');
+        el.style.display = 'none';
+      });
+      const activeEl = document.getElementById('tab-' + tabId);
+      if (activeEl) {
+        activeEl.classList.add('active');
+        activeEl.style.display = 'block';
+      }
+    }
 
     async function loadAppData() {
-      try {
-        const { data: pData } = await supabase.from('personnel').select('*');
-        if (pData && pData.length > 0) {
-          personnelList = pData.map(p => ({
-            id: p.id,
-            firstName: p.first_name,
-            lastName: p.last_name,
-            role: p.role,
-            email: p.email
-          }));
-        }
+      if (supabase) {
+        try {
+          const { data: pData } = await supabase.from('personnel').select('*');
+          if (pData && pData.length > 0) {
+            personnelList = pData.map(p => ({
+              id: p.id,
+              firstName: p.first_name,
+              lastName: p.last_name,
+              role: p.role,
+              email: p.email
+            }));
+          }
 
-        const { data: aData } = await supabase.from('apparatus').select('*');
-        if (aData && aData.length > 0) apparatusList = aData;
+          const { data: aData } = await supabase.from('apparatus').select('*');
+          if (aData && aData.length > 0) apparatusList = aData;
 
-        const { data: iData } = await supabase.from('incidents').select('*');
-        if (iData && iData.length > 0) {
-          activeIncidents = iData.map(i => ({
-            cad: i.cad,
-            type: i.type,
-            location: i.location,
-            dispatchTime: i.dispatch_time,
-            reports: i.reports || []
-          }));
+          const { data: iData } = await supabase.from('incidents').select('*');
+          if (iData && iData.length > 0) {
+            activeIncidents = iData.map(i => ({
+              cad: i.cad,
+              type: i.type,
+              location: i.location,
+              dispatchTime: i.dispatch_time,
+              reports: i.reports || []
+            }));
+          }
+        } catch (err) {
+          console.warn("Using local fallback data:", err);
         }
-      } catch (err) {
-        console.warn("Using local fallback data:", err);
       }
 
-      activeUser = personnelList[0];
       renderUserSelect();
       renderPersonnel();
       renderApparatus();
@@ -203,49 +208,19 @@
       renderIncidentsFeed();
       renderInspectorDropdown();
       renderChecklist();
-      updateNavPermissions();
-    }
-
-    function switchTab(tabId) {
-      if (!canAccessTab(tabId)) {
-        alert("You do not have permission to access this area.");
-        return;
-      }
-      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-      const activeEl = document.getElementById('tab-' + tabId);
-      if (activeEl) activeEl.classList.add('active');
-    }
-
-    function canAccessTab(tabName) {
-      if (tabName === 'home') return true;
-      if (!activeUser) return false;
-      if (activeUser.role === 'admin') return true;
-      return true;
     }
 
     function renderUserSelect() {
       const select = document.getElementById('user-selector');
-      select.innerHTML = personnelList.map(p => 
-        `<option value="${p.id}">${p.firstName} ${p.lastName} (${p.role.toUpperCase()})</option>`
-      ).join('');
+      if (select) {
+        select.innerHTML = personnelList.map(p => 
+          `<option value="${p.id}">${p.firstName} ${p.lastName} (${p.role.toUpperCase()})</option>`
+        ).join('');
+      }
     }
 
     function changeActiveUser(userId) {
-      activeUser = personnelList.find(p => p.id == userId) || personnelList[0];
-      updateNavPermissions();
-    }
-
-    function updateNavPermissions() {
-      const isAdmin = activeUser && activeUser.role === 'admin';
-      
-      document.getElementById('nav-staffing').style.display = 'inline-block';
-      document.getElementById('nav-incidents').style.display = 'inline-block';
-      document.getElementById('nav-inspections').style.display = 'inline-block';
-      document.getElementById('nav-admin').style.display = isAdmin ? 'inline-block' : 'none';
-
-      document.getElementById('card-staffing').style.display = 'flex';
-      document.getElementById('card-incidents').style.display = 'flex';
-      document.getElementById('card-inspections').style.display = 'flex';
+      // User switched
     }
 
     function renderPersonnel() {
@@ -325,30 +300,45 @@
       const email = document.getElementById('p-email').value;
       const role = document.getElementById('p-role').value;
 
-      const { data, error } = await supabase.from('personnel').insert([{ first_name: firstName, last_name: lastName, email, role }]).select();
-      if (error) {
-        alert("Error saving to database: " + error.message);
+      if (supabase) {
+        const { data, error } = await supabase.from('personnel').insert([{ first_name: firstName, last_name: lastName, email, role }]).select();
+        if (error) {
+          alert("Error saving to database: " + error.message);
+          return;
+        }
+        if (data && data[0]) {
+          personnelList.push({ id: data[0].id, firstName, lastName, email, role });
+        }
       } else {
-        personnelList.push({ id: data[0].id, firstName, lastName, email, role });
-        renderPersonnel();
-        renderUserSelect();
-        renderInspectorDropdown();
-        e.target.reset();
+        personnelList.push({ id: Date.now(), firstName, lastName, email, role });
       }
+
+      renderPersonnel();
+      renderUserSelect();
+      renderInspectorDropdown();
+      e.target.reset();
     }
 
     async function addApparatus(e) {
       e.preventDefault();
       const name = document.getElementById('app-name').value;
-      const { data, error } = await supabase.from('apparatus').insert([{ name }]).select();
-      if (error) {
-        alert("Error saving apparatus: " + error.message);
+
+      if (supabase) {
+        const { data, error } = await supabase.from('apparatus').insert([{ name }]).select();
+        if (error) {
+          alert("Error saving apparatus: " + error.message);
+          return;
+        }
+        if (data && data[0]) {
+          apparatusList.push({ id: data[0].id, name });
+        }
       } else {
-        apparatusList.push({ id: data[0].id, name });
-        renderApparatus();
-        renderStaffing();
-        e.target.reset();
+        apparatusList.push({ id: Date.now(), name });
       }
+
+      renderApparatus();
+      renderStaffing();
+      e.target.reset();
     }
 
     function submitChecklist(e) {
@@ -363,9 +353,6 @@
     }
 
     window.addEventListener('DOMContentLoaded', loadAppData);
-  </script>
-</body>
-</html>
   </script>
 </body>
 </html>
