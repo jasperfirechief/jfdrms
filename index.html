@@ -114,7 +114,7 @@ window.rmsLoginImpl=async function(e){
     const r=await client.auth.signInWithPassword({email,password});
     if(r.error)throw r.error;
     if(!r.data?.session)throw new Error("Sign-in completed but no session was returned.");
-    location.reload();
+    await start(r.data.user);
   }catch(error){
     console.error("RMS sign-in error",error);
     if(err)err.textContent=error?.message||"Unable to sign in. Please try again.";
