@@ -169,11 +169,35 @@ function reportResponseSection(unitRows=[]){
     return '<label class="flex items-center gap-2 border rounded-lg p-2 bg-white text-sm"><input type="checkbox" data-report-apparatus-check="'+Number(a.apparatus_id)+'" '+(selected.has(Number(a.apparatus_id))?'checked':'')+' onchange="toggleReportApparatus('+Number(a.apparatus_id)+',this.checked)" class="h-4 w-4"><span class="font-semibold">'+esc(a.unit_number||"Apparatus")+'<span class="text-xs text-slate-500"> · '+esc(a.apparatus_type||"")+(stationName?" · "+esc(stationName):"")+'</span></span></label>'
   }).join("");
   const existingRows=(unitRows||[]).map(u=>reportResponseUnitRow(u)).join("");
+  setTimeout(()=>document.querySelectorAll(".report-response-unit").forEach(syncReportUnitTimes),0);
   return '<section class="border rounded-xl p-4 bg-slate-50 md:col-span-2"><h3 class="font-black text-lg mb-1">Responding Apparatus</h3><p class="text-xs text-slate-500 mb-3">Check every department apparatus that responded. Personnel assigned to those apparatus are tracked automatically from Daily Staffing for NERIS.</p><div class="border rounded-xl p-3 bg-white"><div class="text-sm font-bold mb-2">Select Responding Apparatus</div><div class="grid md:grid-cols-2 gap-2">'+apparatusChoices+'</div></div><div id="reportResponseUnits" class="space-y-3 mt-4">'+(existingRows||'<p class="text-sm text-slate-500">No apparatus selected yet.</p>')+'</div><div class="mt-5 border-t pt-4"><div id="reportOffDutyPersonnel">'+renderOffDutyPersonnel([])+'</div></div></section>'
 }
 function reportResponseUnitRow(u){
   const apId=Number(u.apparatus_id||0),ap=apparatus.find(a=>Number(a.apparatus_id)===apId),crew=Array.isArray(u.crew_snapshot)?u.crew_snapshot:[];
-  return '<div class="report-response-unit border rounded-xl p-3 bg-white" data-apparatus-id="'+apId+'" data-crew="'+esc(JSON.stringify(crew))+'"><div class="flex justify-between gap-3 items-start"><div><b>'+esc(u.unit_number_snapshot||ap?.unit_number||"Unit")+'</b><div class="text-xs text-slate-500">'+esc(u.station_snapshot||"")+'</div></div><button type="button" onclick="removeReportApparatus('+apId+')" class="text-red-600 font-bold text-sm">Remove</button></div><div class="grid md:grid-cols-4 gap-3 mt-3"><label class="text-xs font-bold">En Route<input data-report-unit-time="enroute" type="datetime-local" value="'+esc(localDateTime(u.enroute_time))+'" class="w-full border rounded p-2 mt-1 font-normal"></label><label class="text-xs font-bold">On Scene<input data-report-unit-time="on_scene" type="datetime-local" value="'+esc(localDateTime(u.on_scene_time))+'" class="w-full border rounded p-2 mt-1 font-normal"></label><label class="text-xs font-bold">Cancelled<input data-report-unit-time="cancelled" type="datetime-local" value="'+esc(localDateTime(u.cancelled_time))+'" class="w-full border rounded p-2 mt-1 font-normal"></label><label class="text-xs font-bold">In Service<input data-report-unit-time="in_service" type="datetime-local" value="'+esc(localDateTime(u.in_service_time))+'" class="w-full border rounded p-2 mt-1 font-normal"></label></div></div>'
+  const cancelled=!!u.cancelled_time;
+  return '<div class="report-response-unit border rounded-xl p-3 bg-white" data-apparatus-id="'+apId+'" data-crew="'+esc(JSON.stringify(crew))+'"><div class="flex justify-between gap-3 items-start"><div><b>'+esc(u.unit_number_snapshot||ap?.unit_number||"Unit")+'</b><div class="text-xs text-slate-500">'+esc(u.station_snapshot||"")+'</div></div><button type="button" onclick="removeReportApparatus('+apId+')" class="text-red-600 font-bold text-sm">Remove</button></div><div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-3"><label class="text-xs font-bold">En Route<input data-report-unit-time="enroute" type="datetime-local" value="'+esc(localDateTime(u.enroute_time))+'" class="w-full border rounded p-2 mt-1 font-normal"></label><label class="text-xs font-bold">On Scene<input data-report-unit-time="on_scene" type="datetime-local" value="'+esc(localDateTime(u.on_scene_time))+'" class="w-full border rounded p-2 mt-1 font-normal"></label><label class="text-xs font-bold">Cancelled<input data-report-unit-time="cancelled" type="datetime-local" value="'+esc(localDateTime(u.cancelled_time))+'" class="w-full border rounded p-2 mt-1 font-normal"></label><label class="text-xs font-bold">In Service<input data-report-unit-time="in_service" type="datetime-local" value="'+esc(localDateTime(u.in_service_time))+'" class="w-full border rounded p-2 mt-1 font-normal" '+(cancelled?'disabled ':'')+'></label></div></div>'
+}
+function syncReportUnitTimes(row){
+  if(!row)return;
+  const cancelled=row.querySelector('[data-report-unit-time="cancelled"]');
+  const inService=row.querySelector('[data-report-unit-time="in_service"]');
+  if(!cancelled||!inService)return;
+  const sync=()=>{
+    const isCancelled=!!cancelled.value;
+    inService.disabled=isCancelled;
+    if(isCancelled)inService.value="";
+  };
+  cancelled.addEventListener("input",sync);
+  cancelled.addEventListener("change",sync);
+  inService.addEventListener("input",()=>{
+    if(inService.value)cancelled.value="";
+    sync();
+  });
+  inService.addEventListener("change",()=>{
+    if(inService.value)cancelled.value="";
+    sync();
+  });
+  sync();
 }
 function renderOffDutyPersonnel(selectedIds=[],people=null){
   const chosen=new Set((selectedIds||[]).map(Number));
@@ -195,6 +219,7 @@ function toggleReportApparatus(id,checked){
     const row=document.createElement("div");
     row.innerHTML=reportResponseUnitRow({apparatus_id:Number(id),unit_number_snapshot:ap.unit_number,station_snapshot:"",crew_snapshot:[],enroute_time:"",on_scene_time:"",cancelled_time:"",in_service_time:""});
     box.appendChild(row.firstElementChild);
+    syncReportUnitTimes(row.firstElementChild);
     refreshReportApparatusCrews($("rDate")?.value);
   }else if(!checked&&existing){existing.remove();if(!box.querySelector(".report-response-unit"))box.innerHTML='<p class="text-sm text-slate-500">No apparatus selected yet.</p>'}
 }
