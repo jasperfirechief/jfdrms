@@ -211,7 +211,6 @@ function finishOffDutyResponse(){
 function updateOffDutyResponse(cb){
   const details=cb.closest("details");const count=details?.querySelectorAll('[data-report-person]:checked').length||0;
   const label=details?.querySelector("#reportOffDutyCount");if(label)label.textContent=count+" selected";
-  if(cb.checked&&details)details.open=false;
 }
 function handleReportApparatusSelect(){ updateReportApparatusCount(); }
 function updateReportApparatusCount(){
@@ -313,7 +312,7 @@ function startStandaloneReport(kind){
 async function createIncidentReport(id){if(!canOps())return alert("You must be on duty.");const el=document.querySelector("[data-incident-id=\""+Number(id)+"\"]");if(!el)return alert("Incident not found.");return createIncidentReportByCad(el.dataset.cad)}
 async function createIncidentReportByCad(cad){if(!canOps())return alert("You must be on duty.");if(!cad)return alert("This incident has no CAD number, but reports can still be created manually.");const r=await db.from("incidents").select("*").eq("cad",cad).maybeSingle();if(r.error)return alert(r.error.message);if(!r.data)return alert("Incident not found.");let dr=await db.from("incident_details").select("*").eq("cad",cad).maybeSingle();if(dr.error)return alert(dr.error.message);if(!dr.data){const ins=await db.from("incident_details").insert({cad,status:"draft",report_by:me?.id||null,incident_date:iDateForReport(r.data.dispatch_time)}).select("*").maybeSingle();if(ins.error)return alert("Could not initialize the incident report: "+ins.error.message);dr=ins}const ur=await db.from("incident_units").select("*").eq("incident_id",dr.data.incident_id).order("incident_unit_id");if(ur.error)return alert(ur.error.message);const m=ensureReportModal();m.dataset.incidentId=String(dr.data.incident_id);m.dataset.cad=cad;m.classList.remove("hiddenx");renderReportChooser(r.data,dr.data,ur.data||[])}
 function iDateForReport(v){if(!v)return today();const d=new Date(v);return Number.isNaN(d.getTime())?today():new Intl.DateTimeFormat("en-CA",{timeZone:"America/Chicago"}).format(d)}
-async async function startIncidentReport(kind){
+async function startIncidentReport(kind){
   const cad=$("reportModal").dataset.cad;const id=Number($("reportModal").dataset.incidentId);
   const r=await db.from("incidents").select("*").eq("cad",cad).maybeSingle();if(r.error)return alert(r.error.message);if(!r.data)return alert("Incident not found.");
   const i=r.data;const dr=await db.from("incident_details").select("*").eq("incident_id",id).maybeSingle();if(dr.error)return alert(dr.error.message);
