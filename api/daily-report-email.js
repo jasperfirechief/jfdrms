@@ -85,12 +85,11 @@ async function makeStaffingPdf(shiftStart,shiftEnd,staffing,assignments){
   return makePdf("DAILY STAFFING RECORD",[{title:"SHIFT STAFFING",rows}]);
 }
 async function sendEmail(attachments,shiftStart,shiftEnd,incidentCount,reportCount){
-  const key=process.env.SENDGRID_API_KEY,from=process.env.SENDGRID_FROM_EMAIL;
-  if(!key||!from)throw new Error("Daily report email is not configured. Add SENDGRID_API_KEY and SENDGRID_FROM_EMAIL in Vercel.");
-  const body=["Jasper Fire Department","","Daily Shift Reports","Reporting Period: "+fmtDate(shiftStart+"T12:00:00")+" 7:00 AM – "+fmtDate(shiftEnd+"T12:00:00")+" 7:00 AM","Incidents: "+incidentCount,"Reports: "+reportCount,"","The attached packet contains the final daily staffing record and each submitted incident report as a separate PDF."].join("\n");
-  const payload={personalizations:[{to:[{email:"firechief@jaspercity.com"},{email:"fireclerk@jaspercity.com"}]}],from:{email:from,name:"Jasper Fire Department"},subject:"Jasper Fire Department – Daily Shift Reports – "+shiftStart+"–"+shiftEnd,content:[{type:"text/plain",value:body}],attachments};
-  const r=await fetch("https://api.sendgrid.com/v3/mail/send",{method:"POST",headers:{Authorization:"Bearer "+key,"Content-Type":"application/json"},body:JSON.stringify(payload)});
-  if(!r.ok)throw new Error("SendGrid delivery failed: "+await r.text());
+  const key=process.env.BREVO_API_KEY,from=process.env.BREVO_FROM_EMAIL;
+  if(!key||!from)throw new Error("Brevo email is not configured. Add BREVO_API_KEY and BREVO_FROM_EMAIL in Vercel.");
+  const payload={sender:{email:from,name:"Jasper Fire Department"},to:[{email:"firechief@jaspercity.com"},{email:"fireclerk@jaspercity.com"}],subject:"Jasper Fire Department – Daily Shift Reports – "+shiftStart+"–"+shiftEnd,textContent:body,attachment:attachments.map(a=>({content:a.content,name:a.filename}))};
+  const r=await fetch("https://api.brevo.com/v3/smtp/email",{method:"POST",headers:{"api-key":key,"Content-Type":"application/json","accept":"application/json"},body:JSON.stringify(payload)});
+  if(!r.ok)throw new Error("Brevo delivery failed: "+await r.text());
 }
 export default async function handler(req,res){
   if(req.method!=="GET"&&req.method!=="POST")return res.status(405).json({error:"Method not allowed"});
