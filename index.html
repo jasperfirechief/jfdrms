@@ -78,21 +78,44 @@
 </main></div>
 <script>
 const $=id=>document.getElementById(id), esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const SUPABASE_URL="https://audgtwcctdoiptuekqvn.supabase.co",SUPABASE_KEY="sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz";
+const SUPABASE_URL="https://audgtwcctdoiptuekqvn.supabase.co",SUPABASE_KEY="sb_publishable_oiWaymVcSB3U3uhzNsO5kSg_ghVfnOwz";
 let db=null;
-const supabaseReady=new Promise((resolve,reject)=>{
-  const s=document.createElement("script");
-  s.src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
-  s.onload=()=>{
-    try{
-      if(!window.supabase?.createClient)throw new Error("Supabase sign-in library did not load.");
-      db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:false,flowType:"implicit"}});
-      resolve(db);
-    }catch(err){console.error("Supabase client error",err);reject(err)}
-  };
-  s.onerror=()=>reject(new Error("Unable to load the sign-in service. Please refresh the page."));
-  document.head.appendChild(s);
-});
+let supabaseLoadPromise=null;
+async function ensureSupabaseClient(){
+  if(db)return db;
+  if(!supabaseLoadPromise){
+    supabaseLoadPromise=new Promise((resolve,reject)=>{
+      if(window.supabase?.createClient){try{db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:false,flowType:"implicit"}});resolve(db);return}catch(e){reject(e);return}}
+      const s=document.createElement("script");
+      s.src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
+      s.onload=()=>{try{if(!window.supabase?.createClient)throw new Error("Supabase sign-in library did not load.");db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:false,flowType:"implicit"}});resolve(db)}catch(e){reject(e)}};
+      s.onerror=()=>reject(new Error("Unable to load the sign-in service. Please refresh the page."));
+      document.head.appendChild(s);
+    });
+  }
+  return supabaseLoadPromise;
+}
+window.rmsLoginImpl=async function(e){
+  if(e)e.preventDefault();
+  const btn=document.getElementById("loginSubmit"),err=document.getElementById("loginError");
+  try{
+    if(btn){btn.disabled=true;btn.textContent="Signing in…"}
+    if(err)err.textContent="";
+    const client=await ensureSupabaseClient();
+    const email=document.getElementById("email")?.value.trim(),password=document.getElementById("password")?.value||"";
+    if(!email||!password)throw new Error("Enter your email and password.");
+    const r=await client.auth.signInWithPassword({email,password});
+    if(r.error)throw r.error;
+    if(!r.data?.session)throw new Error("Sign-in completed but no session was returned.");
+    location.reload();
+  }catch(error){
+    console.error("RMS sign-in error",error);
+    if(err)err.textContent=error?.message||"Unable to sign in. Please try again.";
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent="Sign in"}
+  }
+};
+const supabaseReady=ensureSupabaseClient();
 let me=null,profile=null,personnel=[],stations=[],apparatus=[],crew=[],activeTab="home",loginInProgress=false,starting=false;
 const today=()=>new Date().toISOString().slice(0,10);
 function operational(){return profile?.app_role==="admin"||profile?.app_role==="officer"||crew.length>0}
