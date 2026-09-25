@@ -9,40 +9,19 @@ const sections = [
     ["Proper number, type, mounting, signage, distance, unobstructed, readiness","IFC 2024 §§906.1, 906.6"],
     ["No obvious damage or tampering","IFC 2024 §906.2"]
   ]},
-  {name:"SPRINKLER SYSTEM", items:[
-    ["Inspection current/properly tagged","IFC 2024 §903.5"],
-    ["FDC in ready condition","IFC 2024 §912.4"],
-    ["Acceptance test conducted","IFC 2024 §901.6; NFPA 25"]
-  ]},
-  {name:"EXITS / EGRESS", items:[
+  {name:"EXITS AND EGRESS", items:[
     ["Appropriate number and unobstructed width of exits","IFC 2024 §§1005, 1006"],
     ["Appropriate unobstructed width of exit access","IFC 2024 §1005"],
     ["Appropriate travel distance","IFC 2024 §1017.2"],
     ["Outward swinging/appropriate hardware","IFC 2024 §1010"],
-    ["Appropriate signage/lighting","IFC 2024 §§1008, 1013"],
+    ["Appropriate exit signage/lighting","IFC 2024 §§1008, 1013"],
     ["Appropriate exit discharge width, lighting, unobstructed","IFC 2024 §§1008, 1028"],
-    ["Acceptance test conducted","IFC 2024 §901.6; applicable system standard"]
-  ]},
-  {name:"FIRE ALARM SYSTEM", items:[
-    ["Inspection current/properly tagged","IFC 2024 §907.8"],
-    ["No obvious damage or tampering","IFC 2024 §901.8"],
-    ["In ready state","IFC 2024 §907.8"],
-    ["Appropriate detectors and alarms (audible and visual)","IFC 2024 §907.5"],
-    ["Appropriate emergency lighting","IFC 2024 §1008"],
-    ["Call-out test conducted","IFC 2024 §907.8"],
-    ["System acceptance test conducted","IFC 2024 §901.6; NFPA 72"]
+    ["Emergency lighting operational","IFC 2024 §1008.3"]
   ]},
   {name:"CLEARANCES", items:[
-    ["Adequate clearance around electrical panels, fire alarm panels, standpipes, sprinkler risers, FDCs","IFC 2024 §§604.3, 912.4"],
+    ["Adequate clearance around electrical panels, fire alarm panels, standpipes, sprinkler risers and FDCs","IFC 2024 §§604.3, 912.4"],
     ["Adequate clearance below ceiling/sprinkler heads","IFC 2024 §315.3.1; §903.3"],
-    ["Adequate clearance around heat sources","IFC 2024 §315.3.1"],
-  ]},
-  {name:"COMMERCIAL KITCHEN HOOD SYSTEM", items:[
-    ["Inspection current/properly tagged","IFC 2024 §904.14.5"],
-    ["No obvious damage or tampering","IFC 2024 §901.8"],
-    ["Appropriate nozzles/caps in place","IFC 2024 §904.14; NFPA 17A/96 as applicable"],
-    ["No excessive grease build up on equipment, hood, ducts, fan, etc.","IFC 2024 §904.14; NFPA 96"],
-    ["Hood system acceptance test conducted","IFC 2024 §904.14; NFPA 96"]
+    ["Adequate clearance around heat sources","IFC 2024 §315.3.1"]
   ]},
   {name:"OTHER", items:[
     ["Appropriately posted address (rear on strip occupancies)","IFC 2024 §505.1"],
@@ -51,13 +30,40 @@ const sections = [
     ["No voids in ceiling (holes, tiles, etc.)","IFC 2024 §703.1"],
     ["Proper electrical wiring/covers","IFC 2024 Chapter 6"],
     ["Required test/drill logs or emergency plan available/complete/up-to-date","IFC 2024 §405; applicable occupancy section"],
-    ["Required MSDS/SDS available/complete/up-to-date","IFC 2024 Chapter 50; applicable hazardous-material requirements"],
+    ["Required SDS available/complete/up-to-date","IFC 2024 Chapter 50; applicable hazardous-material requirements"],
     ["Required documentation available/complete/up-to-date","IFC 2024 §901.6; applicable system/occupancy section"]
   ]},
-  {name:"FLAMMABLE LIQUIDS / HAZARDOUS MATERIALS", items:[
-    ["Flammable liquids/gas cylinders/hazardous materials stored correctly; proper signage on building where used/stored","IFC 2024 Chapters 50-57"]
+  {name:"SPRINKLER/ STANDPIPE SYSTEM", items:[
+    ["Sprinkler system inspection, testing and maintenance current","IFC 2024 §903.5"],
+    ["Sprinkler control valves accessible, in normal position and supervised where required","IFC 2024 §§903.4, 903.4.1"],
+    ["Sprinkler heads free of damage, obstruction, paint or storage interference","IFC 2024 §§903.3.1, 903.3.3; applicable NFPA standard"],
+    ["Sprinkler riser/valve assembly accessible and in good condition","IFC 2024 §§903.3, 903.4"],
+    ["Fire department connection accessible, identified, unobstructed and in ready condition","IFC 2024 §912.4"],
+    ["Standpipe hose connections accessible, unobstructed and properly located","IFC 2024 §§905.4, 905.5, 905.6"],
+    ["Standpipe hose valves, caps and threads in place, compatible and in good condition","IFC 2024 §905.4; applicable NFPA 14 requirements"],
+    ["Standpipe cabinets accessible, identified and not blocked; cabinet doors unlocked except as permitted","IFC 2024 §905.7"],
+    ["Standpipe risers/laterals have required protection where applicable","IFC 2024 §§905.4.1, 905.6.1"],
+    ["Multiple standpipes interconnected where required","IFC 2024 §§905.4.2, 905.6.2"],
+    ["Standpipe water-supply/control valves supervised where required","IFC 2024 §905.9"],
+    ["Dedicated standpipes and standpipe valve handles properly identified/painted where required","IFC 2024 §905.11"]
+  ]},
+  {name:"FIRE ALARM", items:[
+    ["Inspection current/properly tagged","IFC 2024 §907.8"],
+    ["No obvious damage or tampering","IFC 2024 §901.8"],
+    ["In ready state","IFC 2024 §907.8"],
+    ["Appropriate detectors and alarms (audible and visual)","IFC 2024 §907.5"],
+    ["Call-out test conducted","IFC 2024 §907.8"]
+  ]},
+  {name:"COMMERCIAL KITCHEN HOOD SYSTEM", items:[
+    ["Inspection current/properly tagged","IFC 2024 §904.14.5"],
+    ["No obvious damage or tampering","IFC 2024 §901.8"],
+    ["Appropriate nozzles/caps in place","IFC 2024 §904.14; NFPA 17A/96 as applicable"],
+    ["No excessive grease build up on equipment, hood, ducts, fan, etc.","IFC 2024 §904.14; NFPA 96"]
+  ]},
+  {name:"FLAMMABLE LIQUIDS/ HAZARDOUS MATERIAL", items:[
+    ["Flammable liquids, gas cylinders and hazardous materials stored correctly; required signage provided","IFC 2024 Chapters 50-57"]
   ]}
-];
+]
 
 function esc(v){return String(v ?? "").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 function wrap(text,font,size,maxWidth){
@@ -93,11 +99,11 @@ async function makePdf(data){
   field("Inspector",data.inspector_name); field("Date",data.inspection_date); field("Time",data.inspection_time||""); field("Occupancy Name",data.occupancy_name);
   field("Type",data.occupancy_type||""); field("Square Footage",data.square_footage?Number(data.square_footage).toLocaleString()+" sq. ft.":""); field("Stories",data.stories||""); field("Address",data.address); field("Contact Name",data.contact_name); field("City/St/Zip",data.city_state_zip);
   field("Contact Phone",data.contact_phone); field("Phone",data.phone); field("Email",data.email);
-  field("Inspection Type",data.inspection_type+(data.acceptance_type?" ("+data.acceptance_type+")":""));
+  field("Inspection Type",data.inspection_type+(data.acceptance_type?" ("+data.acceptance_type+")":"")); field("Fire Protection Systems",Array.isArray(data.fire_protection_systems)&&data.fire_protection_systems.length?data.fire_protection_systems.join(", "):"None identified");
   if(data.acceptance_tests&&Object.keys(data.acceptance_tests).length){heading("ACCEPTANCE TEST RESULTS");for(const [name,test] of Object.entries(data.acceptance_tests)){ensure(38);text(name,margin,y,9,bold);text("["+(test.result||"N/A").toUpperCase()+"]",W-margin-75,y,8,bold,test.result==="Fail"?red:gray);y-=12;for(const l of wrap(test.notes||"",regular,8,contentW)){ensure(11);text(l,margin,y,8,regular);y-=10}}}
   for(const s of sections){heading(s.name);for(const [item,ref] of s.items){const result=data.results?.[item]||"N/A";ensure(35);const lines=wrap(item,regular,9,contentW-120);for(let i=0;i<lines.length;i++){text(lines[i],margin,y,9,regular)}const firstY=y;const resultText="["+result.toUpperCase()+"]";text(resultText,W-margin-75,firstY,8,bold,result==="Fail"?red:gray);y-=11*(lines.length);text(ref,margin,y,7,regular,gray);y-=14}}
   heading("REMARKS"); for(const l of wrap(data.remarks||"",regular,9,contentW)){ensure(12);text(l,margin,y,9);y-=11}
-  heading("NOTICE"); const notice="NOTE: This report is based upon observations at the time of the survey which may not discover all hazards. IN THE INTEREST OF FIRE SAFETY AND TO COMPLY WITH THE CITY OF JASPER FIRE CODE, ALL VIOLATIONS NOTED ABOVE MUST BE CORRECTED IMMEDIATELY. FAILURE TO COMPLY MAY RESULT IN PENALTIES AS SET FORTH IN THE FIRE CODE.";
+  heading("NOTICE"); const notice="This report is based upon observations at the time of the survey which may not discover all hazards. IN THE INTEREST OF FIRE SAFETY AND TO COMPLY WITH APPLICABLE CODE, ALL VIOLATIONS NOTED ABOVE MUST BE CORRECTED IMMEDIATELY. FAILURE TO COMPLY MAY RESULT IN PENALTIES AS SET FORTH IN THE FIRE CODE.";
   for(const l of wrap(notice,regular,8,contentW)){ensure(11);text(l,margin,y,8);y-=10}
   if(data.reinspection_date){ensure(20);text("REINSPECTION DATE: "+data.reinspection_date,margin,y,9,bold);y-=18}
   heading("RECEIPT OF NOTICE ACKNOWLEDGED");
@@ -116,18 +122,18 @@ export default async function handler(req,res){
     const profiles=await rest("users?select=user_id,first_name,last_name,email,app_role,active&user_id=eq."+encodeURIComponent(caller.id),auth);
     const profile=profiles?.[0]; if(!profile?.active) throw new Error("Active RMS profile required.");
     let authorized=profile.app_role==="admin";
-    if(!authorized && profile.app_role==="officer"){
-      const people=await rest("personnel?select=id,auth_user_id&auth_user_id=eq."+encodeURIComponent(caller.id)+"&active=eq.true",auth);
-      const pid=people?.[0]?.id;
-      if(pid){
+    if(!authorized){
+      const people=await rest("personnel?select=id,auth_user_id,is_inspector,role&auth_user_id=eq."+encodeURIComponent(caller.id)+"&active=eq.true",auth);
+      const person=people?.[0];
+      if(person?.is_inspector===true){
         const ds=await rest("daily_staffing?select=staffing_id&staffing_date=eq."+new Date().toISOString().slice(0,10)+"&shift=eq.daily&limit=1",auth);
         if(ds?.[0]){
-          const pa=await rest("daily_personnel_assignments?select=personnel_id&staffing_id=eq."+encodeURIComponent(ds[0].staffing_id)+"&personnel_id=eq."+encodeURIComponent(pid)+"&limit=1",auth);
+          const pa=await rest("daily_personnel_assignments?select=personnel_id&staffing_id=eq."+encodeURIComponent(ds[0].staffing_id)+"&personnel_id=eq."+encodeURIComponent(person.id)+"&limit=1",auth);
           authorized=!!pa?.length;
         }
       }
     }
-    if(!authorized) throw new Error("Only administrators and on-duty officers may submit inspections.");
+    if(!authorized) throw new Error("Only administrators and on-duty inspectors may submit inspections.");
     let body=await req.body; if(typeof body==="string") body=JSON.parse(body); if(!body||typeof body!=="object") throw new Error("Inspection data is required.");
     const required=["occupancy_name","address","inspection_type"]; for(const k of required)if(!String(body[k]||"").trim())throw new Error(k.replace(/_/g," ")+" is required.");
     const inspectorName=(profile.first_name+" "+profile.last_name).trim();
