@@ -61,7 +61,8 @@ const sections = [
     ["No excessive grease build up on equipment, hood, ducts, fan, etc.","IFC 2024 §904.14; NFPA 96"]
   ]},
   {name:"FLAMMABLE LIQUIDS/ HAZARDOUS MATERIAL", items:[
-    ["Flammable liquids, gas cylinders and hazardous materials stored correctly; required signage provided","IFC 2024 Chapters 50-57"]
+    ["Flammable liquids, gas cylinders and hazardous materials stored correctly; required signage provided","IFC 2024 Chapters 50-57"],
+  ["Required SDS available and current for hazardous materials on site","IFC 2024 §5003.4"]
   ]}
 ]
 
