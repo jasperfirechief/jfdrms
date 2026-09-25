@@ -166,11 +166,11 @@ function reportResponseSection(unitRows=[]){
   const selected=new Set((unitRows||[]).map(u=>Number(u.apparatus_id)).filter(Boolean));
   const options=apparatus.filter(a=>a.active!==false).sort((a,b)=>String(a.unit_number||"").localeCompare(String(b.unit_number||""))).map(a=>{
     const stationName=(stations.find(s=>Number(s.station_id)===Number(a.station_id))||{}).station_name||"";
-    return '<option value="'+Number(a.apparatus_id)+'" '+(selected.has(Number(a.apparatus_id))?'selected':'')+'>'+esc(a.unit_number||"Apparatus")+(a.apparatus_type?" · "+esc(a.apparatus_type):"")+(stationName?" · "+esc(stationName):"")+'</option>'
+    return '<label class="flex items-center gap-2 border rounded-lg p-2 bg-white text-sm"><input type="checkbox" data-report-apparatus-check="'+Number(a.apparatus_id)+'" '+(selected.has(Number(a.apparatus_id))?'checked':'')+' onchange="toggleReportApparatus('+Number(a.apparatus_id)+',this.checked)" class="h-4 w-4"><span class="font-semibold">'+esc(a.unit_number||"Apparatus")+'<span class="text-xs text-slate-500"> · '+esc(a.apparatus_type||"")+(stationName?" · "+esc(stationName):"")+'</span></span></label>'
   }).join("");
   const existingRows=(unitRows||[]).map(u=>reportResponseUnitRow(u)).join("");
   setTimeout(()=>document.querySelectorAll(".report-response-unit").forEach(syncReportUnitTimes),0);
-  return '<section class="border rounded-xl p-4 bg-slate-50 md:col-span-2"><h3 class="font-black text-lg mb-1">Responding Apparatus</h3><p class="text-xs text-slate-500 mb-3">Select every department apparatus that responded. Personnel assigned to those apparatus are tracked automatically from Daily Staffing for NERIS.</p><div class="border rounded-xl p-3 bg-white"><label class="text-sm font-bold block">Select Responding Apparatus<select id="reportApparatusPicker" multiple size="6" onchange="handleReportApparatusSelect(this)" class="w-full border rounded-lg p-2 mt-2 bg-white">'+options+'</select></label><button type="button" onclick="finishReportApparatusSelection()" class="mt-3 px-4 py-2 rounded-lg bg-slate-800 text-white font-bold text-sm">Finish</button><p class="text-xs text-slate-500 mt-2">Select one or more apparatus, then click Finish to close the list.</p></div><div id="reportResponseUnits" class="space-y-3 mt-4">'+(existingRows||'<p class="text-sm text-slate-500">No apparatus selected yet.</p>')+'</div><div class="mt-5 border-t pt-4"><div id="reportOffDutyPersonnel">'+renderOffDutyPersonnel([])+'</div></div></section>'
+  return '<section class="border rounded-xl p-4 bg-slate-50 md:col-span-2"><h3 class="font-black text-lg mb-1">Responding Apparatus</h3><p class="text-xs text-slate-500 mb-3">Select every department apparatus that responded. Personnel assigned to those apparatus are tracked automatically from Daily Staffing for NERIS.</p><details id="reportApparatusDetails" class="border rounded-xl bg-white"><summary class="cursor-pointer list-none p-3 font-bold flex justify-between"><span>Select Responding Apparatus</span><span id="reportApparatusCount" class="text-xs text-slate-500">'+selected.size+' selected</span></summary><div class="border-t p-3"><div class="grid md:grid-cols-2 gap-2">'+(options||'<p class="text-sm text-slate-500">No active apparatus available.</p>')+'</div><button type="button" onclick="finishReportApparatusSelection()" class="mt-3 px-4 py-2 rounded-lg bg-slate-800 text-white font-bold text-sm">Finish</button></div></details><div id="reportResponseUnits" class="space-y-3 mt-4">'+(existingRows||'<p class="text-sm text-slate-500">No apparatus selected yet.</p>')+'</div><div class="mt-5 border-t pt-4"><div id="reportOffDutyPersonnel">'+renderOffDutyPersonnel([])+'</div></div></section>'
 }
 function reportResponseUnitRow(u){
   const apId=Number(u.apparatus_id||0),ap=apparatus.find(a=>Number(a.apparatus_id)===apId),crew=Array.isArray(u.crew_snapshot)?u.crew_snapshot:[];
@@ -213,25 +213,14 @@ function updateOffDutyResponse(cb){
   const label=details?.querySelector("#reportOffDutyCount");if(label)label.textContent=count+" selected";
   if(cb.checked&&details)details.open=false;
 }
-function handleReportApparatusSelect(select){
-  if(!select)return;
-  const selected=[...select.options].filter(o=>o.selected&&o.value).map(o=>Number(o.value));
-  const box=$("reportResponseUnits");if(!box)return;
-  document.querySelectorAll(".report-response-unit").forEach(row=>{
-    const id=Number(row.dataset.apparatusId);
-    if(!selected.includes(id)){
-      row.remove();
-      const crew=JSON.parse(row.dataset.crew||"[]");
-    }
-  });
-  selected.forEach(id=>toggleReportApparatus(id,true));
-  if(!box.querySelector(".report-response-unit"))box.innerHTML='<p class="text-sm text-slate-500">No apparatus selected yet.</p>';
-  refreshReportApparatusCrews($("rDate")?.value);
+function handleReportApparatusSelect(){ updateReportApparatusCount(); }
+function updateReportApparatusCount(){
+  const count=document.querySelectorAll('[data-report-apparatus-check]:checked').length;
+  const label=$("reportApparatusCount");if(label)label.textContent=count+" selected";
 }
 function finishReportApparatusSelection(){
-  const picker=$("reportApparatusPicker");if(picker)picker.classList.add("hidden");
-  const finish=picker?.nextElementSibling;if(finish)finish.classList.add("hidden");
-  const hint=finish?.nextElementSibling;if(hint)hint.classList.add("hidden");
+  const details=$("reportApparatusDetails");if(details)details.removeAttribute("open");
+  updateReportApparatusCount();
 }
 function toggleReportApparatus(id,checked){
   const box=$("reportResponseUnits");if(!box)return;
@@ -244,7 +233,12 @@ function toggleReportApparatus(id,checked){
     box.appendChild(row.firstElementChild);
     syncReportUnitTimes(row.firstElementChild);
     refreshReportApparatusCrews($("rDate")?.value);
-  }else if(!checked&&existing){existing.remove();if(!box.querySelector(".report-response-unit"))box.innerHTML='<p class="text-sm text-slate-500">No apparatus selected yet.</p>'}
+  }else if(!checked&&existing){
+    existing.remove();
+    if(!box.querySelector(".report-response-unit"))box.innerHTML='<p class="text-sm text-slate-500">No apparatus selected yet.</p>';
+    refreshReportApparatusCrews($("rDate")?.value);
+  }
+  updateReportApparatusCount();
 }
 function removeReportApparatus(id){
   const row=document.querySelector('[data-apparatus-id="'+Number(id)+'"]');row?.remove();
