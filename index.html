@@ -170,7 +170,7 @@ function reportResponseSection(unitRows=[]){
   }).join("");
   const existingRows=(unitRows||[]).map(u=>reportResponseUnitRow(u)).join("");
   setTimeout(()=>document.querySelectorAll(".report-response-unit").forEach(syncReportUnitTimes),0);
-  return '<section class="border rounded-xl p-4 bg-slate-50 md:col-span-2"><h3 class="font-black text-lg mb-1">Responding Apparatus</h3><p class="text-xs text-slate-500 mb-3">Select every department apparatus that responded. Personnel assigned to those apparatus are tracked automatically from Daily Staffing for NERIS.</p><div class="border rounded-xl p-3 bg-white"><label class="text-sm font-bold block">Select Responding Apparatus<select id="reportApparatusPicker" multiple onchange="handleReportApparatusSelect(this)" class="w-full border rounded-lg p-2 mt-2 bg-white min-h-24"><option value="" disabled>Select apparatus...</option>'+options+'</select></label><p class="text-xs text-slate-500 mt-2">Hold Ctrl (Windows) or Command (Mac) to select multiple apparatus.</p></div><div id="reportResponseUnits" class="space-y-3 mt-4">'+(existingRows||'<p class="text-sm text-slate-500">No apparatus selected yet.</p>')+'</div><div class="mt-5 border-t pt-4"><div id="reportOffDutyPersonnel">'+renderOffDutyPersonnel([])+'</div></div></section>'
+  return '<section class="border rounded-xl p-4 bg-slate-50 md:col-span-2"><h3 class="font-black text-lg mb-1">Responding Apparatus</h3><p class="text-xs text-slate-500 mb-3">Select every department apparatus that responded. Personnel assigned to those apparatus are tracked automatically from Daily Staffing for NERIS.</p><div class="border rounded-xl p-3 bg-white"><label class="text-sm font-bold block">Select Responding Apparatus<select id="reportApparatusPicker" multiple size="6" onchange="handleReportApparatusSelect(this)" class="w-full border rounded-lg p-2 mt-2 bg-white">'+options+'</select></label><button type="button" onclick="finishReportApparatusSelection()" class="mt-3 px-4 py-2 rounded-lg bg-slate-800 text-white font-bold text-sm">Finish</button><p class="text-xs text-slate-500 mt-2">Select one or more apparatus, then click Finish to close the list.</p></div><div id="reportResponseUnits" class="space-y-3 mt-4">'+(existingRows||'<p class="text-sm text-slate-500">No apparatus selected yet.</p>')+'</div><div class="mt-5 border-t pt-4"><div id="reportOffDutyPersonnel">'+renderOffDutyPersonnel([])+'</div></div></section>'
 }
 function reportResponseUnitRow(u){
   const apId=Number(u.apparatus_id||0),ap=apparatus.find(a=>Number(a.apparatus_id)===apId),crew=Array.isArray(u.crew_snapshot)?u.crew_snapshot:[];
@@ -203,7 +203,10 @@ function renderOffDutyPersonnel(selectedIds=[],people=null){
   const chosen=new Set((selectedIds||[]).map(Number));
   const active=(people||personnel.filter(p=>p.active!==false)).sort((a,b)=>(a.last_name||"").localeCompare(b.last_name||""));
   const checked=active.filter(p=>chosen.has(Number(p.id)));
-  return '<details id="reportOffDutyDetails" class="border rounded-xl bg-white"><summary class="cursor-pointer list-none p-3 font-bold flex justify-between"><span>Off-Duty Response</span><span id="reportOffDutyCount" class="text-xs text-slate-500">'+checked.length+' selected</span></summary><div class="border-t p-3"><p class="text-xs text-slate-500 mb-2">Select off-duty department personnel who responded. This is used only for NERIS personnel counts and is not displayed on the report.</p><div id="reportOffDutyList" class="grid md:grid-cols-2 gap-2">'+(active.map(p=>'<label class="flex items-center gap-2 border rounded-lg p-2 text-sm"><input type="checkbox" data-report-person="'+Number(p.id)+'" '+(chosen.has(Number(p.id))?'checked':'')+' onchange="updateOffDutyResponse(this)" class="h-4 w-4"><span>'+esc((p.first_name||"")+" "+(p.last_name||""))+'</span></label>').join("")||'<p class="text-sm text-slate-500">No off-duty personnel available.</p>')+'</div></div></details>'
+  return '<details id="reportOffDutyDetails" class="border rounded-xl bg-white"><summary class="cursor-pointer list-none p-3 font-bold flex justify-between"><span>Off-Duty Response</span><span id="reportOffDutyCount" class="text-xs text-slate-500">'+checked.length+' selected</span></summary><div class="border-t p-3"><p class="text-xs text-slate-500 mb-2">Select off-duty department personnel who responded. This is used only for NERIS personnel counts and is not displayed on the report.</p><div id="reportOffDutyList" class="grid md:grid-cols-2 gap-2">'+(active.map(p=>'<label class="flex items-center gap-2 border rounded-lg p-2 text-sm"><input type="checkbox" data-report-person="'+Number(p.id)+'" '+(chosen.has(Number(p.id))?'checked':'')+' onchange="updateOffDutyResponse(this)" class="h-4 w-4"><span>'+esc((p.first_name||"")+" "+(p.last_name||""))+'</span></label>').join("")||'<p class="text-sm text-slate-500">No off-duty personnel available.</p>')+'</div><button type="button" onclick="finishOffDutyResponse()" class="mt-3 px-4 py-2 rounded-lg bg-slate-800 text-white font-bold text-sm">Finish</button></div></details>'
+}
+function finishOffDutyResponse(){
+  const d=$("reportOffDutyDetails");if(d)d.removeAttribute("open");
 }
 function updateOffDutyResponse(cb){
   const details=cb.closest("details");const count=details?.querySelectorAll('[data-report-person]:checked').length||0;
@@ -224,6 +227,11 @@ function handleReportApparatusSelect(select){
   selected.forEach(id=>toggleReportApparatus(id,true));
   if(!box.querySelector(".report-response-unit"))box.innerHTML='<p class="text-sm text-slate-500">No apparatus selected yet.</p>';
   refreshReportApparatusCrews($("rDate")?.value);
+}
+function finishReportApparatusSelection(){
+  const picker=$("reportApparatusPicker");if(picker)picker.classList.add("hidden");
+  const finish=picker?.nextElementSibling;if(finish)finish.classList.add("hidden");
+  const hint=finish?.nextElementSibling;if(hint)hint.classList.add("hidden");
 }
 function toggleReportApparatus(id,checked){
   const box=$("reportResponseUnits");if(!box)return;
