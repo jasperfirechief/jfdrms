@@ -21,7 +21,11 @@
 </div>
 <div class="grid md:grid-cols-2 gap-3">
 <label class="text-sm font-semibold">Occupancy Name<input id="inOccupancy" class="w-full border rounded p-2 mt-1" required></label>
-<label class="text-sm font-semibold">Type<input id="inType" class="w-full border rounded p-2 mt-1"></label>
+<label class="text-sm font-semibold">IFC Occupancy Type<select id="inType" class="w-full border rounded p-2 mt-1" required>
+<option value="">Select occupancy classification</option><optgroup label="Assembly"> <option>A-1 Assembly</option><option>A-2 Assembly</option><option>A-3 Assembly</option><option>A-4 Assembly</option><option>A-5 Assembly</option></optgroup>
+<optgroup label="Other IFC Groups"><option>B Business</option><option>E Educational</option><option>F-1 Factory/Industrial Moderate Hazard</option><option>F-2 Factory/Industrial Low Hazard</option><option>H-1 High Hazard</option><option>H-2 High Hazard</option><option>H-3 High Hazard</option><option>H-4 High Hazard</option><option>H-5 High Hazard</option><option>I-1 Institutional</option><option>I-2 Institutional</option><option>I-3 Institutional</option><option>I-4 Institutional</option><option>M Mercantile</option><option>R-1 Residential</option><option>R-2 Residential</option><option>R-3 Residential</option><option>R-4 Residential</option><option>S-1 Storage Moderate Hazard</option><option>S-2 Storage Low Hazard</option><option>U Utility/Miscellaneous</option></optgroup></select></label>
+<label class="text-sm font-semibold">Square Footage<input id="inSqFt" type="number" min="0" step="1" class="w-full border rounded p-2 mt-1"></label>
+<label class="text-sm font-semibold">Stories<input id="inStories" type="number" min="1" step="1" class="w-full border rounded p-2 mt-1"></label>
 <label class="text-sm font-semibold md:col-span-2">Address<input id="inAddress" class="w-full border rounded p-2 mt-1" required></label>
 <label class="text-sm font-semibold">Contact Name<input id="inContact" class="w-full border rounded p-2 mt-1"></label>
 <label class="text-sm font-semibold">City/St/Zip<input id="inCity" class="w-full border rounded p-2 mt-1"></label>
@@ -30,24 +34,33 @@
 <label class="text-sm font-semibold md:col-span-2">Email<input id="inEmail" type="email" class="w-full border rounded p-2 mt-1"></label>
 </div>
 <div class="card p-4 bg-slate-50">
-<h2 class="font-black mb-3">Inspection Type</h2>
+<h2 class="font-black mb-3">Inspection Type <span class="text-xs font-normal text-slate-500">(select all that apply)</span></h2>
 <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
-<label><input type="radio" name="inspectionType" value="Annual"> Annual</label>
-<label><input type="radio" name="inspectionType" value="Reinspection"> Reinspection</label>
-<label><input type="radio" name="inspectionType" value="Change of Occupancy"> Change of Occupancy</label>
-<label><input type="radio" name="inspectionType" value="Acceptance"> Acceptance</label>
-<label><input type="radio" name="inspectionType" value="Complaint"> Complaint</label>
-<label><input type="radio" name="inspectionType" value="Final"> Final</label>
+<label><input type="checkbox" name="inspectionType" value="Annual"> Annual</label>
+<label><input type="checkbox" name="inspectionType" value="Reinspection"> Reinspection</label>
+<label><input type="checkbox" name="inspectionType" value="Change of Occupancy"> Change of Occupancy</label>
+<label><input type="checkbox" name="inspectionType" value="Acceptance"> Acceptance</label>
+<label><input type="checkbox" name="inspectionType" value="Complaint"> Complaint</label>
+<label><input type="checkbox" name="inspectionType" value="Final"> Final</label>
 </div>
-<label class="block text-sm font-semibold mt-3">Acceptance Type<input id="inAcceptanceType" class="w-full border rounded p-2 mt-1" placeholder="Only if Acceptance is selected"></label>
 </div>
 <div class="card p-4">
-<h2 class="font-black mb-3">Acceptance Test Results</h2>
-<div class="flex flex-wrap gap-4 mb-3"><label><input type="radio" name="acceptanceResult" value="Pass"> Pass</label><label><input type="radio" name="acceptanceResult" value="Fail"> Fail</label><label><input type="radio" name="acceptanceResult" value="N/A" checked> N/A</label></div>
-<textarea id="inAcceptanceNotes" rows="3" class="w-full border rounded p-2" placeholder="Notes"></textarea>
+<h2 class="font-black mb-2">Acceptance Tests <span class="text-xs font-normal text-slate-500">(select all that apply)</span></h2>
+<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2" id="acceptanceTypeOptions">
+<label><input type="checkbox" name="acceptanceType" value="Fire Alarm System"> Fire Alarm System</label>
+<label><input type="checkbox" name="acceptanceType" value="Sprinkler System"> Sprinkler System</label>
+<label><input type="checkbox" name="acceptanceType" value="Commercial Kitchen Hood"> Commercial Kitchen Hood</label>
+<label><input type="checkbox" name="acceptanceType" value="Grease Duct"> Grease Duct</label>
+<label><input type="checkbox" name="acceptanceType" value="Standpipe System"> Standpipe System</label>
+<label><input type="checkbox" name="acceptanceType" value="Fire Pump"> Fire Pump</label>
+<label><input type="checkbox" name="acceptanceType" value="Other"> Other</label>
+</div>
+<p class="text-xs text-slate-500 mt-3">Selecting an acceptance test opens its individual result and notes panel.</p>
+<div id="acceptanceTestPanels" class="mt-3 space-y-2"></div>
 </div>
 <div id="inspectionChecklist" class="space-y-5"></div>
 <div><label class="text-sm font-semibold">REMARKS<textarea id="inRemarks" rows="5" class="w-full border rounded p-2 mt-1"></textarea></label></div>
+<div class="card p-4"><h2 class="font-black mb-2">Pictures / Supporting Files</h2><input id="inAttachments" type="file" multiple accept="image/*,.pdf,.txt,.doc,.docx" class="w-full border rounded p-2"><p class="text-xs text-slate-500 mt-2">Add photos or supporting documents. Maximum 10 MB per file.</p><div id="attachmentList" class="mt-2 text-sm"></div></div>
 <div class="card p-4 bg-amber-50 border-amber-200"><p class="text-sm font-semibold">Reinspection Date</p><input id="inReinspection" type="date" class="border rounded p-2 mt-1"></div>
 <div class="card p-4">
 <h2 class="font-black">Receipt of Notice Acknowledged</h2><p class="text-sm text-slate-500 mb-3">Building Representative Signature</p>
@@ -112,9 +125,9 @@ async function newIncident(){if(!canOps())return alert("You must be on duty.");c
 const checks=["SCBA","Fuel","Lights/Sirens","Medical equipment","Pump/controls"];
 const inspectionSections=[
 {name:"FIRE EXTINGUISHERS",items:[["Inspections current, properly tagged","IFC 2024 §906.2"],["Proper number, type, mounting, signage, distance, unobstructed, readiness","IFC 2024 §§906.1, 906.6"],["No obvious damage or tampering","IFC 2024 §906.2"]]},
-{name:"SPRINKLER SYSTEM",items:[["Inspection current/properly tagged","IFC 2024 §903.5"],["FDC in ready condition","IFC 2024 §912.4"],["ACCEPTANCE TEST CONDUCTED","IFC 2024 §901.6; NFPA 25"]]},
-{name:"EXITS/EGRESS",items:[["Appropriate number and unobstructed width of exits","IFC 2024 §§1005, 1006"],["Appropriate unobstructed width of exit access","IFC 2024 §1005"],["Appropriate travel distance","IFC 2024 §1017.2"],["Outward swinging/appropriate hardware","IFC 2024 §1010"],["Appropriate signage/lighting","IFC 2024 §§1008, 1013"],["Appropriate exit discharge width, lighting, unobstructed","IFC 2024 §§1008, 1028"],["ACCEPTANCE TEST CONDUCTED","IFC 2024 §901.6; applicable system standard"]]},
-{name:"FIRE ALARM SYSTEM",items:[["Inspection current/properly tagged","IFC 2024 §907.8"],["No obvious damage or tampering","IFC 2024 §901.8"],["In ready state","IFC 2024 §907.8"],["Appropriate detectors and alarms (audible and visual)","IFC 2024 §907.5"],["Appropriate emergency lighting","IFC 2024 §1008"],["Call-out test conducted","IFC 2024 §907.8"],["SYSTEM ACCEPTANCE TEST CONDUCTED","IFC 2024 §901.6; NFPA 72"]]},
+{name:"SPRINKLER SYSTEM",items:[["Inspection current/properly tagged","IFC 2024 §903.5"],["FDC in ready condition","IFC 2024 §912.4"],["System inspection current/properly tagged","IFC 2024 §903.5"]]},
+{name:"EXITS/EGRESS",items:[["Appropriate number and unobstructed width of exits","IFC 2024 §§1005, 1006"],["Appropriate unobstructed width of exit access","IFC 2024 §1005"],["Appropriate travel distance","IFC 2024 §1017.2"],["Outward swinging/appropriate hardware","IFC 2024 §1010"],["Appropriate signage/lighting","IFC 2024 §§1008, 1013"],["Appropriate exit discharge width, lighting, unobstructed","IFC 2024 §§1008, 1028"],["Emergency lighting operational","IFC 2024 §1008.3; §1008.3.2"]]},
+{name:"FIRE ALARM SYSTEM",items:[["Inspection current/properly tagged","IFC 2024 §907.8"],["No obvious damage or tampering","IFC 2024 §901.8"],["In ready state","IFC 2024 §907.8"],["Appropriate detectors and alarms (audible and visual)","IFC 2024 §907.5"],["Call-out test conducted","IFC 2024 §907.8"],["In ready state","IFC 2024 §907.8"]]},
 {name:"CLEARANCES",items:[["Adequate clearance around Electrical panels, Fire Alarm panels, standpipes, sprinkler risers, FDCs","IFC 2024 §§604.3, 912.4"],["Adequate clearance below ceiling/sprinkler heads","IFC 2024 §315.3.1; §903.3"],["Adequate clearance around heat sources","IFC 2024 §315.3.1"]]},
 {name:"COMMERCIAL KITCHEN HOOD SYSTEM",items:[["Inspection current/properly tagged","IFC 2024 §904.14.5"],["No obvious damage or tampering","IFC 2024 §901.8"],["Appropriate nozzles/caps in place","IFC 2024 §904.14; NFPA 17A/96 as applicable"],["No excessive grease build up on equipment, hood, ducts, fan, etc.","IFC 2024 §904.14; NFPA 96"],["HOOD SYSTEM ACCEPTANCE TEST CONDUCTED","IFC 2024 §904.14; NFPA 96"]]},
 {name:"OTHER",items:[["Appropriately posted address (rear on strip occupancies)","IFC 2024 §505.1"],["Dumpster/combustibles too close to building","IFC 2024 §304.1; §315"],["Appropriately posted occupancy limit signage","IFC 2024 §1004.9"],["No voids in ceiling (holes, tiles, etc.)","IFC 2024 §703.1"],["Proper electrical wiring/covers","IFC 2024 Chapter 6"],["Required test/drill logs or emergency plan available/complete/up-to-date","IFC 2024 §405; applicable occupancy section"],["Required MSDS/SDS available/complete/up-to-date","IFC 2024 Chapter 50; applicable hazardous-material requirements"],["Required documentation available/complete/up-to-date","IFC 2024 §901.6; applicable system/occupancy section"]]},
