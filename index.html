@@ -1,358 +1,52 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jasper Fire Department - RMS</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <style>
-    .tab-content { display: none; }
-    .tab-content.active { display: block !important; }
-  </style>
-</head>
-<body class="bg-slate-100 min-h-screen text-slate-800 font-sans">
-
-  <!-- TOP HEADER & NAV -->
-  <header class="bg-slate-900 text-white shadow-md">
-    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-      <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('home')">
-        <div class="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center font-bold text-xl border-2 border-white">
-          J
-        </div>
-        <span class="font-bold text-xl tracking-wide">JASPER FIRE DEPARTMENT</span>
-      </div>
-
-      <nav class="hidden md:flex space-x-6 text-sm font-semibold">
-        <button type="button" onclick="switchTab('home')" class="hover:text-red-400 transition">Home</button>
-        <button type="button" onclick="switchTab('staffing')" class="hover:text-red-400 transition">Daily Staffing</button>
-        <button type="button" onclick="switchTab('incidents')" class="hover:text-red-400 transition">Incidents</button>
-        <button type="button" onclick="switchTab('inspections')" class="hover:text-red-400 transition">Inspections</button>
-        <button type="button" onclick="switchTab('admin')" class="hover:text-red-400 transition text-yellow-400">Admin Portal</button>
-      </nav>
-
-      <div class="flex items-center space-x-3">
-        <select id="user-selector" onchange="changeActiveUser(this.value)" class="bg-slate-800 text-xs border border-slate-700 rounded px-2 py-1 text-white focus:outline-none">
-          <option value="1">Chief Admin (ADMIN)</option>
-          <option value="2">John Doe (OFFICER)</option>
-        </select>
-        <button type="button" onclick="logoutUser()" class="bg-red-600 hover:bg-red-700 text-xs px-3 py-1.5 rounded font-bold transition">Logout</button>
-      </div>
-    </div>
-  </header>
-
-  <!-- MAIN CONTAINER -->
-  <main class="max-w-7xl mx-auto p-4 md:p-6">
-
-    <!-- TAB 1: HOME -->
-    <section id="tab-home" class="tab-content active">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-        <div onclick="switchTab('staffing')" class="bg-white p-8 rounded-lg shadow-md hover:shadow-xl transition border-t-4 border-red-600 cursor-pointer flex flex-col items-center justify-center text-center">
-          <i class="fa-solid fa-users text-red-600 text-4xl mb-4"></i>
-          <h2 class="text-xl font-bold text-slate-800 uppercase tracking-wider">Daily Staffing</h2>
-        </div>
-
-        <div onclick="switchTab('incidents')" class="bg-white p-8 rounded-lg shadow-md hover:shadow-xl transition border-t-4 border-red-600 cursor-pointer flex flex-col items-center justify-center text-center">
-          <i class="fa-solid fa-fire-flame-curved text-red-600 text-4xl mb-4"></i>
-          <h2 class="text-xl font-bold text-slate-800 uppercase tracking-wider">Incident Reporting</h2>
-        </div>
-
-        <div onclick="switchTab('inspections')" class="bg-white p-8 rounded-lg shadow-md hover:shadow-xl transition border-t-4 border-red-600 cursor-pointer flex flex-col items-center justify-center text-center">
-          <i class="fa-solid fa-clipboard-check text-red-600 text-4xl mb-4"></i>
-          <h2 class="text-xl font-bold text-slate-800 uppercase tracking-wider">Inspections</h2>
-        </div>
-      </div>
-    </section>
-
-    <!-- TAB 2: DAILY STAFFING -->
-    <section id="tab-staffing" class="tab-content">
-      <h1 class="text-2xl font-bold text-slate-800 mb-6">Daily Roster & Staffing</h1>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="stations-container"></div>
-    </section>
-
-    <!-- TAB 3: INCIDENTS -->
-    <section id="tab-incidents" class="tab-content">
-      <h1 class="text-2xl font-bold text-slate-800 mb-6">Incident Reports</h1>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="incidents-feed"></div>
-    </section>
-
-    <!-- TAB 4: INSPECTIONS -->
-    <section id="tab-inspections" class="tab-content">
-      <h1 class="text-2xl font-bold text-slate-800 mb-6">Apparatus Checklist & Inspections</h1>
-      <div class="bg-white p-6 rounded-lg shadow-md max-w-2xl mx-auto">
-        <form onsubmit="submitChecklist(event)">
-          <div class="mb-4">
-            <label class="block font-bold text-slate-700 text-sm mb-1">Select Inspector</label>
-            <select id="inspection-inspector" class="w-full border rounded p-2 text-sm" required></select>
-          </div>
-          <div class="mb-4">
-            <label class="block font-bold text-slate-700 text-sm mb-1">Select Apparatus</label>
-            <select id="inspection-apparatus" class="w-full border rounded p-2 text-sm" required></select>
-          </div>
-          <div class="mb-4" id="checklist-items"></div>
-          <button type="submit" class="w-full bg-red-600 text-white font-bold py-2 rounded hover:bg-red-700">Submit Inspection</button>
-        </form>
-      </div>
-    </section>
-
-    <!-- TAB 5: ADMIN PORTAL -->
-    <section id="tab-admin" class="tab-content">
-      <h1 class="text-2xl font-bold text-slate-800 mb-6">Admin Portal</h1>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="bg-white p-6 rounded-lg shadow-md">
-          <h2 class="text-lg font-bold mb-4 border-b pb-2">Add Personnel</h2>
-          <form onsubmit="addPersonnel(event)" class="space-y-3">
-            <input id="p-fname" type="text" placeholder="First Name" class="w-full border p-2 text-sm rounded" required>
-            <input id="p-lname" type="text" placeholder="Last Name" class="w-full border p-2 text-sm rounded" required>
-            <input id="p-email" type="email" placeholder="Email" class="w-full border p-2 text-sm rounded" required>
-            <select id="p-role" class="w-full border p-2 text-sm rounded">
-              <option value="firefighter">Firefighter</option>
-              <option value="officer">Officer</option>
-              <option value="admin">Admin</option>
-            </select>
-            <button type="submit" class="bg-slate-900 text-white font-bold px-4 py-2 text-sm rounded hover:bg-slate-800">Add Personnel</button>
-          </form>
-          <div class="mt-6">
-            <h3 class="font-bold text-sm mb-2">Current Personnel</h3>
-            <ul id="personnel-list" class="divide-y text-xs text-slate-700"></ul>
-          </div>
-        </div>
-
-        <div class="bg-white p-6 rounded-lg shadow-md">
-          <h2 class="text-lg font-bold mb-4 border-b pb-2">Add Apparatus</h2>
-          <form onsubmit="addApparatus(event)" class="flex space-x-2">
-            <input id="app-name" type="text" placeholder="e.g. Engine 3" class="flex-grow border p-2 text-sm rounded" required>
-            <button type="submit" class="bg-slate-900 text-white font-bold px-4 py-2 text-sm rounded hover:bg-slate-800">Add</button>
-          </form>
-          <div class="mt-6">
-            <h3 class="font-bold text-sm mb-2">Current Apparatus</h3>
-            <ul id="apparatus-list" class="divide-y text-xs text-slate-700"></ul>
-          </div>
-        </div>
-      </div>
-    </section>
-
-  </main>
-
-  <script>
-    const SUPABASE_URL = 'https://audgtwcctdoiptuekqvn.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz';
-    let supabase = null;
-
-    if (window.supabase) {
-      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    }
-
-    let personnelList = [
-      { id: 1, firstName: 'Admin', lastName: 'Chief', role: 'admin', email: 'admin@jasperfire.org' },
-      { id: 2, firstName: 'John', lastName: 'Doe', role: 'officer', email: 'jdoe@jasperfire.org' }
-    ];
-    let apparatusList = [
-      { id: 1, name: 'Engine 1' },
-      { id: 2, name: 'Ladder 1' },
-      { id: 3, name: 'Rescue 2' }
-    ];
-    let activeIncidents = [
-      { cad: '2026-00123', type: 'STRUCTURE FIRE', location: '1200 4th Ave, Jasper, AL', dispatchTime: '14:32', reports: [] }
-    ];
-
-    function switchTab(tabId) {
-      document.querySelectorAll('.tab-content').forEach(el => {
-        el.classList.remove('active');
-        el.style.display = 'none';
-      });
-      const activeEl = document.getElementById('tab-' + tabId);
-      if (activeEl) {
-        activeEl.classList.add('active');
-        activeEl.style.display = 'block';
-      }
-    }
-
-    async function loadAppData() {
-      if (supabase) {
-        try {
-          const { data: pData } = await supabase.from('personnel').select('*');
-          if (pData && pData.length > 0) {
-            personnelList = pData.map(p => ({
-              id: p.id,
-              firstName: p.first_name,
-              lastName: p.last_name,
-              role: p.role,
-              email: p.email
-            }));
-          }
-
-          const { data: aData } = await supabase.from('apparatus').select('*');
-          if (aData && aData.length > 0) apparatusList = aData;
-
-          const { data: iData } = await supabase.from('incidents').select('*');
-          if (iData && iData.length > 0) {
-            activeIncidents = iData.map(i => ({
-              cad: i.cad,
-              type: i.type,
-              location: i.location,
-              dispatchTime: i.dispatch_time,
-              reports: i.reports || []
-            }));
-          }
-        } catch (err) {
-          console.warn("Using local fallback data:", err);
-        }
-      }
-
-      renderUserSelect();
-      renderPersonnel();
-      renderApparatus();
-      renderStaffing();
-      renderIncidentsFeed();
-      renderInspectorDropdown();
-      renderChecklist();
-    }
-
-    function renderUserSelect() {
-      const select = document.getElementById('user-selector');
-      if (select) {
-        select.innerHTML = personnelList.map(p => 
-          `<option value="${p.id}">${p.firstName} ${p.lastName} (${p.role.toUpperCase()})</option>`
-        ).join('');
-      }
-    }
-
-    function changeActiveUser(userId) {
-      // User switched
-    }
-
-    function renderPersonnel() {
-      const el = document.getElementById('personnel-list');
-      if (el) {
-        el.innerHTML = personnelList.map(p => `<li class="py-1">${p.firstName} ${p.lastName} - <span class="uppercase font-semibold">${p.role}</span></li>`).join('');
-      }
-    }
-
-    function renderApparatus() {
-      const el = document.getElementById('apparatus-list');
-      const inspectionApp = document.getElementById('inspection-apparatus');
-      if (el) {
-        el.innerHTML = apparatusList.map(a => `<li class="py-1">${a.name}</li>`).join('');
-      }
-      if (inspectionApp) {
-        inspectionApp.innerHTML = apparatusList.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
-      }
-    }
-
-    function renderInspectorDropdown() {
-      const el = document.getElementById('inspection-inspector');
-      if (el) {
-        el.innerHTML = personnelList.map(p => `<option value="${p.id}">${p.firstName} ${p.lastName}</option>`).join('');
-      }
-    }
-
-    function renderStaffing() {
-      const container = document.getElementById('stations-container');
-      if (!container) return;
-      
-      const stations = ['Station 1', 'Station 2', 'Station 3'];
-      container.innerHTML = stations.map((st, idx) => `
-        <div class="bg-white p-4 rounded shadow border-l-4 border-red-600">
-          <h3 class="font-bold text-lg mb-3">${st}</h3>
-          <div class="text-sm space-y-2 text-slate-600">
-            <p><strong>Apparatus:</strong> ${apparatusList[idx] ? apparatusList[idx].name : 'Engine ' + (idx + 1)}</p>
-            <p><strong>Officer:</strong> ${personnelList[0] ? personnelList[0].firstName + ' ' + personnelList[0].lastName : 'Unassigned'}</p>
-            <p><strong>Driver/Engineer:</strong> ${personnelList[1] ? personnelList[1].firstName + ' ' + personnelList[1].lastName : 'Unassigned'}</p>
-          </div>
-        </div>
-      `).join('');
-    }
-
-    function renderIncidentsFeed() {
-      const container = document.getElementById('incidents-feed');
-      if (!container) return;
-
-      container.innerHTML = activeIncidents.map(inc => `
-        <div class="bg-white p-5 rounded-lg shadow border border-slate-200">
-          <div class="flex justify-between items-center mb-2">
-            <span class="bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded">${inc.type}</span>
-            <span class="text-xs text-slate-500 font-mono">${inc.cad}</span>
-          </div>
-          <p class="text-sm font-bold text-slate-800">${inc.location}</p>
-          <p class="text-xs text-slate-500 mt-1">Dispatched: ${inc.dispatchTime}</p>
-        </div>
-      `).join('');
-    }
-
-    function renderChecklist() {
-      const container = document.getElementById('checklist-items');
-      if (!container) return;
-      const items = ['SCBA Check', 'Fuel Level OK', 'Lights & Sirens Functional', 'Medical Bag Inventoried', 'Pump Test Completed'];
-      container.innerHTML = items.map((item, i) => `
-        <label class="flex items-center space-x-2 py-1 text-sm text-slate-700">
-          <input type="checkbox" id="check-${i}" class="rounded text-red-600">
-          <span>${item}</span>
-        </label>
-      `).join('');
-    }
-
-    async function addPersonnel(e) {
-      e.preventDefault();
-      const firstName = document.getElementById('p-fname').value;
-      const lastName = document.getElementById('p-lname').value;
-      const email = document.getElementById('p-email').value;
-      const role = document.getElementById('p-role').value;
-
-      if (supabase) {
-        const { data, error } = await supabase.from('personnel').insert([{ first_name: firstName, last_name: lastName, email, role }]).select();
-        if (error) {
-          alert("Error saving to database: " + error.message);
-          return;
-        }
-        if (data && data[0]) {
-          personnelList.push({ id: data[0].id, firstName, lastName, email, role });
-        }
-      } else {
-        personnelList.push({ id: Date.now(), firstName, lastName, email, role });
-      }
-
-      renderPersonnel();
-      renderUserSelect();
-      renderInspectorDropdown();
-      e.target.reset();
-    }
-
-    async function addApparatus(e) {
-      e.preventDefault();
-      const name = document.getElementById('app-name').value;
-
-      if (supabase) {
-        const { data, error } = await supabase.from('apparatus').insert([{ name }]).select();
-        if (error) {
-          alert("Error saving apparatus: " + error.message);
-          return;
-        }
-        if (data && data[0]) {
-          apparatusList.push({ id: data[0].id, name });
-        }
-      } else {
-        apparatusList.push({ id: Date.now(), name });
-      }
-
-      renderApparatus();
-      renderStaffing();
-      e.target.reset();
-    }
-
-    function submitChecklist(e) {
-      e.preventDefault();
-      alert("Inspection Checklist Submitted Successfully!");
-      e.target.reset();
-    }
-
-    function logoutUser() {
-      alert("Logged out successfully.");
-      switchTab('home');
-    }
-
-    window.addEventListener('DOMContentLoaded', loadAppData);
-  </script>
-</body>
-</html>
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Jasper Fire Department RMS</title>
+<script src="https://cdn.tailwindcss.com"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>body{font-family:Inter,system-ui,sans-serif}.hiddenx{display:none!important}.card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 1px 3px #0001}.navbtn.active{color:#dc2626;border-bottom:2px solid #dc2626}</style></head>
+<body class="bg-slate-100 text-slate-900 min-h-screen">
+<div id="login" class="min-h-screen grid place-items-center p-5"><div class="card w-full max-w-md p-7"><div class="flex items-center gap-3 mb-6"><div class="h-12 w-12 rounded-full bg-red-600 text-white grid place-items-center font-black text-xl">J</div><div><h1 class="font-black text-xl">Jasper Fire Department</h1><p class="text-slate-500 text-sm">RMS Login</p></div></div><form id="loginForm" class="space-y-3"><input id="email" type="email" autocomplete="username" placeholder="Email" required class="w-full border rounded-lg p-3"><input id="password" type="password" autocomplete="current-password" placeholder="Password" required class="w-full border rounded-lg p-3"><button class="w-full bg-red-600 text-white rounded-lg p-3 font-bold">Sign in</button><p id="loginError" class="text-red-600 text-sm"></p></form></div></div>
+<div id="app" class="hiddenx min-h-screen"><header class="bg-slate-950 text-white sticky top-0 z-20"><div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center"><button onclick="tab('home')" class="flex items-center gap-3"><span class="h-10 w-10 rounded-full bg-red-600 grid place-items-center font-black">J</span><span><b class="block">JASPER FIRE DEPARTMENT</b><small class="text-slate-400">RMS</small></span></button><div class="flex items-center gap-3"><span id="userLabel" class="text-xs text-slate-300"></span><button onclick="logout()" class="bg-red-600 px-3 py-2 rounded text-sm font-bold">Sign out</button></div></div></header>
+<nav class="bg-white border-b overflow-x-auto"><div class="max-w-7xl mx-auto px-4 flex gap-5"><button id="n-home" onclick="tab('home')" class="navbtn py-3 text-sm font-semibold">Home</button><button id="n-staffing" onclick="tab('staffing')" class="navbtn py-3 text-sm font-semibold">Staffing</button><button id="n-incidents" onclick="tab('incidents')" class="navbtn py-3 text-sm font-semibold">Incidents</button><button id="n-inspections" onclick="tab('inspections')" class="navbtn py-3 text-sm font-semibold">Inspections</button><button id="n-checks" onclick="tab('checks')" class="navbtn py-3 text-sm font-semibold">Checks</button><button id="n-apparatus" onclick="tab('apparatus')" class="navbtn py-3 text-sm font-semibold">Apparatus</button><button id="n-personnel" onclick="tab('personnel')" class="navbtn py-3 text-sm font-semibold">Personnel</button><button id="n-admin" onclick="tab('admin')" class="navbtn py-3 text-sm font-semibold">Admin</button></div></nav>
+<main class="max-w-7xl mx-auto p-4">
+<section id="t-home"><h1 class="text-2xl font-black">Department RMS</h1><p class="text-slate-500 mb-5">Operational records and daily staffing.</p><div id="homeCards" class="grid md:grid-cols-3 gap-4"></div></section>
+<section id="t-staffing" class="hiddenx"><div class="flex flex-wrap justify-between gap-3 mb-5"><div><h1 class="text-2xl font-black">Daily Staffing</h1><p class="text-slate-500">Officers can control staffing even when off duty.</p></div><input id="staffDate" type="date" class="border rounded-lg p-2 bg-white"></div><div id="staffGrid" class="grid lg:grid-cols-3 gap-4"></div></section>
+<section id="t-incidents" class="hiddenx"><div class="flex justify-between mb-5"><h1 class="text-2xl font-black">Incident Reports</h1><button onclick="newIncident()" class="bg-red-600 text-white px-4 py-2 rounded-lg font-bold">New Report</button></div><div id="incidentList" class="space-y-3"></div></section>
+<section id="t-inspections" class="hiddenx"><h1 class="text-2xl font-black mb-5">Inspections</h1><div class="card p-5"><form id="inspectionForm" class="space-y-3"><select id="inspectionApp" class="w-full border rounded p-2"></select><textarea id="inspectionNotes" placeholder="Notes" class="w-full border rounded p-2"></textarea><div id="inspectionChecks"></div><button class="bg-red-600 text-white px-4 py-2 rounded font-bold">Complete Inspection</button></form><div id="inspectionHistory" class="mt-6 space-y-2"></div></div></section>
+<section id="t-checks" class="hiddenx"><h1 class="text-2xl font-black mb-5">Apparatus Checks</h1><div id="checkGrid" class="grid md:grid-cols-2 lg:grid-cols-3 gap-3"></div></section>
+<section id="t-apparatus" class="hiddenx"><div class="flex justify-between mb-5"><h1 class="text-2xl font-black">Apparatus</h1><button onclick="addApparatus()" class="bg-slate-950 text-white px-4 py-2 rounded font-bold">Add</button></div><div id="apparatusList" class="grid md:grid-cols-3 gap-3"></div></section>
+<section id="t-personnel" class="hiddenx"><div class="flex justify-between mb-5"><h1 class="text-2xl font-black">Personnel</h1><button onclick="addUser()" class="bg-slate-950 text-white px-4 py-2 rounded font-bold">Add User</button></div><div id="personnelList" class="grid md:grid-cols-3 gap-3"></div></section>
+<section id="t-admin" class="hiddenx"><h1 class="text-2xl font-black mb-5">Administration</h1><div class="card p-5"><h2 class="font-bold">Stations</h2><div id="stationList" class="mt-3 space-y-2"></div><button onclick="addStation()" class="mt-4 bg-slate-950 text-white px-4 py-2 rounded font-bold">Add Station</button></div></section>
+</main></div>
+<script>
+const URL="https://audgtwcctdoiptuekqvn.supabase.co",KEY="sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz",db=supabase.createClient(URL,KEY);
+let me=null,profile=null,personnel=[],stations=[],apparatus=[],crew=[],activeTab="home";
+const $=id=>document.getElementById(id), esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const today=()=>new Date().toISOString().slice(0,10);
+function operational(){return profile?.app_role==="admin"||profile?.app_role==="officer"||crew.length>0}
+function canStaff(){return profile?.app_role==="admin"||profile?.app_role==="officer"}
+function canOps(){return profile?.app_role==="admin"||crew.length>0}
+function canInspect(){return profile?.app_role==="admin"||(profile?.app_role==="officer"&&crew.length>0)}
+function tab(t){activeTab=t;document.querySelectorAll("main>section").forEach(s=>s.classList.add("hiddenx"));$("t-"+t).classList.remove("hiddenx");document.querySelectorAll(".navbtn").forEach(b=>b.classList.remove("active"));$("n-"+t)?.classList.add("active");if(t==="staffing")loadStaffing();if(t==="incidents")loadIncidents();if(t==="inspections")loadInspections();if(t==="checks")renderChecks();if(t==="apparatus")renderApparatus();if(t==="personnel")renderPersonnel();if(t==="admin")renderAdmin()}
+async function boot(){const {data:{session}}=await db.auth.getSession();if(session)await start(session.user);else $("login").classList.remove("hiddenx")}
+async function start(u){me=u;const p=await db.from("users").select("*").eq("user_id",u.id).single();if(p.error||!p.data?.active){await db.auth.signOut();$("loginError").textContent="Your account is not active.";return}profile=p.data;await refresh();$("login").classList.add("hiddenx");$("app").classList.remove("hiddenx");$("userLabel").textContent=profile.first_name+" "+profile.last_name+" · "+profile.app_role.toUpperCase();tab("home")}
+async function refresh(){const [p,s,a]=await Promise.all([db.from("personnel").select("*").eq("active",true).order("last_name"),db.from("stations").select("*").eq("active",true).order("station_id"),db.from("apparatus").select("*").eq("active",true).order("apparatus_id")]);personnel=p.data||[];stations=s.data||[];apparatus=a.data||[];await loadCrew();renderHome();renderApparatus();renderPersonnel();renderAdmin()}
+async function loadCrew(){const d=today();const r=await db.from("daily_staffing").select("staffing_id").eq("staffing_date",d).eq("shift","daily").maybeSingle();crew=[];if(r.data){const x=await db.from("daily_personnel_assignments").select("*,daily_app_assignments!inner(apparatus_id,staffing_id)").eq("daily_app_assignments.staffing_id",r.data.staffing_id).eq("personnel_id",(await db.from("personnel").select("id").eq("auth_user_id",me.id).maybeSingle()).data?.id);crew=x.data||[]}}
+function renderHome(){$("homeCards").innerHTML=[["staffing","Daily Staffing","Assign apparatus and crews."],["incidents","Incident Reports","Create and complete internal reports."],["checks","Apparatus Checks","Driver/officer/admin checks."]].map(a=>'<button onclick="tab(\''+a[0]+'\')" class="card p-6 text-left"><b class="text-lg">'+a[1]+'</b><p class="text-sm text-slate-500 mt-1">'+a[2]+'</p></button>').join("")}
+async function loadStaffing(){if(!canStaff())return;const d=$("staffDate").value||today();const r=await db.from("daily_staffing").select("staffing_id").eq("staffing_date",d).eq("shift","daily").maybeSingle();let sid=r.data?.staffing_id;if(!sid){const q=await db.rpc("get_or_create_daily_staffing",{p_date:d});sid=q.data}const a=await db.from("daily_app_assignments").select("*,daily_personnel_assignments(*,personnel(*)),apparatus(*),stations(*)").eq("staffing_id",sid);const rows=a.data||[];$("staffGrid").innerHTML=stations.map(s=>'<div class="card p-4"><h2 class="font-black text-lg mb-3">'+esc(s.station_name)+'</h2>'+apparatus.map(ap=>{const z=rows.find(x=>x.station_id===s.station_id&&x.apparatus_id===ap.apparatus_id);const people=z?.daily_personnel_assignments||[];return '<div class="border rounded-lg p-3 mb-2"><div class="flex justify-between"><b>'+esc(ap.unit_number)+'</b><button onclick="crewEdit('+sid+','+s.station_id+','+ap.apparatus_id+')" class="text-red-600 text-xs font-bold">Crew</button></div><div class="text-xs text-slate-500 mt-1">'+(people.length?people.map(p=>esc(p.personnel.first_name+" "+p.personnel.last_name)+" · "+p.assignment_role).join("<br>"):"Not assigned")+'</div></div>'}).join("")+'</div>').join("")}
+async function crewEdit(sid,stationId,apparatusId){const ids=personnel.map(p=>p.id+":"+p.first_name+" "+p.last_name).join("\n");const d=prompt("DRIVER personnel ID (required)\n\n"+ids);if(!d)return;const driver=personnel.find(p=>String(p.id)===d.trim());if(!driver)return alert("Invalid driver.");const o=prompt("OFFICER personnel ID (optional)\n\n"+ids)||"";const fs=prompt("FIREFIGHTER IDs, comma separated (optional)\n\n"+ids)||"";const x=await db.from("daily_app_assignments").upsert({staffing_id:sid,station_id:stationId,apparatus_id:apparatusId},{onConflict:"staffing_id,apparatus_id"}).select().single();if(x.error)return alert(x.error.message);await db.from("daily_personnel_assignments").delete().eq("apparatus_assignment_id",x.data.assignment_id);const rows=[{apparatus_assignment_id:x.data.assignment_id,personnel_id:driver.id,assignment_role:"driver"}];if(o){const op=personnel.find(p=>String(p.id)===o.trim());if(op)rows.push({apparatus_assignment_id:x.data.assignment_id,personnel_id:op.id,assignment_role:"officer"})}fs.split(",").map(x=>x.trim()).filter(Boolean).forEach(id=>{const p=personnel.find(q=>String(q.id)===id);if(p)rows.push({apparatus_assignment_id:x.data.assignment_id,personnel_id:p.id,assignment_role:"firefighter"})});const r=await db.from("daily_personnel_assignments").insert(rows);if(r.error)alert(r.error.message);else loadStaffing()}
+async function loadIncidents(){if(!canOps()){$("incidentList").innerHTML='<div class="card p-5">You must be on duty to access incident reports.</div>';return}const r=await db.from("incidents").select("*").order("dispatch_time",{ascending:false}).limit(100);$("incidentList").innerHTML=(r.data||[]).map(i=>'<div class="card p-4"><div class="flex justify-between"><b>'+esc(i.type)+'</b><span class="font-mono text-xs">'+esc(i.cad)+'</span></div><div>'+esc(i.location)+'</div><div class="text-xs text-slate-500">'+esc(i.dispatch_time)+'</div></div>').join("")||'<div class="card p-5">No reports.</div>'}
+async function newIncident(){if(!canOps())return alert("You must be on duty.");const cad=prompt("CAD number:");if(!cad)return;const type=prompt("Incident type:")||"Other";const loc=prompt("Location:")||"";const r=await db.from("incidents").insert({cad,type,location:loc,dispatch_time:new Date().toISOString(),reports:[]});if(r.error)alert(r.error.message);else loadIncidents()}
+const checks=["SCBA","Fuel","Lights/Sirens","Medical equipment","Pump/controls"];
+async function loadInspections(){if(!canInspect()){document.querySelector("#inspectionHistory").innerHTML='<p class="text-slate-500">Only an admin or on-duty officer can manage inspections.</p>';return}$("inspectionApp").innerHTML=apparatus.map(a=>'<option value="'+a.apparatus_id+'">'+esc(a.unit_number)+'</option>').join("");$("inspectionChecks").innerHTML=checks.map((x,i)=>'<label class="block py-1"><input type="checkbox" id="ic'+i+'"> '+x+'</label>').join("");const r=await db.from("inspections").select("*,apparatus(unit_number)").order("created_at",{ascending:false}).limit(20);$("inspectionHistory").innerHTML=(r.data||[]).map(x=>'<div class="border-b py-2 text-sm"><b>'+esc(x.apparatus?.unit_number)+'</b> · '+esc(x.status)+' · '+esc(x.inspection_date)+'</div>').join("")}
+$("inspectionForm").onsubmit=async e=>{e.preventDefault();if(!canInspect())return;const checklist={};checks.forEach((x,i)=>checklist[x]=$("ic"+i).checked);const r=await db.from("inspections").insert({apparatus_id:Number($("inspectionApp").value),inspector_user_id:me.id,status:Object.values(checklist).every(Boolean)?"complete":"failed",notes:$("inspectionNotes").value,checklist});if(r.error)alert(r.error.message);else{$("inspectionNotes").value="";loadInspections()}}
+async function renderChecks(){const allowed=profile?.app_role==="admin"||profile?.app_role==="officer"||crew.some(x=>x.assignment_role==="driver");if(!allowed){$("checkGrid").innerHTML='<div class="card p-5">No apparatus-check access while off duty.</div>';return}$("checkGrid").innerHTML=apparatus.map(a=>'<div class="card p-4"><b>'+esc(a.unit_number)+'</b><p class="text-xs text-slate-500 mb-3">'+esc(a.apparatus_type||"")+'</p><button onclick="doCheck('+a.apparatus_id+')" class="bg-red-600 text-white px-3 py-2 rounded font-bold text-sm">Perform Check</button></div>').join("")}
+async function doCheck(id){const vals={};checks.forEach((x,i)=>vals[x]=confirm(x+" OK?"));const r=await db.from("apparatus_checks").insert({apparatus_id:id,performed_by:me.id,status:Object.values(vals).every(Boolean)?"complete":"failed",checklist:vals});if(r.error)alert(r.error.message);else alert("Apparatus check saved.")}
+function renderApparatus(){$("apparatusList").innerHTML=apparatus.map(a=>'<div class="card p-4"><b>'+esc(a.unit_number)+'</b><p class="text-sm text-slate-500">'+esc(a.apparatus_type||"")+'</p></div>').join("")||'<div class="card p-5">No apparatus.</div>'}
+function renderPersonnel(){$("personnelList").innerHTML=personnel.map(p=>'<div class="card p-4"><b>'+esc(p.first_name+" "+p.last_name)+'</b><div class="text-xs uppercase text-slate-500">'+esc(p.role)+'</div><div class="text-xs text-slate-400">'+esc(p.email||"")+'</div></div>').join("")}
+function renderAdmin(){$("stationList").innerHTML=stations.map(s=>'<div class="border-b py-2">'+esc(s.station_name)+'</div>').join("")}
+async function addStation(){if(profile?.app_role!=="admin")return;const n=prompt("Station name:");if(!n)return;const r=await db.from("stations").insert({station_name:n,active:true});if(r.error)alert(r.error.message);else refresh()}
+async function addApparatus(){if(profile?.app_role!=="admin")return;const n=prompt("Unit number/name:");if(!n)return;const t=prompt("Apparatus type:")||"";const r=await db.from("apparatus").insert({unit_number:n,apparatus_type:t,active:true});if(r.error)alert(r.error.message);else refresh()}
+async function addUser(){if(profile?.app_role!=="admin")return;const first=prompt("First name:");if(!first)return;const last=prompt("Last name:");if(!last)return;const email=prompt("Email:");if(!email)return;const pw=prompt("Temporary password (user should change it after first login):");if(!pw)return;const role=prompt("Role: admin, officer, firefighter","firefighter")||"firefighter";const s=await db.auth.getSession();const r=await fetch(URL+"/functions/v1/admin-create-user",{method:"POST",headers:{Authorization:"Bearer "+s.data.session.access_token,"Content-Type":"application/json"},body:JSON.stringify({first_name:first,last_name:last,email,password:pw,role})});const j=await r.json();if(!r.ok)alert(j.error||"Could not create user");else{alert("User created.");refresh()}}
+$("loginForm").onsubmit=async e=>{e.preventDefault();$("loginError").textContent="";const r=await db.auth.signInWithPassword({email:$("email").value,password:$("password").value});if(r.error){$("loginError").textContent=r.error.message;return}await start(r.data.user)}
+async function logout(){await db.auth.signOut();location.reload()}
+$("staffDate").value=today();$("staffDate").onchange=loadStaffing;db.auth.onAuthStateChange(function(ev,session){if(ev==="SIGNED_OUT"){location.reload()}});boot();
+</script></body></html>
