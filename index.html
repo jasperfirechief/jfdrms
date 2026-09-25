@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Jasper Fire Department RMS</title>
-<script src="https://cdn.tailwindcss.com"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script><script>if(!window.supabase?.createClient)document.write('<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"><\/script>')</script>
+<script src="https://cdn.tailwindcss.com"></script>
 <style>body{font-family:Inter,system-ui,sans-serif}.hiddenx{display:none!important}.card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 1px 3px #0001}.navbtn.active{color:#dc2626;border-bottom:2px solid #dc2626}</style></head>
 <body class="bg-slate-100 text-slate-900 min-h-screen">
 <div id="login" class="min-h-screen grid place-items-center p-5"><div class="card w-full max-w-md p-7"><div class="flex items-center gap-3 mb-6"><div class="h-12 w-12 rounded-full bg-red-600 text-white grid place-items-center font-black text-xl">J</div><div><h1 class="font-black text-xl">Jasper Fire Department</h1><p class="text-slate-500 text-sm">RMS Login</p></div></div><form id="loginForm" action="javascript:void(0)" onsubmit="window.rmsLogin(event);return false" class="space-y-3"><input id="email" type="email" autocomplete="username" placeholder="Email" required class="w-full border rounded-lg p-3"><div class="relative"><input id="password" type="password" autocomplete="current-password" placeholder="Password" required class="w-full border rounded-lg p-3 pr-12"><button id="togglePassword" type="button" aria-label="Show password" title="Show password" onclick="var p=document.getElementById('password');p.type=p.type==='password'?'text':'password';this.textContent=p.type==='password'?'👁':'🙈';this.setAttribute('aria-label',p.type==='password'?'Show password':'Hide password')" class="absolute inset-y-0 right-0 px-3 text-slate-500 hover:text-slate-900">👁</button></div><button id="loginSubmit" type="submit" class="w-full bg-red-600 text-white rounded-lg p-3 font-bold">Sign in</button><p id="loginError" class="text-red-600 text-sm"></p></form><script>window.rmsLogin=function(e){if(e)e.preventDefault();if(typeof window.rmsLoginImpl==="function"){window.rmsLoginImpl(e);return false}var el=document.getElementById("loginError");if(el)el.textContent="Sign-in is still initializing. Please refresh the page.";return false};</script></div></div>
@@ -19,8 +19,15 @@
 <script>
 const $=id=>document.getElementById(id), esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const URL="https://audgtwcctdoiptuekqvn.supabase.co",KEY="sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz";
-if(!window.supabase?.createClient){$("loginError").textContent="Unable to load the sign-in service. Please refresh this page.";throw new Error("Supabase JavaScript library failed to load.");}
-const db=window.supabase.createClient(URL,KEY,{auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:false,flowType:"implicit"}});
+let db=null;
+const supabaseReady=import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm").then(m=>{
+  if(!m?.createClient)throw new Error("Supabase sign-in library did not load.");
+  db=m.createClient(URL,KEY,{auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:false,flowType:"implicit"} });
+  return db;
+}).catch(err=>{
+  console.error("Supabase library load error",err);
+  throw err;
+});
 let me=null,profile=null,personnel=[],stations=[],apparatus=[],crew=[],activeTab="home",loginInProgress=false,starting=false;
 const today=()=>new Date().toISOString().slice(0,10);
 function operational(){return profile?.app_role==="admin"||profile?.app_role==="officer"||crew.length>0}
@@ -28,7 +35,7 @@ function canStaff(){return profile?.app_role==="admin"||profile?.app_role==="off
 function canOps(){return profile?.app_role==="admin"||crew.length>0}
 function canInspect(){return profile?.app_role==="admin"||(profile?.app_role==="officer"&&crew.length>0)}
 function tab(t){activeTab=t;document.querySelectorAll("main>section").forEach(s=>s.classList.add("hiddenx"));$("t-"+t).classList.remove("hiddenx");document.querySelectorAll(".navbtn").forEach(b=>b.classList.remove("active"));$("n-"+t)?.classList.add("active");if(t==="ai"){}if(t==="staffing")loadStaffing();if(t==="incidents")loadIncidents();if(t==="inspections")loadInspections();if(t==="checks")renderChecks();if(t==="apparatus")renderApparatus();if(t==="personnel")renderPersonnel();if(t==="admin")renderAdmin()}
-async function boot(){if(loginInProgress||starting||me)return;try{const {data:{session},error}=await db.auth.getSession();if(error)throw error;if(session&&!me){await start(session.user)}else if(!me&&!loginInProgress){$("login").classList.remove("hiddenx")}}catch(err){console.error("RMS auth bootstrap error",err);if(!me&&!loginInProgress){$("loginError").textContent="Unable to initialize sign-in: "+(err?.message||"Unknown error");$("login").classList.remove("hiddenx")}}}
+async function boot(){if(loginInProgress||starting||me)return;try{await supabaseReady;const {data:{session},error}=await db.auth.getSession();if(error)throw error;if(session&&!me){await start(session.user)}else if(!me&&!loginInProgress){$("login").classList.remove("hiddenx")}}catch(err){console.error("RMS auth bootstrap error",err);if(!me&&!loginInProgress){$("loginError").textContent="Unable to initialize sign-in: "+(err?.message||"Unknown error");$("login").classList.remove("hiddenx")}}}
 async function start(u){if(starting)return;starting=true;me=u;try{let p=null,lastError=null;for(let attempt=0;attempt<3;attempt++){const s=await db.auth.getSession();if(!s.data?.session)throw new Error("Authentication session was not established. Please try signing in again.");const q=await db.from("users").select("*").eq("user_id",u.id).maybeSingle();if(q.data){p=q.data;break}lastError=q.error;if(attempt<2)await new Promise(r=>setTimeout(r,400))}if(!p)throw new Error("Profile load failed: "+(lastError?.message||"No matching RMS user profile was returned."));if(!p.active)throw new Error("Your account is not active.");profile=p;$("login").classList.add("hiddenx");$("app").classList.remove("hiddenx");$("userLabel").textContent=(profile.first_name||"")+" "+(profile.last_name||"")+" · "+String(profile.app_role||"").toUpperCase();$("appError").classList.add("hiddenx");tab("home");try{await refresh()}catch(err){console.error("RMS data startup error",err);$("appError").textContent="Signed in successfully, but some department data could not load: "+(err?.message||"Unknown error");$("appError").classList.remove("hiddenx")}}catch(err){console.error("RMS startup error",err);me=null;profile=null;$("app").classList.add("hiddenx");$("login").classList.remove("hiddenx");$("loginError").textContent=err?.message||"Unable to finish sign-in. Please try again."}finally{starting=false}}
 async function refresh(){const [p,s,a]=await Promise.all([db.from("personnel").select("*").eq("active",true).order("last_name"),db.from("stations").select("*").eq("active",true).order("station_id"),db.from("apparatus").select("*").eq("active",true).order("apparatus_id")]);personnel=p.data||[];stations=s.data||[];apparatus=a.data||[];await loadCrew();renderHome();renderApparatus();renderPersonnel();renderAdmin()}
 async function loadCrew(){const d=today();const r=await db.from("daily_staffing").select("staffing_id").eq("staffing_date",d).eq("shift","daily").maybeSingle();crew=[];if(r.data){const x=await db.from("daily_personnel_assignments").select("*,daily_app_assignments!inner(apparatus_id,staffing_id)").eq("daily_app_assignments.staffing_id",r.data.staffing_id).eq("personnel_id",(await db.from("personnel").select("id").eq("auth_user_id",me.id).maybeSingle()).data?.id);crew=x.data||[]}}
@@ -57,6 +64,7 @@ async function addUser(){if(profile?.app_role!=="admin")return;const first=promp
 window.rmsLoginImpl=handleLogin;
 async function handleLogin(e){
 e.preventDefault();
+await supabaseReady;
 if(loginInProgress||starting)return false;
 loginInProgress=true;
 $("loginError").textContent="";
