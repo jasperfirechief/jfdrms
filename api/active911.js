@@ -12,8 +12,16 @@ export default async function handler(req, res) {
   }
 
   try {
-    const secret = String(req.query?.key || "");
-    if (!secret) return res.status(401).json({ ok: false, error: "Missing integration key" });
+    // Production uses a server-side Vercel environment variable so the
+    // Active911 URL does not have to contain the secret.
+    // The query-string key remains supported for backwards compatibility.
+    const configuredSecret = String(process.env.ACTIVE911_WEBHOOK_KEY || "");
+    const querySecret = String(req.query?.key || "");
+    const secret = configuredSecret || querySecret;
+
+    if (!secret) {
+      return res.status(401).json({ ok: false, error: "Webhook authentication is not configured" });
+    }
 
     let payload = req.body;
     if (typeof payload === "string") payload = JSON.parse(payload);
