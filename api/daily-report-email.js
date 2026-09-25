@@ -87,7 +87,7 @@ async function makeStaffingPdf(shiftStart,shiftEnd,staffing,assignments){
 async function sendEmail(attachments,shiftStart,shiftEnd,incidentCount,reportCount){
   const key=process.env.BREVO_API_KEY,from=process.env.BREVO_FROM_EMAIL;
   if(!key||!from)throw new Error("Brevo email is not configured. Add BREVO_API_KEY and BREVO_FROM_EMAIL in Vercel.");
-  const payload={sender:{email:from,name:"Jasper Fire Department"},to:[{email:"firechief@jaspercity.com"},{email:"fireclerk@jaspercity.com"}],subject:"Jasper Fire Department – Daily Shift Reports – "+shiftStart+"–"+shiftEnd,textContent:body,attachment:attachments.map(a=>({content:a.content,name:a.filename}))};
+  const payload={sender:{email:from,name:"Jasper Fire Department"},to:[{email:"firechief@jaspercity.com"},{email:"fireclerk@jaspercity.com"}],subject:"Jasper Fire Department – Daily Shift Reports – "+shiftStart+"–"+shiftEnd,textContent:"Jasper Fire Department daily shift report packet for "+shiftStart+" through "+shiftEnd+".\n\nIncidents: "+incidentCount+"\nSubmitted reports: "+reportCount+"\nAttachments: "+attachments.length+"\n\nThe attached packet contains the final daily staffing record and each submitted incident report as a separate PDF.",attachment:attachments.map(a=>({content:a.content,name:a.filename}))};
   const r=await fetch("https://api.brevo.com/v3/smtp/email",{method:"POST",headers:{"api-key":key,"Content-Type":"application/json","accept":"application/json"},body:JSON.stringify(payload)});
   if(!r.ok)throw new Error("Brevo delivery failed: "+await r.text());
 }
