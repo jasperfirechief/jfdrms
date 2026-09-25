@@ -215,7 +215,7 @@ try{
 }finally{
  loginInProgress=false;btn.disabled=false;btn.textContent="Sign in";
 }}
-$("loginForm").addEventListener("submit",handleLogin);
+// Login is handled by the inline form handler above. Do not attach a second submit handler.
 $("loginForm").addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.tagName==="INPUT"){}});
 window.addEventListener("error",e=>{console.error("RMS browser error",e.error||e.message);if(!$("app")||$("app").classList.contains("hiddenx"))$("loginError").textContent="RMS startup error: "+e.message});
 async function generateAI(e){e.preventDefault();const prompt=$("aiPrompt").value.trim();if(!prompt)return;const out=$("aiOutput"),btn=$("aiSubmit");out.textContent="";btn.disabled=true;btn.textContent="Generating…";try{const s=await db.auth.getSession();if(!s.data.session)throw new Error("You must be signed in.");const r=await fetch("/api/ai",{method:"POST",headers:{Authorization:"Bearer "+s.data.session.access_token,"Content-Type":"application/json"},body:JSON.stringify({prompt})});if(!r.ok)throw new Error((await r.text())||"AI request failed.");if(!r.body)throw new Error("No streaming response received.");const reader=r.body.getReader(),decoder=new TextDecoder();while(true){const {value,done}=await reader.read();if(done)break;out.textContent+=decoder.decode(value,{stream:true});out.scrollTop=out.scrollHeight}}catch(err){out.textContent="Error: "+err.message}finally{btn.disabled=false;btn.textContent="Generate"}}
