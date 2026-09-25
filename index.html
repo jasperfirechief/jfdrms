@@ -225,4 +225,14 @@ async function generateAI(e){e.preventDefault();const prompt=$("aiPrompt").value
 $("aiForm").onsubmit=generateAI;
 async function logout(){await db.auth.signOut();location.reload()}
 $("staffDate").value=today();$("staffDate").onchange=loadStaffing;boot();
+<script>
+(function(){
+  window.setTimeout(function(){
+    var login=document.getElementById("login"),app=document.getElementById("app");
+    if(login && !login.classList.contains("hiddenx") && app && app.classList.contains("hiddenx")){
+      var e=document.getElementById("loginError");
+      if(e && !e.textContent) e.textContent="RMS startup did not complete. The app code did not finish initializing.";
+    }
+  },4000);
+})();
 </script></body></html>
