@@ -225,6 +225,7 @@ async function generateAI(e){e.preventDefault();const prompt=$("aiPrompt").value
 $("aiForm").onsubmit=generateAI;
 async function logout(){await db.auth.signOut();location.reload()}
 $("staffDate").value=today();$("staffDate").onchange=loadStaffing;boot();
+</script>
 <script>
 (function(){
   window.setTimeout(function(){
