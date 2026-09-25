@@ -91,12 +91,10 @@ async function makePdf(data){
   function field(label,value){ensure(22);text(label,margin,y,8,bold,gray);text(value,margin+95,y,9,regular);y-=15}
   text("JASPER FIRE DEPARTMENT",margin,y,16,bold,red); y-=19; text("FIRE INSPECTION REPORT",margin,y,11,bold); y-=24;
   field("Inspector",data.inspector_name); field("Date",data.inspection_date); field("Time",data.inspection_time||""); field("Occupancy Name",data.occupancy_name);
-  field("Type",data.occupancy_type||""); field("Address",data.address); field("Contact Name",data.contact_name); field("City/St/Zip",data.city_state_zip);
+  field("Type",data.occupancy_type||""); field("Square Footage",data.square_footage?Number(data.square_footage).toLocaleString()+" sq. ft.":""); field("Stories",data.stories||""); field("Address",data.address); field("Contact Name",data.contact_name); field("City/St/Zip",data.city_state_zip);
   field("Contact Phone",data.contact_phone); field("Phone",data.phone); field("Email",data.email);
   field("Inspection Type",data.inspection_type+(data.acceptance_type?" ("+data.acceptance_type+")":""));
-  heading("ACCEPTANCE TEST RESULTS");
-  text("Overall: "+(data.acceptance_test_result||"N/A"),margin,y,9,bold); y-=15;
-  if(data.acceptance_test_notes){text("Notes:",margin,y,8,bold);y-=12;for(const l of wrap(data.acceptance_test_notes,regular,9,contentW)){ensure(12);text(l,margin,y,9);y-=11}}
+  if(data.acceptance_tests&&Object.keys(data.acceptance_tests).length){heading("ACCEPTANCE TEST RESULTS");for(const [name,test] of Object.entries(data.acceptance_tests)){ensure(38);text(name,margin,y,9,bold);text("["+(test.result||"N/A").toUpperCase()+"]",W-margin-75,y,8,bold,test.result==="Fail"?red:gray);y-=12;for(const l of wrap(test.notes||"",regular,8,contentW)){ensure(11);text(l,margin,y,8,regular);y-=10}}}
   for(const s of sections){heading(s.name);for(const [item,ref] of s.items){const result=data.results?.[item]||"N/A";ensure(35);const lines=wrap(item,regular,9,contentW-120);for(let i=0;i<lines.length;i++){text(lines[i],margin,y,9,regular)}const firstY=y;const resultText="["+result.toUpperCase()+"]";text(resultText,W-margin-75,firstY,8,bold,result==="Fail"?red:gray);y-=11*(lines.length);text(ref,margin,y,7,regular,gray);y-=14}}
   heading("REMARKS"); for(const l of wrap(data.remarks||"",regular,9,contentW)){ensure(12);text(l,margin,y,9);y-=11}
   heading("NOTICE"); const notice="NOTE: This report is based upon observations at the time of the survey which may not discover all hazards. IN THE INTEREST OF FIRE SAFETY AND TO COMPLY WITH THE CITY OF JASPER FIRE CODE, ALL VIOLATIONS NOTED ABOVE MUST BE CORRECTED IMMEDIATELY. FAILURE TO COMPLY MAY RESULT IN PENALTIES AS SET FORTH IN THE FIRE CODE.";
