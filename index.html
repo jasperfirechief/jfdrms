@@ -210,6 +210,21 @@ function updateOffDutyResponse(cb){
   const label=details?.querySelector("#reportOffDutyCount");if(label)label.textContent=count+" selected";
   if(cb.checked&&details)details.open=false;
 }
+function handleReportApparatusSelect(select){
+  if(!select)return;
+  const selected=[...select.options].filter(o=>o.selected&&o.value).map(o=>Number(o.value));
+  const box=$("reportResponseUnits");if(!box)return;
+  document.querySelectorAll(".report-response-unit").forEach(row=>{
+    const id=Number(row.dataset.apparatusId);
+    if(!selected.includes(id)){
+      row.remove();
+      const crew=JSON.parse(row.dataset.crew||"[]");
+    }
+  });
+  selected.forEach(id=>toggleReportApparatus(id,true));
+  if(!box.querySelector(".report-response-unit"))box.innerHTML='<p class="text-sm text-slate-500">No apparatus selected yet.</p>';
+  refreshReportApparatusCrews($("rDate")?.value);
+}
 function toggleReportApparatus(id,checked){
   const box=$("reportResponseUnits");if(!box)return;
   const existing=box.querySelector('[data-apparatus-id="'+Number(id)+'"]');
