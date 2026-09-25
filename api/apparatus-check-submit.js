@@ -13,11 +13,14 @@ export default async function handler(req,res){
   if(!app?.active)throw new Error("Apparatus not found or inactive.");
   let ok=p.app_role==="admin";
   if(!ok){
-   const person=(await api("personnel?select=id,auth_user_id&auth_user_id=eq."+u.id+"&active=eq.true",auth))[0];
+   const person=(await api("personnel?select=id,auth_user_id,role&auth_user_id=eq."+u.id+"&active=eq.true",auth))[0];
    const ds=(await api("daily_staffing?select=staffing_id&staffing_date=eq."+new Date().toISOString().slice(0,10)+"&shift=eq.daily&limit=1",auth))[0];
    if(person&&ds){
-    const aa=await api("daily_app_assignments?select=assignment_id,apparatus_id,daily_personnel_assignments(personnel_id,assignment_role)&staffing_id=eq."+ds.staffing_id+"&apparatus_id=eq."+aid,auth);
-    ok=(aa||[]).some(x=>(x.daily_personnel_assignments||[]).some(y=>Number(y.personnel_id)===Number(person.id)&&(y.assignment_role==="driver"||y.assignment_role==="officer")));
+    if(person.role==="officer") ok=true;
+    else {
+      const aa=await api("daily_app_assignments?select=assignment_id,apparatus_id,daily_personnel_assignments(personnel_id,assignment_role)&staffing_id=eq."+ds.staffing_id+"&apparatus_id=eq."+aid,auth);
+      ok=(aa||[]).some(x=>(x.daily_personnel_assignments||[]).some(y=>Number(y.personnel_id)===Number(person.id)&&y.assignment_role==="driver"));
+    }
    }
   }
   if(!ok)throw new Error("Only the assigned on-duty driver, assigned on-duty officer, or an administrator may complete this apparatus check.");
