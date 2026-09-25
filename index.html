@@ -20,13 +20,18 @@
 const $=id=>document.getElementById(id), esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const URL="https://audgtwcctdoiptuekqvn.supabase.co",KEY="sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz";
 let db=null;
-const supabaseReady=import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm").then(m=>{
-  if(!m?.createClient)throw new Error("Supabase sign-in library did not load.");
-  db=m.createClient("https://audgtwcctdoiptuekqvn.supabase.co/",KEY,{auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:false,flowType:"implicit"} });
-  return db;
-}).catch(err=>{
-  console.error("Supabase library load error",err);
-  throw err;
+const supabaseReady=new Promise((resolve,reject)=>{
+  const s=document.createElement("script");
+  s.src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
+  s.onload=()=>{
+    try{
+      if(!window.supabase?.createClient)throw new Error("Supabase sign-in library did not load.");
+      db=window.supabase.createClient(URL,KEY,{auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:false,flowType:"implicit"}});
+      resolve(db);
+    }catch(err){console.error("Supabase client error",err);reject(err)}
+  };
+  s.onerror=()=>reject(new Error("Unable to load the sign-in service. Please refresh the page."));
+  document.head.appendChild(s);
 });
 let me=null,profile=null,personnel=[],stations=[],apparatus=[],crew=[],activeTab="home",loginInProgress=false,starting=false;
 const today=()=>new Date().toISOString().slice(0,10);
