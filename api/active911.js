@@ -1,7 +1,7 @@
 const SUPABASE_URL = "https://audgtwcctdoiptuekqvn.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz";
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method === "GET") {
     return res.status(200).json({ ok: true, service: "jfdrms-active911", method: "POST required" });
   }
