@@ -22,7 +22,7 @@ const URL="https://audgtwcctdoiptuekqvn.supabase.co",KEY="sb_publishable_oiWaymV
 let db=null;
 const supabaseReady=import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm").then(m=>{
   if(!m?.createClient)throw new Error("Supabase sign-in library did not load.");
-  db=m.createClient(URL,KEY,{auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:false,flowType:"implicit"} });
+  db=m.createClient("https://audgtwcctdoiptuekqvn.supabase.co/",KEY,{auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:false,flowType:"implicit"} });
   return db;
 }).catch(err=>{
   console.error("Supabase library load error",err);
