@@ -667,6 +667,11 @@ async function openSavedReport(cad,reportId){
   const reports=Array.isArray(i.reports)?i.reports:[],rep=reports.find(x=>x?.report_id===reportId);
   if(!rep)return alert("Saved report not found.");
   const kind=String(rep.report_type||"").startsWith("pcr_")?"pcr":"fire";
+  const m=ensureReportModal();
+  m.dataset.incidentId=String(d.incident_id||"");
+  m.dataset.cad=String(i.cad||cad);
+  m.dataset.standalone="";
+  m.classList.remove("hiddenx");
   await openIncidentReportForm(kind,i,d,ur.data||[]);
   applyPreviousReportValues(rep.data||{});
   if(Array.isArray(rep.data?.responding_apparatus)&&rep.data.responding_apparatus.length){
