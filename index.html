@@ -304,9 +304,7 @@ async function adminSubmitReport(cad,idx){
   if(profile?.app_role!=="admin")return alert("Administrator access required.");
   const r=await db.from("incidents").select("reports").eq("cad",cad).maybeSingle();if(r.error||!r.data)return alert(r.error?.message||"Incident not found.");
   const reports=Array.isArray(r.data.reports)?r.data.reports:[],rep=reports[idx];if(!rep)return alert("Report not found.");
-  const validation=await validateReportForNeris(rep.data,true);if(!validation.ok)return alert("Validation failed:
-"+validation.errors.join("
-"));
+  const validation=await validateReportForNeris(rep.data,true);if(!validation.ok)return alert("Validation failed:\n"+validation.errors.join("\n"));
   if(!confirm("Validation passed. Submit this report to NERIS?"))return;
   const result=await submitReportToNeris(rep.data,null);
   if(!result.ok)return alert(result.error);
