@@ -317,95 +317,16 @@ function renderAcceptancePanels(){
 function renderInspectionChecklist(){
   const box=$("inspectionChecklist");if(!box)return;
   const sections=[
-    ["General / Building Information",[
-      "Required fire department access provided and unobstructed",
-      "Premises address and suite/unit identification clearly posted",
-      "Fire department key box / access device available and maintained",
-      "Occupant load signs posted where required",
-      "Required permits, certificates, or inspection records available",
-      "Building use/occupancy matches approved use",
-      "Housekeeping is maintained and combustible storage is controlled"
-    ]],
-    ["Means of Egress",[
-      "All required exits are provided and readily accessible",
-      "Exit doors open in the required direction where applicable",
-      "Exit doors are not locked, blocked, chained, or obstructed",
-      "Exit access corridors and aisles are clear",
-      "Exit signs are visible and properly illuminated",
-      "Emergency lighting is installed where required and operational",
-      "Exit access and exit discharge are maintained free of storage",
-      "Stairs, handrails, guards, and landings are in safe condition",
-      "Required panic or fire-exit hardware is operational"
-    ]],
-    ["Fire Extinguishers",[
-      "Required portable fire extinguishers are provided",
-      "Extinguishers are properly located and readily accessible",
-      "Extinguishers are properly mounted and identified",
-      "Extinguishers have current inspection/service tags",
-      "Extinguishers are correct type and rating for the hazard",
-      "Extinguishers show no obvious damage, corrosion, leakage, or obstruction"
-    ]],
-    ["Fire Alarm / Detection",[
-      "Fire alarm control panel is accessible and shows normal condition",
-      "Manual fire alarm boxes are accessible and unobstructed",
-      "Smoke/heat detection devices are present where required",
-      "Notification appliances are present and unobstructed",
-      "Fire alarm monitoring information is current where applicable",
-      "Required inspection/testing/service documentation is available"
-    ]],
-    ["Automatic Sprinkler / Suppression",[
-      "Sprinkler control valves are accessible and in the normal position",
-      "Sprinkler heads are unobstructed and free of improper storage",
-      "Sprinkler heads show no obvious damage or improper modification",
-      "Required sprinkler inspection/testing documentation is current",
-      "Fire department connection is visible, accessible, and identified",
-      "Required suppression system tags and records are current"
-    ]],
-    ["Electrical / Mechanical",[
-      "Electrical panels are accessible and unobstructed",
-      "Electrical panel covers and dead fronts are installed",
-      "Required working clearances around electrical equipment are maintained",
-      "Extension cords are not being used as permanent wiring",
-      "Power strips and temporary wiring are used appropriately",
-      "Electrical wiring/receptacles show no obvious unsafe condition",
-      "Mechanical rooms are accessible and free of improper storage",
-      "Heating equipment has required clearance from combustibles"
-    ]],
-    ["Commercial Cooking / Hood Systems",[
-      "Commercial cooking equipment is clean and properly maintained",
-      "Hood and exhaust system is clean and maintained",
-      "Grease filters are properly installed and clean",
-      "Automatic cooking suppression system is present where required",
-      "Cooking suppression system inspection/service is current",
-      "Manual suppression-system pull station is accessible",
-      "Required clearance from combustible materials is maintained"
-    ]],
-    ["Hazardous Materials / Special Hazards",[
-      "Flammable/combustible liquids are properly stored",
-      "Compressed gas cylinders are secured and properly stored",
-      "Hazardous materials are properly labeled",
-      "Required safety data sheets/inventory information is available",
-      "Hazardous material storage areas are properly protected",
-      "No unauthorized hazardous material accumulation observed"
-    ]],
-    ["Fire Lanes / Exterior",[
-      "Fire apparatus access road is provided and maintained",
-      "Fire lane is unobstructed and properly marked where required",
-      "Fire hydrants are visible and accessible",
-      "Fire hydrants have required clearance",
-      "Exterior access to fire protection equipment is unobstructed",
-      "Address numbers are visible from the required approach"
-    ]],
-    ["Other Fire/Life Safety",[
-      "Combustible decorative materials are properly treated or limited",
-      "Storage does not obstruct sprinklers, exits, or fire equipment",
-      "Required fire doors are installed and maintained",
-      "Fire doors are not propped open where prohibited",
-      "Penetrations/openings in rated assemblies appear properly protected",
-      "Required occupant notification/emergency procedures are posted",
-      "Other observed fire or life safety hazards are documented in remarks"
-    ]]
-  ];
+{name:"FIRE EXTINGUISHERS",items:[["Inspections current, properly tagged","IFC 2024 §906.2"],["Proper number, type, mounting, signage, distance, unobstructed, readiness","IFC 2024 §§906.1, 906.6"],["No obvious damage or tampering","IFC 2024 §906.2"]]},
+{name:"EXITS AND EGRESS",items:[["Appropriate number and unobstructed width of exits","IFC 2024 §§1005, 1006"],["Appropriate unobstructed width of exit access","IFC 2024 §1005"],["Appropriate travel distance","IFC 2024 §1017.2"],["Outward swinging/appropriate hardware","IFC 2024 §1010"],["Appropriate exit signage/lighting","IFC 2024 §§1008, 1013"],["Appropriate exit discharge width, lighting, unobstructed","IFC 2024 §§1008, 1028"],["Emergency lighting operational","IFC 2024 §1008.3"]]},
+{name:"CLEARANCES",items:[["Adequate clearance around electrical panels, fire alarm panels, standpipes, sprinkler risers and FDCs","IFC 2024 §§604.3, 912.4"],["Adequate clearance below ceiling/sprinkler heads","IFC 2024 §315.3.1; §903.3"],["Adequate clearance around heat sources","IFC 2024 §315.3.1"]]},
+{name:"OTHER",items:[["Appropriately posted address (rear on strip occupancies)","IFC 2024 §505.1"],["Dumpster/combustibles too close to building","IFC 2024 §304.1; §315"],["Appropriately posted occupancy limit signage","IFC 2024 §1004.9"],["No voids in ceiling (holes, tiles, etc.)","IFC 2024 §703.1"],["Proper electrical wiring/covers","IFC 2024 Chapter 6"],["Required test/drill logs or emergency plan available/complete/up-to-date","IFC 2024 §405; applicable occupancy section"],["Required documentation available/complete/up-to-date","IFC 2024 §901.6; applicable system/occupancy section"]]},
+{name:"SPRINKLER/ STANDPIPE SYSTEM",items:[["Sprinkler system inspection, testing and maintenance current","IFC 2024 §903.5"],["Sprinkler control valves accessible, in normal position and supervised where required","IFC 2024 §§903.4, 903.4.1"],["Sprinkler heads free of damage, obstruction, paint or storage interference","IFC 2024 §§903.3.1, 903.3.3; applicable NFPA standard"],["Sprinkler riser/valve assembly accessible and in good condition","IFC 2024 §§903.3, 903.4"],["Fire department connection accessible, identified, unobstructed and in ready condition","IFC 2024 §912.4"],["Standpipe hose connections accessible, unobstructed and properly located","IFC 2024 §§905.4, 905.5, 905.6"],["Standpipe hose valves, caps and threads in place, compatible and in good condition","IFC 2024 §905.4; applicable NFPA 14 requirements"],["Standpipe cabinets accessible, identified and not blocked; cabinet doors unlocked except as permitted","IFC 2024 §905.7"],["Standpipe risers/laterals have required protection where applicable","IFC 2024 §§905.4.1, 905.6.1"],["Multiple standpipes interconnected where required","IFC 2024 §§905.4.2, 905.6.2"],["Standpipe water-supply/control valves supervised where required","IFC 2024 §905.9"],["Dedicated standpipes and standpipe valve handles properly identified/painted where required","IFC 2024 §905.11"]]},
+{name:"FIRE ALARM",items:[["Inspection current/properly tagged","IFC 2024 §907.8"],["No obvious damage or tampering","IFC 2024 §901.8"],["In ready state","IFC 2024 §907.8"],["Appropriate detectors and alarms (audible and visual)","IFC 2024 §907.5"],["Call-out test conducted","IFC 2024 §907.8"]]},
+{name:"COMMERCIAL KITCHEN HOOD SYSTEM",items:[["Inspection current/properly tagged","IFC 2024 §904.14.5"],["No obvious damage or tampering","IFC 2024 §901.8"],["Appropriate nozzles/caps in place","IFC 2024 §904.14; NFPA 17A/96 as applicable"],["No excessive grease build up on equipment, hood, ducts, fan, etc.","IFC 2024 §904.14; NFPA 96"]]},
+{name:"FLAMMABLE LIQUIDS/ HAZARDOUS MATERIAL",items:[["Flammable liquids, gas cylinders and hazardous materials stored correctly; required signage provided","IFC 2024 Chapters 50-57"],
+  ["Required SDS available and current for hazardous materials on site","IFC 2024 §5003.4"]]}
+].map(s=>[s.name,s.items]);
   box.innerHTML=sections.map(([title,items])=>'<div class="card p-4"><h2 class="font-black mb-3">'+esc(title)+'</h2><div class="space-y-2">'+items.map((item,i)=>'<div class="grid md:grid-cols-[1fr_180px] gap-2 items-center border-b last:border-0 pb-2"><label class="text-sm font-medium flex items-start gap-2"><input type="checkbox" class="mt-1" data-inspection-present="'+esc(item)+'"> <span>'+esc(item)+'</span></label><select data-inspection-check="'+esc(item)+'" class="border rounded p-2 text-sm"><option value="">Select</option><option value="OK">OK</option><option value="Violation">Violation</option><option value="N/A">N/A</option></select><input data-inspection-note="'+esc(item)+'" class="md:col-span-2 border rounded p-2 text-sm" placeholder="Notes / violation details"></div>').join("")+'</div></div>').join("");
 }
 function bindInspectionDimensions(){
