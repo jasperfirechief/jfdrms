@@ -681,7 +681,7 @@ async function openSavedReport(cad,reportId){
       if(saved.times)Object.entries(saved.times).forEach(([k,v])=>{const el=row.querySelector('[data-report-unit-time="'+k+'"]');if(el)el.value=v||"";});
     });
   }
-  const m=$("reportModal");if(m)m.dataset.reportId=rep.report_id||"";
+  m.dataset.reportId=rep.report_id||"";
 }
 async function renderReports(){
   const list=$("reportsList");if(!list)return;
