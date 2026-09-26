@@ -46,8 +46,8 @@ export default async function handler(req, res) {
 
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-    if (!body || body.action !== "submit" || !body.payload) {
-      return res.status(400).json({ ok:false, error:"A NERIS submission payload is required." });
+    if (!body || !["validate","submit"].includes(body.action) || !body.payload) {
+      return res.status(400).json({ ok:false, error:"A NERIS validation or submission payload is required." });
     }
 
     const payload = withDepartmentId(body.payload);
@@ -72,6 +72,10 @@ export default async function handler(req, res) {
         status:validation.status,
         details:validationData
       });
+    }
+
+    if (body.action === "validate") {
+      return res.status(200).json({ok:true,validated:true,details:validationData});
     }
 
     const submitted = await fetch(BASE_URL + "/incident/" + encodeURIComponent(payload.base.department_neris_id), {
