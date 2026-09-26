@@ -44,7 +44,7 @@ window.rmsLogin=async function(e){
 <label class="text-sm font-semibold">IFC Occupancy Type<select id="inType" class="w-full border rounded p-2 mt-1" required>
 <option value="">Select occupancy classification</option><optgroup label="Assembly"> <option>A-1 Assembly</option><option>A-2 Assembly</option><option>A-3 Assembly</option><option>A-4 Assembly</option><option>A-5 Assembly</option></optgroup>
 <optgroup label="Other IFC Groups"><option>B Business</option><option>E Educational</option><option>F-1 Factory/Industrial Moderate Hazard</option><option>F-2 Factory/Industrial Low Hazard</option><option>H-1 High Hazard</option><option>H-2 High Hazard</option><option>H-3 High Hazard</option><option>H-4 High Hazard</option><option>H-5 High Hazard</option><option>I-1 Institutional</option><option>I-2 Institutional</option><option>I-3 Institutional</option><option>I-4 Institutional</option><option>M Mercantile</option><option>R-1 Residential</option><option>R-2 Residential</option><option>R-3 Residential</option><option>R-4 Residential</option><option>S-1 Storage Moderate Hazard</option><option>S-2 Storage Low Hazard</option><option>U Utility/Miscellaneous</option></optgroup></select></label>
-<label class="text-sm font-semibold">Square Footage<input id="inSqFt" type="number" min="0" step="1" class="w-full border rounded p-2 mt-1"></label>
+<div class="md:col-span-2 grid sm:grid-cols-2 gap-3"><label class="text-sm font-semibold">Building Dimensions (feet)<div class="flex items-center gap-2 mt-1"><input id="inLengthFt" type="number" min="0" step="0.01" placeholder="Length" class="w-full border rounded p-2"><span class="font-black">×</span><input id="inWidthFt" type="number" min="0" step="0.01" placeholder="Width" class="w-full border rounded p-2"></div><span class="text-xs text-slate-500">Enter length × width. Square footage calculates automatically.</span></label><label class="text-sm font-semibold">Square Footage<input id="inSqFt" type="number" min="0" step="1" class="w-full border rounded p-2 mt-1"><span id="inSqFtCalc" class="text-xs text-slate-500"></span></label></div>
 <label class="text-sm font-semibold">Stories<input id="inStories" type="number" min="1" step="1" class="w-full border rounded p-2 mt-1"></label>
 <label class="text-sm font-semibold md:col-span-2">Address<input id="inAddress" class="w-full border rounded p-2 mt-1" required></label>
 <label class="text-sm font-semibold">Contact Name<input id="inContact" class="w-full border rounded p-2 mt-1"></label>
@@ -228,11 +228,111 @@ function renderAcceptancePanels(){
   const chosen=[...document.querySelectorAll('input[name="acceptanceType"]:checked')].map(x=>x.value);
   box.innerHTML=chosen.map((x,i)=>'<div class="border rounded-lg p-3 bg-white"><div class="font-bold">'+esc(x)+'</div><div class="grid md:grid-cols-2 gap-2 mt-2"><select data-accept-result="'+esc(x)+'" class="border rounded p-2"><option value="">Result</option><option>Passed</option><option>Failed</option><option>Not Applicable</option></select><textarea data-accept-notes="'+esc(x)+'" class="border rounded p-2" rows="2" placeholder="Notes"></textarea></div></div>').join("");
 }
+function renderInspectionChecklist(){
+  const box=$("inspectionChecklist");if(!box)return;
+  const sections=[
+    ["General / Building Information",[
+      "Required fire department access provided and unobstructed",
+      "Premises address and suite/unit identification clearly posted",
+      "Fire department key box / access device available and maintained",
+      "Occupant load signs posted where required",
+      "Required permits, certificates, or inspection records available",
+      "Building use/occupancy matches approved use",
+      "Housekeeping is maintained and combustible storage is controlled"
+    ]],
+    ["Means of Egress",[
+      "All required exits are provided and readily accessible",
+      "Exit doors open in the required direction where applicable",
+      "Exit doors are not locked, blocked, chained, or obstructed",
+      "Exit access corridors and aisles are clear",
+      "Exit signs are visible and properly illuminated",
+      "Emergency lighting is installed where required and operational",
+      "Exit access and exit discharge are maintained free of storage",
+      "Stairs, handrails, guards, and landings are in safe condition",
+      "Required panic or fire-exit hardware is operational"
+    ]],
+    ["Fire Extinguishers",[
+      "Required portable fire extinguishers are provided",
+      "Extinguishers are properly located and readily accessible",
+      "Extinguishers are properly mounted and identified",
+      "Extinguishers have current inspection/service tags",
+      "Extinguishers are correct type and rating for the hazard",
+      "Extinguishers show no obvious damage, corrosion, leakage, or obstruction"
+    ]],
+    ["Fire Alarm / Detection",[
+      "Fire alarm control panel is accessible and shows normal condition",
+      "Manual fire alarm boxes are accessible and unobstructed",
+      "Smoke/heat detection devices are present where required",
+      "Notification appliances are present and unobstructed",
+      "Fire alarm monitoring information is current where applicable",
+      "Required inspection/testing/service documentation is available"
+    ]],
+    ["Automatic Sprinkler / Suppression",[
+      "Sprinkler control valves are accessible and in the normal position",
+      "Sprinkler heads are unobstructed and free of improper storage",
+      "Sprinkler heads show no obvious damage or improper modification",
+      "Required sprinkler inspection/testing documentation is current",
+      "Fire department connection is visible, accessible, and identified",
+      "Required suppression system tags and records are current"
+    ]],
+    ["Electrical / Mechanical",[
+      "Electrical panels are accessible and unobstructed",
+      "Electrical panel covers and dead fronts are installed",
+      "Required working clearances around electrical equipment are maintained",
+      "Extension cords are not being used as permanent wiring",
+      "Power strips and temporary wiring are used appropriately",
+      "Electrical wiring/receptacles show no obvious unsafe condition",
+      "Mechanical rooms are accessible and free of improper storage",
+      "Heating equipment has required clearance from combustibles"
+    ]],
+    ["Commercial Cooking / Hood Systems",[
+      "Commercial cooking equipment is clean and properly maintained",
+      "Hood and exhaust system is clean and maintained",
+      "Grease filters are properly installed and clean",
+      "Automatic cooking suppression system is present where required",
+      "Cooking suppression system inspection/service is current",
+      "Manual suppression-system pull station is accessible",
+      "Required clearance from combustible materials is maintained"
+    ]],
+    ["Hazardous Materials / Special Hazards",[
+      "Flammable/combustible liquids are properly stored",
+      "Compressed gas cylinders are secured and properly stored",
+      "Hazardous materials are properly labeled",
+      "Required safety data sheets/inventory information is available",
+      "Hazardous material storage areas are properly protected",
+      "No unauthorized hazardous material accumulation observed"
+    ]],
+    ["Fire Lanes / Exterior",[
+      "Fire apparatus access road is provided and maintained",
+      "Fire lane is unobstructed and properly marked where required",
+      "Fire hydrants are visible and accessible",
+      "Fire hydrants have required clearance",
+      "Exterior access to fire protection equipment is unobstructed",
+      "Address numbers are visible from the required approach"
+    ]],
+    ["Other Fire/Life Safety",[
+      "Combustible decorative materials are properly treated or limited",
+      "Storage does not obstruct sprinklers, exits, or fire equipment",
+      "Required fire doors are installed and maintained",
+      "Fire doors are not propped open where prohibited",
+      "Penetrations/openings in rated assemblies appear properly protected",
+      "Required occupant notification/emergency procedures are posted",
+      "Other observed fire or life safety hazards are documented in remarks"
+    ]]
+  ];
+  box.innerHTML=sections.map(([title,items])=>'<div class="card p-4"><h2 class="font-black mb-3">'+esc(title)+'</h2><div class="space-y-2">'+items.map((item,i)=>'<div class="grid md:grid-cols-[1fr_180px] gap-2 items-center border-b last:border-0 pb-2"><label class="text-sm font-medium flex items-start gap-2"><input type="checkbox" class="mt-1" data-inspection-present="'+esc(item)+'"> <span>'+esc(item)+'</span></label><select data-inspection-check="'+esc(item)+'" class="border rounded p-2 text-sm"><option value="">Select</option><option value="OK">OK</option><option value="Violation">Violation</option><option value="N/A">N/A</option></select><input data-inspection-note="'+esc(item)+'" class="md:col-span-2 border rounded p-2 text-sm" placeholder="Notes / violation details"></div>').join("")+'</div></div>').join("");
+}
+function bindInspectionDimensions(){
+  const l=$("inLengthFt"),w=$("inWidthFt"),s=$("inSqFt"),out=$("inSqFtCalc");if(!l||!w||!s)return;
+  const calc=()=>{const a=Number(l.value),b=Number(w.value);if(a>0&&b>0){const sqft=Math.round(a*b);s.value=sqft;if(out)out.textContent="Calculated: "+sqft.toLocaleString()+" sq ft";}else if(out)out.textContent="Enter both dimensions to calculate.";
+  };
+  l.addEventListener("input",calc);w.addEventListener("input",calc);s.addEventListener("input",()=>{if(out&&!l.value&&!w.value)out.textContent="Manual square footage entry";});calc();
+}
 function collectInspectionData(){
   const sig=$("signaturePad")?.toDataURL("image/png")||null;
   const acceptance=[...document.querySelectorAll('input[name="acceptanceType"]:checked')].map(x=>({type:x.value,result:document.querySelector('[data-accept-result="'+CSS.escape(x.value)+'"]')?.value||"",notes:document.querySelector('[data-accept-notes="'+CSS.escape(x.value)+'"]')?.value||""}));
   const checklist={};document.querySelectorAll("[data-inspection-check]").forEach(x=>{checklist[x.dataset.inspectionCheck]={status:x.value,notes:document.querySelector('[data-inspection-note="'+CSS.escape(x.dataset.inspectionCheck)+'"]')?.value||""}});
-  return {inspector_id:Number($("inInspector")?.value||0)||null,date:$("inDate")?.value,time:$("inTime")?.value,occupancy_name:$("inOccupancy")?.value,type:$("inType")?.value,square_footage:$("inSqFt")?.value,stories:$("inStories")?.value,address:$("inAddress")?.value,city_state_zip:$("inCity")?.value,contact_name:$("inContact")?.value,contact_phone:$("inContactPhone")?.value,phone:$("inPhone")?.value,email:$("inEmail")?.value,inspection_types:[...document.querySelectorAll('input[name="inspectionType"]:checked')].map(x=>x.value),acceptance_tests:acceptance,checklist,remarks:$("inRemarks")?.value,reinspection_date:$("inReinspection")?.value,representative_signature:sig,representative_signature_date:$("inSignatureDate")?.value};
+  return {inspector_id:Number($("inInspector")?.value||0)||null,date:$("inDate")?.value,time:$("inTime")?.value,occupancy_name:$("inOccupancy")?.value,type:$("inType")?.value,square_footage:$("inSqFt")?.value,stories:$("inStories")?.value,address:$("inAddress")?.value,city_state_zip:$("inCity")?.value,contact_name:$("inContact")?.value,contact_phone:$("inContactPhone")?.value,phone:$("inPhone")?.value,email:$("inEmail")?.value,inspection_types:[...document.querySelectorAll('input[name="inspectionType"]:checked')].map(x=>x.value),acceptance_tests:acceptance,checklist,building_length_ft:$("inLengthFt")?.value,building_width_ft:$("inWidthFt")?.value,remarks:$("inRemarks")?.value,reinspection_date:$("inReinspection")?.value,representative_signature:sig,representative_signature_date:$("inSignatureDate")?.value};
 }
 async function loadInspections(){
   const list=$("inspectionHistory");if(!list)return;
@@ -244,7 +344,7 @@ function newInspection(){
   if(!canInspect())return alert("Only administrators and on-duty inspectors can perform inspections.");
   $("inspectionEditor").classList.remove("hiddenx");$("inspectionForm").reset();
   $("inDate").value=today();$("inTime").value=new Date().toTimeString().slice(0,5);$("inSignatureDate").value=today();
-  populateInspectionInspector();renderAcceptancePanels();ensureInspectionSignaturePad();window.scrollTo({top:0,behavior:"smooth"});
+  populateInspectionInspector();renderAcceptancePanels();renderInspectionChecklist();ensureInspectionSignaturePad();bindInspectionDimensions();window.scrollTo({top:0,behavior:"smooth"});
 }
 function closeInspectionEditor(){$("inspectionEditor")?.classList.add("hiddenx");$("inspectionForm")?.reset();clearInspectionSignature()}
 document.addEventListener("change",e=>{if(e.target.matches('input[name="acceptanceType"]'))renderAcceptancePanels()});
