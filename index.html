@@ -141,6 +141,7 @@ window.rmsLoginImpl=async function(e){
 const supabaseReady=ensureSupabaseClient();
 let me=null,profile=null,personnel=[],stations=[],apparatus=[],crew=[],activeTab="home",loginInProgress=false,starting=false;
 const today=()=>new Date().toISOString().slice(0,10);
+const localDateTime=(v)=>{if(!v)return "";const d=new Date(v);if(Number.isNaN(d.getTime()))return "";const p=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes())};
 function operational(){return profile?.app_role==="admin"||profile?.app_role==="officer"||crew.length>0}
 function canStaff(){return profile?.app_role==="admin"||profile?.app_role==="officer"}
 function canPerformApparatusChecks(){return profile?.app_role==="admin"||(profile?.app_role==="officer"&&crew.length>0)||crew.some(x=>String(x.assignment_role||"").toLowerCase()==="driver")}
