@@ -646,10 +646,7 @@ async function validateAndFinishReport(kind){
   try{
     const data=collectReportFormData(),m=$("reportModal"),incidentId=Number(m?.dataset.incidentId||0)||null;
     const validation=validateReportForNeris(data,false);
-    if(!validation.ok)return alert("The report is not ready for NERIS review:
-
-"+validation.errors.join("
-"));
+    if(!validation.ok)return alert("The report is not ready for NERIS review:\n\n"+validation.errors.join("\n"));
     if(!incidentId)return alert("Standalone reports can be saved as drafts, but must be attached to an incident before NERIS review.");
     const existing=await db.from("incidents").select("reports").eq("cad",m.dataset.cad||"").maybeSingle();if(existing.error)throw new Error(existing.error.message);
     const reports=Array.isArray(existing.data?.reports)?existing.data.reports:[];
