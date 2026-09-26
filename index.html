@@ -347,4 +347,128 @@ function applyPreviousReportValues(data){
     }else el.value=String(value);
   });
 }
+function collectReportFormData(){
+  const data={};
+  $("incidentReportForm")?.querySelectorAll("input,select,textarea").forEach(el=>{
+    if(!el.id||el.matches("[data-report-unit-time],[data-report-person]")||el.type==="checkbox"||el.type==="file")return;
+    data[el.id]=el.value;
+  });
+  data.responding_apparatus=[...document.querySelectorAll(".report-response-unit")].map(row=>({
+    apparatus_id:Number(row.dataset.apparatusId||0),
+    unit_number:row.querySelector("[data-report-unit-number]")?.value||row.querySelector(".font-bold")?.textContent?.trim()||"",
+    station:row.querySelector(".text-xs.text-slate-500")?.textContent?.trim()||"",
+    crew:JSON.parse(row.dataset.crew||"[]"),
+    times:Object.fromEntries([...row.querySelectorAll("[data-report-unit-time]")].map(x=>[x.dataset.reportUnitTime,x.value]))
+  }));
+  data.additional_personnel=[...document.querySelectorAll("[data-report-person]:checked")].map(x=>Number(x.dataset.reportPerson));
+  return data;
+}
+function nerisIso(v,fallback){
+  if(v){const d=new Date(v);if(!Number.isNaN(d.getTime()))return d.toISOString();}
+  return fallback;
+}
+function buildNerisLocation(value,lat,lng){
+  const raw=String(value||"").trim();
+  const m=raw.match(/^([0-9]+)\\s+(.+)$/);
+  const loc={country:"US",state:"AL"};
+  if(m){loc.number=Number(m[1]);loc.street=m[2];}else if(raw)loc.street=raw;
+  if(lat!==""&&lng!==""&&!Number.isNaN(Number(lat))&&!Number.isNaN(Number(lng))){
+    loc.point={crs:4326,geometry:{type:"Point",coordinates:[Number(lng),Number(lat)]}};
+  }
+  return loc;
+}
+function buildNerisPayload(data){
+  const incidentNumber=$("reportModal")?.dataset.cad||data.rCad||data.rIncidentNumber||data.rDate||("JFD-"+Date.now());
+  const baseTime=nerisIso(data.rDispatch||data.rDate,new Date().toISOString());
+  const arrival=nerisIso(data.rEnroute||data.rDispatch,baseTime);
+  const answered=nerisIso(data.rOnscene||data.rEnroute||data.rDispatch,arrival);
+  const create=nerisIso(data.rDispatch||data.rDate,baseTime);
+  const times=[arrival,answered,create].sort();
+  const callArrival=times[0],callAnswered=times[1],callCreate=times[2];
+  const incidentType=data.rNerisType||"FIRE||STRUCTURE_FIRE";
+  const location=buildNerisLocation(data.rLocation,data.rLatitude,data.rLongitude);
+  const units=(data.responding_apparatus||[]).filter(u=>u.unit_number).map(u=>{
+    const t=u.times||{};
+    return {
+      reported_unit_id:u.unit_number,
+      dispatch:nerisIso(t.dispatch||data.rDispatch,callCreate),
+      enroute_to_scene:nerisIso(t.enroute||data.rEnroute,callCreate),
+      on_scene:nerisIso(t.on_scene||data.rOnscene,callAnswered),
+      unit_clear:nerisIso(t.clear||data.rCleared,callAnswered),
+      unable_to_dispatch:false
+    };
+  });
+  if(!units.length)units.push({reported_unit_id:"JFD",dispatch:callCreate,unable_to_dispatch:false});
+  const payload={
+    base:{
+      incident_number:String(incidentNumber),
+      incident_types:[incidentType],
+      location,
+      outcome_narrative:data.rNarrative||""
+    },
+    dispatch:{
+      incident_number:String(incidentNumber),
+      call_arrival:callArrival,
+      call_answered:callAnswered,
+      call_create:callCreate,
+      location,
+      unit_responses:units
+    }
+  };
+  if(data.rLocationUse||data.rUsedAsIntended||data.rVacancy){
+    payload.base.location_use={
+      use_type:data.rPrimaryUse||undefined,
+      vacancy_cause:data.rVacancy||undefined,
+      in_use:{in_use:data.rLocationUse==="Yes"?true:data.rLocationUse==="No"?false:undefined}
+    };
+  }
+  if(data.rActions)payload.actions_tactics={action_noaction:{type:"ACTION",actions:[]}};
+  return payload;
+}
+async function submitReportToNeris(data,incidentId){
+  if(!incidentId)return {ok:false,error:"NERIS submission requires an incident record."};
+  if(!data.rLocation)return {ok:false,error:"Incident location is required before NERIS submission."};
+  const payload=buildNerisPayload(data);
+  const check=await fetch("/api/neris",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"submit",payload})});
+  let body={};try{body=await check.json();}catch{}
+  if(!check.ok||body.ok===false)return {ok:false,error:body.error||"NERIS submission failed",details:body.details||body.response||null};
+  const ins=await db.from("neris_submissions").insert({incident_id:Number(incidentId),status:"submitted",neris_incident_id:body.neris_incident_id||body.id||null,request_metadata:{payload},response_metadata:body,submitted_by:me?.id||null,submitted_at:new Date().toISOString()});
+  if(ins.error)return {ok:false,error:"NERIS accepted the incident, but RMS could not save the submission record: "+ins.error.message,neris:body};
+  return {ok:true,neris:body};
+}
+function bindReportForm(kind){
+  const form=$("incidentReportForm");if(!form)return;
+  form.onsubmit=async function(e){
+    e.preventDefault();
+    const data=collectReportFormData();
+    const m=$("reportModal");
+    const incidentId=Number(m?.dataset.incidentId||0)||null;
+    const reportType=kind==="fire"?"fire_neris_v2":"pcr_neris_v2";
+    const saveButton=[...form.querySelectorAll("button")].find(b=>b.type==="submit");
+    if(saveButton){saveButton.disabled=true;saveButton.textContent="Saving...";}
+    try{
+      if(incidentId){
+        const existing=await db.from("incidents").select("reports").eq("cad",m.dataset.cad||"").maybeSingle();
+        const reports=Array.isArray(existing.data?.reports)?existing.data.reports:[];
+        reports.unshift({report_type:reportType,data,updated_at:new Date().toISOString(),created_by:me?.id||null});
+        const upd=await db.from("incidents").update({reports,updated_at:new Date().toISOString()}).eq("cad",m.dataset.cad||"");
+        if(upd.error)throw new Error(upd.error.message);
+      }else{
+        const ins=await db.from("standalone_reports").insert({report_type:reportType,data,status:"saved",created_by:me?.id||null});
+        if(ins.error)throw new Error(ins.error.message);
+      }
+      if(kind==="fire"&&incidentId){
+        const go=confirm("Report saved. Submit this report to NERIS now?");
+        if(go){
+          if(saveButton){saveButton.disabled=true;saveButton.textContent="Submitting to NERIS...";}
+          const result=await submitReportToNeris(data,incidentId);
+          if(!result.ok)throw new Error(result.error);
+          alert("Report submitted to NERIS successfully."+ (result.neris?.neris_incident_id?"\\nNERIS Incident: "+result.neris.neris_incident_id:""));
+        }else alert("Report saved as a draft.");
+      }else alert("Report saved.");
+      closeReportModal();loadIncidents?.();
+    }catch(err){alert(err?.message||String(err));}
+    finally{if(saveButton){saveButton.disabled=false;saveButton.textContent=kind==="fire"?"Save Report":"Save PCR";}}
+  };
+}
 window.rmsBoot();
