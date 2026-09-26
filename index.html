@@ -154,9 +154,95 @@ async function start(u){if(starting)return;starting=true;me=u;try{let p=null,las
 window.__rmsStartImpl=start;
 async function refresh(){const [p,s,a]=await Promise.all([db.from("personnel").select("*").eq("active",true).order("last_name"),db.from("stations").select("*").eq("active",true).order("station_id"),db.from("apparatus").select("*").eq("active",true).order("apparatus_id")]);personnel=p.data||[];stations=s.data||[];apparatus=a.data||[];await loadCrew();renderHome();renderApparatus();renderPersonnel();renderAdmin();$("n-inspections")?.classList.toggle("hiddenx",!canInspect())}
 async function loadCrew(){crew=[];if(!me)return;const cp=await db.from("personnel").select("id,shift").eq("auth_user_id",me.id).maybeSingle();if(cp.error||!cp.data?.id)return;const shift=String(cp.data.shift||"A").trim()||"A";const r=await db.from("daily_staffing").select("staffing_id").eq("staffing_date",today()).eq("shift",shift).maybeSingle();if(r.error||!r.data)return;const x=await db.from("daily_personnel_assignments").select("*,daily_app_assignments!inner(apparatus_id,staffing_id)").eq("daily_app_assignments.staffing_id",r.data.staffing_id).eq("personnel_id",cp.data.id);crew=x.data||[]}
+async function loadAdminData(){
+  if(!db)return;
+  const [s,a,p]=await Promise.all([
+    db.from("stations").select("*").eq("active",true).order("station_id"),
+    db.from("apparatus").select("*").eq("active",true).order("unit_number"),
+    db.from("personnel").select("*").order("last_name").order("first_name")
+  ]);
+  if(s.error)console.error(s.error); if(a.error)console.error(a.error); if(p.error)console.error(p.error);
+  if(s.data)window.stations=s.data; if(a.data)apparatus=a.data; if(p.data)personnel=p.data;
+  const sl=$("stationList");if(sl)sl.innerHTML=(window.stations||[]).map(x=>'<div class="border rounded p-3 flex justify-between items-center"><div><b>'+esc(x.station_name)+'</b></div><button onclick="editStation('+Number(x.station_id)+')" class="border px-3 py-1 rounded text-sm font-semibold">Edit</button></div>').join("")||'<p class="text-sm text-slate-500">No stations found.</p>';
+}
+async function addStation(){
+  if(!db)return alert("Database is not ready.");
+  const name=prompt("Station name:");if(!name?.trim())return;
+  const r=await db.from("stations").insert({station_name:name.trim(),active:true}).select().single();
+  if(r.error)return alert(r.error.message);await loadAdminData();renderAdmin();
+}
+async function editStation(id){
+  const row=(window.stations||[]).find(x=>Number(x.station_id)===Number(id));if(!row)return;
+  const name=prompt("Station name:",row.station_name||"");if(!name?.trim())return;
+  const r=await db.from("stations").update({station_name:name.trim()}).eq("station_id",id);
+  if(r.error)return alert(r.error.message);await loadAdminData();renderAdmin();
+}
+async function addApparatus(){
+  if(!db)return alert("Database is not ready.");
+  const unit=prompt("Unit number:");if(!unit?.trim())return;
+  const type=prompt("Apparatus type:","Engine");if(!type?.trim())return;
+  const r=await db.from("apparatus").insert({unit_number:unit.trim(),apparatus_type:type.trim(),active:true}).select().single();
+  if(r.error)return alert(r.error.message);await loadAdminData();renderAdmin();
+}
+async function editApparatus(id){
+  const row=(apparatus||[]).find(x=>Number(x.apparatus_id)===Number(id));if(!row)return;
+  const unit=prompt("Unit number:",row.unit_number||"");if(!unit?.trim())return;
+  const type=prompt("Apparatus type:",row.apparatus_type||"");if(!type?.trim())return;
+  const r=await db.from("apparatus").update({unit_number:unit.trim(),apparatus_type:type.trim()}).eq("apparatus_id",id);
+  if(r.error)return alert(r.error.message);await loadAdminData();renderAdmin();
+}
+function openPersonnelForm(id=null){
+  const m=$("personnelFormModal");if(!m)return;
+  const p=(personnel||[]).find(x=>Number(x.id)===Number(id));
+  $("pfId").value=p?.id||"";$("pfFirst").value=p?.first_name||"";$("pfLast").value=p?.last_name||"";$("pfEmail").value=p?.email||"";$("pfPassword").value="";
+  $("pfRole").value=p?.role||"firefighter";$("pfInspector").checked=!!p?.is_inspector;$("pfShift").value=p?.shift||"A";
+  $("personnelFormTitle").textContent=p?"Edit Personnel":"Add Personnel";m.classList.remove("hiddenx");
+}
+function closePersonnelForm(){$("personnelFormModal")?.classList.add("hiddenx")}
+function syncInspectorField(){}
+async function savePersonnel(){
+  const data={first_name:$("pfFirst").value.trim(),last_name:$("pfLast").value.trim(),email:$("pfEmail").value.trim(),role:$("pfRole").value,shift:$("pfShift").value,is_inspector:$("pfInspector").checked,active:true};
+  if(!data.first_name||!data.last_name||!data.email)return alert("First name, last name, and email are required.");
+  const id=Number($("pfId").value||0);let r;
+  if(id)r=await db.from("personnel").update(data).eq("id",id);else r=await db.from("personnel").insert(data);
+  if(r.error)return alert(r.error.message);closePersonnelForm();await loadAdminData();renderAdmin();
+}
+async function openChecklistManager(){
+  const m=$("checklistManagerModal");if(!m)return alert("Checklist manager is not available.");
+  const sel=$("checklistManagerApparatus");sel.innerHTML=(apparatus||[]).map(x=>'<option value="'+Number(x.apparatus_id)+'">'+esc(x.unit_number||"")+'</option>').join("");
+  m.classList.remove("hiddenx");if(sel.options.length)await selectChecklistApparatus();
+}
+function closeChecklistManager(){$("checklistManagerModal")?.classList.add("hiddenx")}
+async function selectChecklistApparatus(){
+  const id=Number($("checklistManagerApparatus")?.value||0);if(!id)return;
+  const [c,i]=await Promise.all([
+    db.from("apparatus_check_categories").select("*").eq("apparatus_id",id).eq("active",true).order("sort_order"),
+    db.from("apparatus_check_items").select("*").eq("apparatus_id",id).eq("active",true).order("sort_order")
+  ]);
+  if(c.error||i.error)return alert(c.error?.message||i.error?.message);
+  window.adminCheckCategories=c.data||[];window.adminCheckItems=i.data||[];
+  const cats=$("checklistCategories"),sel=$("newCheckCategorySelect"),items=$("inlineCheckItems");
+  cats.innerHTML=window.adminCheckCategories.map(x=>'<div class="border rounded p-2 flex justify-between"><span>'+esc(x.category_name)+'</span><button onclick="deactivateChecklistCategory('+Number(x.category_id)+')" class="text-red-600 text-xs font-bold">Deactivate</button></div>').join("")||'<p class="text-sm text-slate-500">No categories.</p>';
+  sel.innerHTML=window.adminCheckCategories.map(x=>'<option value="'+Number(x.category_id)+'">'+esc(x.category_name)+'</option>').join("");
+  items.innerHTML=window.adminCheckItems.map(x=>'<div class="border rounded p-2 flex justify-between gap-2"><span>'+esc(x.item_text)+'</span><button onclick="deactivateChecklistItem('+Number(x.item_id)+')" class="text-red-600 text-xs font-bold">Deactivate</button></div>').join("")||'<p class="text-sm text-slate-500">No items.</p>';
+}
+async function addChecklistCategory(){
+  const apparatusId=Number($("checklistManagerApparatus")?.value||0);const input=$("newCheckCategory");const name=input?.value.trim();if(!apparatusId||!name)return;
+  const max=(window.adminCheckCategories||[]).reduce((m,x)=>Math.max(m,Number(x.sort_order)||0),0);
+  const r=await db.from("apparatus_check_categories").insert({apparatus_id:apparatusId,category_name:name,sort_order:max+1,active:true});
+  if(r.error)return alert(r.error.message);input.value="";await selectChecklistApparatus();
+}
+async function addInlineCheckItem(){
+  const apparatusId=Number($("checklistManagerApparatus")?.value||0),categoryId=Number($("newCheckCategorySelect")?.value||0),textValue=$("newCheckText")?.value.trim();if(!apparatusId||!categoryId||!textValue)return;
+  const cat=(window.adminCheckCategories||[]).find(x=>Number(x.category_id)===categoryId);const max=(window.adminCheckItems||[]).filter(x=>Number(x.category_id)===categoryId).reduce((m,x)=>Math.max(m,Number(x.sort_order)||0),0);
+  const r=await db.from("apparatus_check_items").insert({apparatus_id:apparatusId,category_id:categoryId,category:cat?.category_name||"",item_text:textValue,sort_order:max+1,active:true});
+  if(r.error)return alert(r.error.message);$("newCheckText").value="";await selectChecklistApparatus();
+}
+async function deactivateChecklistCategory(id){const r=await db.from("apparatus_check_categories").update({active:false}).eq("category_id",id);if(r.error)return alert(r.error.message);await selectChecklistApparatus()}
+async function deactivateChecklistItem(id){const r=await db.from("apparatus_check_items").update({active:false}).eq("item_id",id);if(r.error)return alert(r.error.message);await selectChecklistApparatus()}
 function renderAdminApparatus(){const el=$("adminApparatusList");if(!el)return;el.innerHTML=apparatus.map(ap=>'<div class="border rounded-lg p-3 flex justify-between items-center gap-3"><div><b>'+esc(ap.unit_number||"")+'</b><div class="text-xs text-slate-500">'+esc(ap.apparatus_type||"")+(ap.station_id?' · Station '+esc(ap.station_id):"")+'</div></div><button onclick="editApparatus('+Number(ap.apparatus_id)+')" class="border px-3 py-1 rounded text-sm font-semibold">Edit</button></div>').join("")||'<p class="text-sm text-slate-500">No apparatus found.</p>'}
 function renderPersonnel(){const el=$("adminPersonnelList");if(!el)return;el.innerHTML=personnel.map(p=>'<div class="border rounded-lg p-3 flex justify-between items-center gap-3"><div><b>'+esc((p.first_name||"")+" "+(p.last_name||""))+'</b><div class="text-xs text-slate-500">'+esc(p.email||"")+'</div></div><button onclick="openPersonnelForm('+Number(p.id)+')" class="border px-3 py-1 rounded text-sm font-semibold">Edit</button></div>').join("")||'<p class="text-sm text-slate-500">No personnel found.</p>'}
-function renderAdmin(){renderAdminApparatus();renderPersonnel();const el=$("adminCheckItems");if(el&&!el.innerHTML)el.innerHTML='<p class="text-sm text-slate-500">Checklist management is available from Manage Checklists.</p>'}
+function renderAdmin(){loadAdminData();renderAdminApparatus();renderPersonnel();const el=$("adminCheckItems");if(el&&!el.innerHTML)el.innerHTML='<p class="text-sm text-slate-500">Checklist management is available from Manage Checklists.</p>'}
 function renderApparatus(){renderAdminApparatus()}
 function renderHome(){const cards=[["staffing","Daily Staffing","Assign apparatus and crews."],["incidents","Incidents","Create and complete internal reports."],["checks","Apparatus Checks","Driver/officer/admin checks."],["ai","RMS AI Assistant","Generate streaming assistance with GPT-6 Astra."]];$("homeCards").innerHTML=cards.map(a=>`<button onclick="tab('${a[0]}')" class="card p-6 text-left"><b class="text-lg">${a[1]}</b><p class="text-sm text-slate-500 mt-1">${a[2]}</p></button>`).join("")}async function getOrCreateStaffing(date,shift){
   let r=await db.from("daily_staffing").select("staffing_id,staffing_date,shift").eq("staffing_date",date).eq("shift",shift).maybeSingle();
