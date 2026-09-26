@@ -336,6 +336,102 @@ function bindStaffingControls(){
   $("staffDate")?.addEventListener("change",loadStaffing);$("staffShift")?.addEventListener("change",loadStaffing);
 }
 bindStaffingControls();
+
+// ===== Administration and checklist controls =====
+function renderAdmin(){
+  renderAdminApparatus();renderPersonnel();
+  const el=$("adminCheckItems");if(el&&!el.innerHTML)el.innerHTML='<p class="text-sm text-slate-500">Use Manage Checklists to edit each apparatus checklist.</p>';
+  if(profile?.app_role==="admin"){ensureAdminReviewQueue();renderNerisReviewQueue();}
+}
+function addStation(){
+  if(profile?.app_role!=="admin")return alert("Administrator access required.");
+  const name=prompt("Station name:");if(!name?.trim())return;
+  db.from("stations").insert({station_name:name.trim(),active:true}).select("*").maybeSingle().then(r=>{if(r.error)return alert(r.error.message);stations.push(r.data);renderAdmin();loadStaffing()});
+}
+async function editStation(id){
+  if(profile?.app_role!=="admin")return alert("Administrator access required.");
+  const s=stations.find(x=>Number(x.station_id)===Number(id));if(!s)return;
+  const name=prompt("Station name:",s.station_name||"");if(!name?.trim())return;
+  const r=await db.from("stations").update({station_name:name.trim()}).eq("station_id",id);if(r.error)return alert(r.error.message);await refresh();
+}
+function addApparatus(){
+  if(profile?.app_role!=="admin")return alert("Administrator access required.");
+  const unit=prompt("Unit number:");if(!unit?.trim())return;
+  const type=prompt("Apparatus type:","Engine")||"";
+  db.from("apparatus").insert({unit_number:unit.trim(),apparatus_type:type.trim(),active:true}).select("*").maybeSingle().then(r=>{if(r.error)return alert(r.error.message);apparatus.push(r.data);renderAdmin();renderChecks()});
+}
+async function editApparatus(id){
+  if(profile?.app_role!=="admin")return alert("Administrator access required.");
+  const a=apparatus.find(x=>Number(x.apparatus_id)===Number(id));if(!a)return;
+  const unit=prompt("Unit number:",a.unit_number||"");if(!unit?.trim())return;
+  const type=prompt("Apparatus type:",a.apparatus_type||"")||"";
+  const active=confirm("Keep this apparatus active? Click Cancel to deactivate it.");
+  const r=await db.from("apparatus").update({unit_number:unit.trim(),apparatus_type:type.trim(),active}).eq("apparatus_id",id);if(r.error)return alert(r.error.message);await refresh();
+}
+function openPersonnelForm(id=null){
+  if(profile?.app_role!=="admin")return alert("Administrator access required.");
+  const p=id?personnel.find(x=>Number(x.id)===Number(id)):null;
+  $("personnelFormTitle").textContent=p?"Edit Personnel":"Add Personnel";$("pfId").value=p?.id||"";$("pfFirst").value=p?.first_name||"";$("pfLast").value=p?.last_name||"";$("pfEmail").value=p?.email||"";$("pfPassword").value="";$("pfRole").value=p?.role||"firefighter";$("pfInspector").checked=!!p?.is_inspector;$("pfShift").value=p?.shift||"A";$("personnelFormModal").classList.remove("hiddenx");
+}
+function closePersonnelForm(){$("personnelFormModal")?.classList.add("hiddenx");$("personnelForm")?.reset()}
+function syncInspectorField(){}
+async function savePersonnel(){
+  if(profile?.app_role!=="admin")return alert("Administrator access required.");
+  const id=Number($("pfId").value)||null,data={first_name:$("pfFirst").value.trim(),last_name:$("pfLast").value.trim(),email:$("pfEmail").value.trim(),role:$("pfRole").value,shift:$("pfShift").value,is_inspector:$("pfInspector").checked,active:true};
+  if(!data.first_name||!data.last_name||!data.email)return alert("First name, last name, and email are required.");
+  if(id){
+    const r=await db.from("personnel").update(data).eq("id",id);if(r.error)return alert(r.error.message);
+  }else{
+    const r=await db.from("personnel").insert(data).select("*").maybeSingle();if(r.error)return alert(r.error.message);
+    personnel.push(r.data);
+  }
+  alert("Personnel record saved. Login credentials are managed separately from the personnel record.");closePersonnelForm();await refresh();
+}
+function openChecklistManager(){
+  if(profile?.app_role!=="admin")return alert("Administrator access required.");
+  const m=$("checklistManagerModal");if(!m)return;
+  const sel=$("checklistManagerApparatus");sel.innerHTML=apparatus.map(a=>'<option value="'+Number(a.apparatus_id)+'">'+esc(a.unit_number||"")+' · '+esc(a.apparatus_type||"")+'</option>').join("");
+  if(!apparatus.length){alert("No active apparatus found.");return}
+  m.classList.remove("hiddenx");selectChecklistApparatus();
+}
+function closeChecklistManager(){$("checklistManagerModal")?.classList.add("hiddenx")}
+async function selectChecklistApparatus(){
+  const id=Number($("checklistManagerApparatus")?.value);if(!id)return;
+  const [cr,ir]=await Promise.all([
+    db.from("apparatus_check_categories").select("*").eq("apparatus_id",id).eq("active",true).order("sort_order"),
+    db.from("apparatus_check_items").select("*").eq("apparatus_id",id).eq("active",true).order("sort_order")
+  ]);
+  if(cr.error||ir.error)return alert((cr.error||ir.error).message);
+  const cats=cr.data||[],items=ir.data||[];
+  $("checklistCategories").innerHTML=cats.map(c=>'<div class="border rounded p-2 flex justify-between gap-2"><span>'+esc(c.category_name)+'</span><button onclick="deactivateChecklistCategory('+Number(c.category_id)+')" class="text-red-600 text-xs font-bold">Remove</button></div>').join("")||'<p class="text-xs text-slate-500">No categories yet.</p>';
+  $("newCheckCategorySelect").innerHTML=cats.map(c=>'<option value="'+Number(c.category_id)+'">'+esc(c.category_name)+'</option>').join("");
+  $("inlineCheckItems").innerHTML=items.map(x=>'<div class="border rounded-lg p-3 flex justify-between gap-3 items-center"><div><b>'+esc(x.category||cats.find(c=>Number(c.category_id)===Number(x.category_id))?.category_name||"General")+'</b><div class="text-sm">'+esc(x.item_text||"")+'</div></div><button onclick="deactivateChecklistItem('+Number(x.item_id)+')" class="text-red-600 text-xs font-bold">Remove</button></div>').join("")||'<p class="text-sm text-slate-500">No checklist items yet.</p>';
+}
+async function addChecklistCategory(){
+  if(profile?.app_role!=="admin")return;
+  const id=Number($("checklistManagerApparatus")?.value),name=$("newCheckCategory")?.value.trim();if(!id||!name)return;
+  const existing=await db.from("apparatus_check_categories").select("sort_order").eq("apparatus_id",id).order("sort_order",{ascending:false}).limit(1);
+  const next=Number(existing.data?.[0]?.sort_order||0)+1;
+  const r=await db.from("apparatus_check_categories").insert({apparatus_id:id,category_name:name,sort_order:next,active:true});if(r.error)return alert(r.error.message);
+  $("newCheckCategory").value="";await selectChecklistApparatus();
+}
+async function addInlineCheckItem(){
+  if(profile?.app_role!=="admin")return;
+  const apparatusId=Number($("checklistManagerApparatus")?.value),categoryId=Number($("newCheckCategorySelect")?.value),textVal=$("newCheckText")?.value.trim();if(!apparatusId||!textVal)return;
+  const cat=await db.from("apparatus_check_categories").select("category_name").eq("category_id",categoryId).maybeSingle();if(cat.error)return alert(cat.error.message);
+  const mx=await db.from("apparatus_check_items").select("sort_order").eq("apparatus_id",apparatusId).order("sort_order",{ascending:false}).limit(1);
+  const next=Number(mx.data?.[0]?.sort_order||0)+1;
+  const r=await db.from("apparatus_check_items").insert({apparatus_id:apparatusId,category_id:categoryId,category:cat.data?.category_name||"General",item_text:textVal,sort_order:next,active:true});if(r.error)return alert(r.error.message);
+  $("newCheckText").value="";await selectChecklistApparatus();
+}
+async function deactivateChecklistCategory(id){
+  if(!confirm("Remove this checklist category? Existing completed checks will remain unchanged."))return;
+  const r=await db.from("apparatus_check_categories").update({active:false}).eq("category_id",id);if(r.error)return alert(r.error.message);
+  await db.from("apparatus_check_items").update({active:false}).eq("category_id",id);await selectChecklistApparatus();
+}
+async function deactivateChecklistItem(id){
+  const r=await db.from("apparatus_check_items").update({active:false}).eq("item_id",id);if(r.error)return alert(r.error.message);await selectChecklistApparatus();
+}
 function incidentDate(v){if(!v)return "";const d=new Date(v);return d.toLocaleDateString("en-US",{month:"2-digit",day:"2-digit",year:"numeric"})}function incidentTime(v){if(!v)return "";const d=new Date(v);return d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}function mapIncident(id){const el=document.querySelector("[data-incident-id=\""+Number(id)+"\"]");const q=el?.dataset.location||"";const lat=el?.dataset.lat||"";const lng=el?.dataset.lng||"";if(!q&&!lat&&!lng)return alert("No incident location is available.");const destination=(lat&&lng)?lat+","+lng:q;const url="https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(destination)+"&travelmode=driving";window.open(url,"_blank","noopener")}function reportTypeLabel(t){return t==="fire_neris_v2"?"Fire / NERIS Report":t==="pcr_neris_v2"?"Patient Care Report":"Incident Report"}
 function reportTypeIcon(t){return t==="fire_neris_v2"?"🔥":"🚑"}
 function ensureReportModal(){
@@ -567,10 +663,10 @@ function buildNerisLocation(value,lat,lng){
 }
 function buildNerisPayload(data){
   const incidentNumber=$("reportModal")?.dataset.cad||data.rCad||data.rIncidentNumber||data.rDate||("JFD-"+Date.now());
-  const baseTime=nerisIso(data.rDispatch||data.rDate,new Date().toISOString());
-  const arrival=nerisIso(data.rEnroute||data.rDispatch,baseTime);
-  const answered=nerisIso(data.rOnscene||data.rEnroute||data.rDispatch,arrival);
-  const create=nerisIso(data.rDispatch||data.rDate,baseTime);
+  const baseTime=nerisIso(data.rCallArrival||data.rDispatch||data.rDate,new Date().toISOString());
+  const arrival=nerisIso(data.rCallArrival,baseTime);
+  const answered=nerisIso(data.rCallAnswered||data.rDispatch,arrival);
+  const create=nerisIso(data.rCallCreate||data.rDispatch||data.rDate,answered);
   const times=[arrival,answered,create].sort();
   const callArrival=times[0],callAnswered=times[1],callCreate=times[2];
   const incidentType=data.rNerisType||"FIRE||STRUCTURE_FIRE";
@@ -648,4 +744,3 @@ async function validateAndFinishReport(kind){
     const validation=validateReportForNeris(data,false);
     if(!validation.ok)return alert("The report is not ready for NERIS review:\n\n"+validation.errors.join("\n"));
     if(!incidentId)return alert("Standalone reports can be saved as drafts, but must be attached to an incident before NERIS review.");
-    const existing=await db.from("incidents").select("reports").eq("cad",m.dataset.cad||"").maybeSingle();if(existing.error)throw new Error(existing.error.message);
