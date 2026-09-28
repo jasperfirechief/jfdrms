@@ -942,7 +942,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   window.jfdClearSignature=function(id){const c=$(id);if(c)c.getContext("2d").clearRect(0,0,c.width,c.height)};
   window.jfdSyncRefusal=function(id){
     const care=$(id+"_refusedCare")?.checked,transport=$(id+"_refusedTransport")?.checked,minor=$(id+"_minorRefusal")?.checked;
-    const box=$(id+"_refusalDetails"),hint=$(id+"_minorNameHint");if(box)box.classList.toggle("hiddenx",!(care||transport));if(hint)hint.classList.toggle("hiddenx",!minor);
+    const box=$(id+"_refusalDetails"),hint=$(id+"_minorNameHint");if(box)box.classList.toggle("hiddenx",!(care||transport||minor));if(hint)hint.classList.toggle("hiddenx",!minor);
   };
   window.jfdPatientState=[];
   window.jfdRenderPatients=function(state){window.jfdPatientState=state||[];const box=$("jfdPatients");if(!box)return;box.innerHTML=(window.jfdPatientState.length?window.jfdPatientState.map(patientCard).join(""):'<div class="rounded-xl border border-dashed p-5 text-sm text-slate-500">No patient started yet.</div>');setTimeout(jfdBindSignaturePads,0);};
