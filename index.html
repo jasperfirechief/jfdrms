@@ -979,10 +979,10 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   }
   function pcrFormNew(i,d,m,unitRows){
     const saved=d?.patients||d?.pcr?.patients||[];
-    h=incidentHeader(i,d,m,"pcr");
+    let h=incidentHeader(i,d,m,"pcr");
     h+=card("PATIENTS — START HERE",'<div class="rounded-xl bg-blue-50 border border-blue-200 p-3 text-sm mb-3"><b>On scene priority:</b> Get patient information, complaint, assessment, vitals, care/refusal and signature documented first. Incident details can be completed later.</div><div id="jfdPatients"></div><div class="mt-3 flex flex-wrap gap-2">'+btn("+ Add Patient","jfdAddPatient({})","primary")+'</div>');
     h+=responseUi(unitRows);
-    h+=card("Incident Details — Complete Later",'<div class="grid md:grid-cols-2 gap-3">'+field("rIncidentTypes","Incident Type(s)",d?.incident_types||"")+field("rLocationType","Location Type",d?.location_type||"")+field("rPrimaryUse","Primary Use",d?.primary_use||"")+area("rActions","Actions Taken","")+area("rNarrative","Narrative",d?.narrative||"","md:col-span-2")+field("rCompletedBy","Report Completed By",(d?.completed_by)||((profile?.first_name||"")+" "+(profile?.last_name||""))+'</div>');
+    h+=card("Incident Details — Complete Later",'<div class="grid md:grid-cols-2 gap-3">'+field("rIncidentTypes","Incident Type(s)",d?.incident_types||"")+field("rLocationType","Location Type",d?.location_type||"")+field("rPrimaryUse","Primary Use",d?.primary_use||"")+area("rActions","Actions Taken","")+area("rNarrative","Narrative",d?.narrative||"","md:col-span-2")+field("rCompletedBy","Report Completed By",(d?.completed_by)||((profile?.first_name||"")+" "+(profile?.last_name||""))) + '</div>');
     h+=actionBar("pcr");
     setTimeout(()=>jfdRenderPatients(saved),0);
     return h;
