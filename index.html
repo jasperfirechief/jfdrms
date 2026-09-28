@@ -858,5 +858,193 @@ function closeIncidentEditor(){$("incidentEditor")?.classList.add("hiddenx");$("
 async function setIncidentStatus(status){if(!canOps())return alert("You must be on duty.");const id=Number($("incidentId").value);if(!id)return alert("No incident selected.");const patch={status,report_by:me?.id||null};if(status==="complete")patch.completed_at=new Date().toISOString();const r=await db.from("incident_details").update(patch).eq("incident_id",id);if(r.error)return alert(r.error.message);closeIncidentEditor();await loadIncidents();}
 $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
 
+
+/* ===== JFD INCIDENT / PCR WORKFLOW REBUILD ===== */
+(function(){
+  const oldFire=window.fireReportForm, oldPcr=window.pcrReportForm;
+  const field=(id,label,val="",type="text",cls="")=>'<label class="text-sm font-semibold '+cls+'">'+esc(label)+'<input id="'+id+'" type="'+type+'" value="'+esc(val??"")+'" class="w-full border rounded-lg p-2 mt-1 bg-white"></label>';
+  const select=(id,label,opts,val="",cls="")=>'<label class="text-sm font-semibold '+cls+'">'+esc(label)+'<select id="'+id+'" class="w-full border rounded-lg p-2 mt-1 bg-white"><option value="">Select...</option>'+opts.map(o=>'<option value="'+esc(o)+'" '+(String(o)===String(val)?"selected":"")+'>'+esc(o)+'</option>').join("")+'</select></label>';
+  const area=(id,label,val="",cls="")=>'<label class="text-sm font-semibold '+cls+'">'+esc(label)+'<textarea id="'+id+'" rows="4" class="w-full border rounded-lg p-2 mt-1 bg-white">'+esc(val??"")+'</textarea></label>';
+  const card=(title,body,extra="")=>'<section class="rounded-2xl border bg-white shadow-sm p-4 sm:p-5 '+extra+'"><h3 class="text-lg font-black mb-3">'+title+'</h3>'+body+'</section>';
+  const btn=(label,fn,kind="border")=>'<button type="button" onclick="'+fn+'" class="'+(kind==="primary"?"bg-red-600 text-white":kind==="blue"?"bg-blue-700 text-white":"border bg-white")+' px-3 py-2 rounded-lg font-bold text-sm">'+label+'</button>';
+  const incidentHeader=(i,d,m,kind)=>card('<span class="text-red-600">JASPER FIRE DEPARTMENT</span><div class="text-xs text-slate-500 font-semibold mt-1">'+(kind==="pcr"?"PATIENT CARE REPORT":"FIRE INCIDENT REPORT")+'</div>',
+    '<div class="grid md:grid-cols-3 gap-3">'+
+    field("rDate","Incident Date",/^\\d{4}-\\d{2}-\\d{2}/.test(String(i.dispatch_time||""))?String(i.dispatch_time).slice(0,10):"","date")+
+    field("rCad","CAD / Incident Number",i.cad||"")+
+    field("rCall","Call Type",d?.call_type||i.type||"")+
+    field("rLocation","Location",i.location||"","text","md:col-span-2")+
+    field("rStation","Station",m.station||"")+
+    select("rShift","Shift",["A","B","C"],m.shift||"")+
+    field("rCallArrival","Call Arrival",localDateTime(i.call_arrival||i.dispatch_time),"datetime-local")+
+    field("rCallAnswered","Call Answered",localDateTime(i.call_answered||i.dispatch_time),"datetime-local")+
+    field("rCallCreate","Call Create",localDateTime(i.call_create||i.dispatch_time),"datetime-local")+
+    field("rDispatch","Dispatch Time",localDateTime(i.dispatch_time),"datetime-local")+
+    field("rEnroute","First Unit En Route",localDateTime(i.enroute_time||i.enroute_at),"datetime-local")+
+    field("rOnscene","First Unit On Scene",localDateTime(d?.arrival_time||i.on_scene_time),"datetime-local")+
+    field("rCancelled","Cancelled",localDateTime(i.cancelled_time||i.cancelled_at),"datetime-local")+
+    field("rCleared","Last Unit Cleared",localDateTime(d?.clear_time),"datetime-local")+
+    field("rLatitude","Latitude",i.latitude??"","number")+field("rLongitude","Longitude",i.longitude??"","number")+
+    field("rNerisType","NERIS Incident Type",d?.neris_incident_type||"","text","md:col-span-2")+
+    '</div>');
+  function responseUi(unitRows){
+    const selected=(unitRows||[]).map(u=>Number(u.apparatus_id)).filter(Boolean);
+    const checks=apparatus.filter(a=>a.active!==false).sort((a,b)=>String(a.unit_number).localeCompare(String(b.unit_number))).map(a=>'<label class="flex items-center gap-2 border rounded-lg p-2 bg-white"><input type="checkbox" data-runit="'+Number(a.apparatus_id)+'" '+(selected.includes(Number(a.apparatus_id))?"checked":"")+' onchange="jfdSyncUnits()"> <b>'+esc(a.unit_number)+'</b><span class="text-xs text-slate-500">'+esc(a.apparatus_type||"")+'</span></label>').join("");
+    const rows=(unitRows||[]).map(u=>'<div class="border rounded-xl p-3" data-unit-row="'+Number(u.apparatus_id||0)+'"><div class="flex justify-between"><b>'+esc(u.unit_number_snapshot||"Unit")+'</b><button type="button" onclick="this.closest(\'[data-unit-row]\').remove()" class="text-red-600 font-bold">Remove</button></div><div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-2 mt-2">'+
+      field("","En Route",localDateTime(u.enroute_time),"datetime-local","")+
+      field("","On Scene",localDateTime(u.on_scene_time),"datetime-local","")+
+      field("","Cancelled",localDateTime(u.cancelled_time),"datetime-local","")+
+      field("","Cleared",localDateTime(u.in_service_time),"datetime-local","")+
+      select("","Response Mode",["Emergent","Non Emergent"],"")+'</div></div>').join("");
+    return card("Response",'<p class="text-xs text-slate-500 mb-3">CAD/Active911 response data is preloaded. Add or correct units without retyping the incident times.</p><div class="grid md:grid-cols-2 gap-2">'+checks+'</div><div id="jfdUnitRows" class="space-y-2 mt-3">'+(rows||'<p class="text-sm text-slate-500">Select responding apparatus above.</p>')+'</div><div class="mt-3 flex flex-wrap gap-2">'+btn("Refresh Crew","refreshReportApparatusCrews($('rDate')?.value||today())","primary")+'</div>');
+  }
+  window.jfdSyncUnits=function(){
+    const box=$("jfdUnitRows"); if(!box)return;
+    const selected=[...document.querySelectorAll("[data-runit]:checked")].map(x=>Number(x.dataset.runit));
+    const existing=new Set([...box.querySelectorAll("[data-unit-row]")].map(x=>Number(x.dataset.unitRow)));
+    selected.forEach(id=>{if(existing.has(id))return;const ap=apparatus.find(a=>Number(a.apparatus_id)===id);if(!ap)return;const d=document.createElement("div");d.innerHTML='<div class="border rounded-xl p-3" data-unit-row="'+id+'"><div class="flex justify-between"><b>'+esc(ap.unit_number)+'</b><button type="button" onclick="this.closest(\'[data-unit-row]\').remove();document.querySelector(\'[data-runit=\\''+id+'\\']\').checked=false" class="text-red-600 font-bold">Remove</button></div><div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-2 mt-2">'+field("","En Route","","datetime-local")+field("","On Scene","","datetime-local")+field("","Cancelled","","datetime-local")+field("","Cleared","","datetime-local")+select("","Response Mode",["Emergent","Non Emergent"],"")+'</div></div>';box.appendChild(d.firstElementChild)});
+    [...box.querySelectorAll("[data-unit-row]")].forEach(r=>{if(!selected.includes(Number(r.dataset.unitRow))){r.remove()}});
+  };
+  function actionBar(kind){return '<div class="sticky bottom-0 z-10 bg-white/95 backdrop-blur border-t pt-3 flex flex-wrap justify-between gap-2"><div class="flex flex-wrap gap-2">'+btn("Save Draft","saveReportDraft(window.currentReportKind)")+btn("Save & Add Another Patient","jfdSaveAndContinuePatient()")+'</div><div class="flex flex-wrap gap-2">'+btn("Close","closeReportModal()")+btn("Validate & Finish","validateAndFinishReport(window.currentReportKind)","primary")+'</div></div>'}
+  function patientCard(p,index){
+    p=p||{}; const id="p"+index;
+    return '<article class="border-2 rounded-2xl p-4 bg-slate-50" data-patient-card="'+index+'"><div class="flex justify-between items-start gap-3"><div><h4 class="font-black text-lg">Patient '+(index+1)+'</h4><p class="text-xs text-slate-500">Get the patient off and moving first. Everything else can be completed later.</p></div><button type="button" onclick="jfdRemovePatient('+index+')" class="text-red-600 font-bold">Remove</button></div>'+
+      '<div class="grid md:grid-cols-3 gap-3 mt-3">'+field(id+"_name","Patient Name",p.name||"")+field(id+"_dob","DOB",p.dob||"","date")+select(id+"_gender","Gender",["Male","Female","Transgender Male","Transgender Female","Other","Unknown"],p.gender||"")+field(id+"_address","Address",p.address||"","text","md:col-span-3")+field(id+"_chief","Chief Complaint",p.chief||"","text","md:col-span-2")+field(id+"_injury","Injury",p.injury||"")+'</div>'+
+      card("Patient Care Evaluation",'<div class="grid md:grid-cols-2 gap-3">'+select(id+"_evaluation","Patient Care Evaluation",["Evaluated and cared for","Evaluated and refused care","Evaluated, no care required","Refused evaluation/care","Support services provided","DOA"],p.evaluation||"")+select(id+"_status","Patient Status",["Improved","Unchanged","Worsened"],p.status||"")+field(id+"_transport","Transported By",p.transport||"")+select(id+"_transportDisposition","Transport Disposition",["Transport by EMS Unit","Transport by Other Agency","Patient Refused Transport","Non-Patient Transport","No Transport"],p.transportDisposition||"")+'</div>'+
+      '<div class="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200"><div class="font-black">Refusal Documentation</div><p class="text-sm mt-1">The patient/guardian was advised of the risks of refusing medical evaluation, treatment, and/or transport to a medical facility.</p><div class="grid md:grid-cols-2 gap-3 mt-2">'+select(id+"_refusalType","Refusal Type",["","Refused evaluation/care","Refused transport","Refused evaluation/care and transport"],p.refusalType||"")+field(id+"_refusalSigner","Patient / Guardian Name",p.refusalSigner||"")+field(id+"_refusalRelationship","Relationship",p.refusalRelationship||"")+field(id+"_refusalTime","Refusal Date/Time",p.refusalTime||"","datetime-local")+'</div><div class="mt-2"><label class="flex items-center gap-2 text-sm font-semibold"><input id="'+id+'_risk" type="checkbox" '+(p.riskAdvised?"checked":"")+'> Risks explained and understood</label><label class="block text-sm font-semibold mt-2">Signature (type full legal name if electronic signature is used)<input id="'+id+'_signature" class="w-full border rounded p-2 mt-1" value="'+esc(p.signature||"")+'"></label></div></div>')+
+      card("Vitals & Assessment",'<div id="'+id+'_vitals" class="space-y-2">'+(p.vitals||[]).map((v,j)=>'<div class="grid grid-cols-5 gap-2" data-vital="'+j+'">'+field("","Time",v.time||"","time")+field("","O2 / SpO₂",v.o2||"")+field("","Pulse",v.pulse||"")+field("","Resp",v.resp||"")+field("","BP",v.bp||"")+'</div>').join("")+'</div><div class="mt-3 flex flex-wrap gap-2">'+btn("+ Add Vital","jfdAddVital("+index+")")+'</div>'+
+      '<div class="grid md:grid-cols-3 gap-3 mt-3">'+area(id+"_history","Medical History",p.history||"")+area(id+"_meds","Medications",p.meds||"")+area(id+"_allergies","Known Allergies",p.allergies||"")+'</div>')+
+      card("Treatment / Equipment",area(id+"_treatment","Treatment",p.treatment||"")+area(id+"_equipment","Equipment Used / Replaced",p.equipment||"")+area(id+"_comments","Comments",p.comments||""))+
+      '</article>';
+  }
+  window.jfdPatientState=[];
+  window.jfdRenderPatients=function(state){
+    window.jfdPatientState=state||[];
+    const box=$("jfdPatients");if(!box)return;
+    box.innerHTML=(window.jfdPatientState.length?window.jfdPatientState.map(patientCard).join(""):'<div class="rounded-xl border border-dashed p-5 text-sm text-slate-500">No patient started yet.</div>');
+  };
+  window.jfdAddPatient=function(p){window.jfdPatientState.push(p||{});jfdRenderPatients(window.jfdPatientState);};
+  window.jfdRemovePatient=function(i){window.jfdPatientState.splice(i,1);jfdRenderPatients(window.jfdPatientState);};
+  window.jfdAddVital=function(i){const p=window.jfdPatientState[i]||{};(p.vitals||(p.vitals=[])).push({});window.jfdPatientState[i]=p;jfdRenderPatients(window.jfdPatientState);};
+  window.jfdSaveAndContinuePatient=async function(){await saveReportDraft("pcr");jfdAddPatient({});window.scrollTo({top:document.querySelector("[data-patient-card='"+(window.jfdPatientState.length-1)+"']")?.offsetTop||0,behavior:"smooth"});};
+  function collectPatients(){
+    return [...document.querySelectorAll("[data-patient-card]")].map((cardEl,i)=>{
+      const g=id=>cardEl.querySelector("#p"+i+"_"+id)?.value||"";
+      const c=id=>cardEl.querySelector("#p"+i+"_"+id)?.checked===true;
+      const vitals=[...cardEl.querySelectorAll("[data-vital]")].map(v=>{const x=[...v.querySelectorAll("input")];return {time:x[0]?.value||"",o2:x[1]?.value||"",pulse:x[2]?.value||"",resp:x[3]?.value||"",bp:x[4]?.value||""}}).filter(v=>Object.values(v).some(Boolean));
+      return {name:g("name"),dob:g("dob"),gender:g("gender"),address:g("address"),chief:g("chief"),injury:g("injury"),evaluation:g("evaluation"),status:g("status"),transport:g("transport"),transportDisposition:g("transportDisposition"),refusalType:g("refusalType"),refusalSigner:g("refusalSigner"),refusalRelationship:g("refusalRelationship"),refusalTime:g("refusalTime"),riskAdvised:c("risk"),signature:g("signature"),vitals,history:g("history"),meds:g("meds"),allergies:g("allergies"),treatment:g("treatment"),equipment:g("equipment"),comments:g("comments")};
+    });
+  }
+  function fireDetails(i,d){
+    return card("Fire Details",'<div class="grid md:grid-cols-2 gap-3">'+
+      select("rFireLoc","Fire Location",["Structure","Outside"],d?.fire_location||"")+field("rFloor","Floor of Origin",d?.floor_of_origin||"")+
+      select("rWater","Water Supply",["Hydrant","Tank Water","Shuttle","Other","Nurse from Other Apparatus","Draft from Static Source","Supply From Fire Boat","Foam / Water Additive"],d?.water_supply||"")+select("rInvestigation","Investigation Required?",["Yes","No"],d?.investigation||"")+
+      field("rInvestigationType","Investigation Type",d?.investigation_type||"")+select("rCondition","Condition",["No Smoke/Fire Showing","Smoke Showing","Smoke and Fire Showing","Structure Involved","Fire Spread Beyond Structure","Fire Out Upon Arrival"],d?.condition||"")+
+      select("rDamageType","Damage Type",["No Damage","Minor","Moderate","Major"],d?.damage_type||"")+select("rRoom","Room Type",["Assembly","Bathroom","Bedroom","Kitchen","Living Space","Hallway/Foyer","Garage","Balcony/Porch/Deck","Basement","Attic","Office","Utility Room","Other","Unknown"],d?.room_type||"")+
+      select("rCause","Cause",["Operating Equipment","Electrical","Battery/Power Storage","Heat From Another Object","Explosives/Fireworks","Smoking Materials/Illicit Drugs","Open Flame","Cooking","Chemical","Act Of Nature","Incendiary","Other Heat Source","Unable to be Determined"],d?.cause||"")+field("rAcres","Wildfire Acres Burned",d?.wildfire_acres||"","number")+
+      select("rSmokePresence","Smoke Alarm",d?.smoke_alarm_presence||"")+select("rSmokeWorking","Smoke Alarm Working",["Yes","No"],d?.smoke_alarm_working||"")+select("rFireAlarm","Fire Alarm",["Present","Not Present","Not Applicable"],d?.fire_alarm||"")+select("rOtherAlarm","Other Alarm",["Present","Not Present","Not Applicable"],d?.other_alarm||"")+select("rSuppression","Suppression System",["Present","Not Present","Not Applicable"],d?.suppression_system||"")+select("rCookingSuppression","Cooking Fire Suppression",["Present","Not Present","Not Applicable"],d?.cooking_suppression||"")+
+      '</div>');
+  }
+  function repeatedSection(title,key,label,rows,renderRow){
+    const body='<div id="jfd_'+key+'">'+(rows||[]).map(renderRow).join("")+'</div><div class="mt-3">'+btn("+ Add "+label,"jfdAddRepeat('"+key+"')","primary")+'</div>';
+    return card(title,body);
+  }
+  window.jfdRepeats={exposures:[],casualties:[],vehicles:[],hazards:[]};
+  window.jfdAddRepeat=function(key){(window.jfdRepeats[key]||(window.jfdRepeats[key]=[])).push({});jfdRenderRepeats(key)};
+  window.jfdRemoveRepeat=function(key,i){window.jfdRepeats[key].splice(i,1);jfdRenderRepeats(key)};
+  function jfdRenderRepeats(key){
+    const box=$("jfd_"+key);if(!box)return;
+    const arr=window.jfdRepeats[key]||[];
+    box.innerHTML=arr.map((x,i)=>{
+      if(key==="exposures")return '<div class="border rounded-xl p-3 mb-2"><div class="flex justify-between"><b>Exposure '+(i+1)+'</b><button type="button" onclick="jfdRemoveRepeat(\'exposures\','+i+')" class="text-red-600 font-bold">Remove</button></div><div class="grid md:grid-cols-2 gap-2 mt-2">'+field("","Displacement Count",x.displacement||"0","number")+field("","Cause",x.cause||"")+select("","Damage Type",["No Damage","Minor","Moderate","Major"],x.damage||"")+select("","Exposure Type",["External","Internal"],x.type||"")+'</div></div>';
+      if(key==="casualties")return '<div class="border rounded-xl p-3 mb-2"><div class="flex justify-between"><b>Casualty / Rescue '+(i+1)+'</b><button type="button" onclick="jfdRemoveRepeat(\'casualties\','+i+')" class="text-red-600 font-bold">Remove</button></div><div class="grid md:grid-cols-2 gap-2 mt-2">'+select("","FF / Non-FF",["Firefighter","Non-Firefighter"],x.ff||"")+field("","Birth Month & Year",x.dob||"")+select("","Gender",["Male","Female","Transgender Male","Transgender Female","Other","Unknown"],x.gender||"")+select("","Race",["American Indian or Alaska Native","Asian","Black or African American","Middle Eastern or North African","Hispanic or Latino","Native Hawaiian or Pacific Islander","White","Other","Unknown"],x.race||"")+select("","Casualty Type",["Uninjured","Injured Nonfatal","Injured Fatal"],x.status||"")+select("","Rescue Type",["Rescued By Firefighter","Rescued By Firefighter RIT","Rescued By Non-firefighter","Evacuation Assisted By Firefighter","Self-Evacuation","No Rescue Needed"],x.rescue||"")+'</div></div>';
+      if(key==="vehicles")return '<div class="border rounded-xl p-3 mb-2"><div class="flex justify-between"><b>Vehicle '+(i+1)+'</b><button type="button" onclick="jfdRemoveRepeat(\'vehicles\','+i+')" class="text-red-600 font-bold">Remove</button></div><div class="grid md:grid-cols-3 gap-2 mt-2">'+field("","Make",x.make||"")+field("","Model",x.model||"")+field("","Year",x.year||"","number")+field("","License Plate / VIN",x.vin||"")+field("","Owner",x.owner||"")+field("","Insurance Company",x.insurance||"")+'</div></div>';
+      return '<div class="border rounded-xl p-3 mb-2"><div class="flex justify-between"><b>Hazard '+(i+1)+'</b><button type="button" onclick="jfdRemoveRepeat(\'hazards\','+i+')" class="text-red-600 font-bold">Remove</button></div><div class="grid md:grid-cols-2 gap-2 mt-2">'+select("","Hazard Type",["HAZMAT","Electrical Hazard","Power Generation","CSST","Medical Oxygen"],x.type||"")+field("","Details",x.details||"")+field("","Chemical / Material",x.chemical||"")+field("","Disposition",x.disposition||"")+'</div></div>';
+    }).join("");
+  }
+  function fireFormNew(i,d,m,unitRows){
+    window.jfdRepeats={exposures:d?.exposures||[],casualties:d?.casualties||[],vehicles:d?.vehicles||[],hazards:d?.hazards||[]};
+    let h=incidentHeader(i,d,m,"fire");
+    h+=responseUi(unitRows);
+    h+=card("Incident & Location Details",'<div class="grid md:grid-cols-2 gap-3">'+field("rLocationType","Location Type",d?.location_type||"")+field("rPrimaryUse","Primary Use",d?.primary_use||"")+select("rLocationInUse","Location In Use",["Yes","No"],d?.location_in_use||"")+select("rUsedAsIntended","Used as Intended",["Yes","No"],d?.used_as_intended||"")+field("rVacancy","Cause for Vacancy",d?.cause_for_vacancy||"")+field("rPerson","Person Involved",d?.person_involved||"")+'</div>');
+    h+=card("Incident Types & Actions",field("rIncidentTypes","Incident Type(s)",d?.incident_types||"","text","md:col-span-2")+area("rActions","Actions Taken",d?.actions_taken||"","md:col-span-2"));
+    h+=fireDetails(i,d);
+    h+=repeatedSection("Exposures","exposures","Exposure",window.jfdRepeats.exposures,x=>x);
+    h+=repeatedSection("Casualties / Rescues","casualties","Casualty / Rescue",window.jfdRepeats.casualties,x=>x);
+    h+=repeatedSection("Hazards","hazards","Hazard",window.jfdRepeats.hazards,x=>x);
+    h+=repeatedSection("Vehicles","vehicles","Vehicle",window.jfdRepeats.vehicles,x=>x);
+    h+=card("Mutual Aid / Non-FD Aid",'<div class="grid md:grid-cols-2 gap-3">'+select("rMutual","Mutual Aid",["None","Given","Received"],d?.mutual_aid||"")+area("rMutualAgencies","Agencies",d?.mutual_agencies||"")+area("rNonFdAid","Non-FD Aid",d?.non_fd_aid||"")+'</div>');
+    h+=card("Narrative & Completion",area("rNarrative","Narrative",d?.narrative||"","md:col-span-2")+field("rCompletedBy","Report Completed By",(d?.completed_by)||((profile?.first_name||"")+" "+(profile?.last_name||""))));
+    h+=actionBar("fire");
+    return h;
+  }
+  function pcrFormNew(i,d,m,unitRows){
+    const saved=d?.patients||d?.pcr?.patients||[];
+    h=incidentHeader(i,d,m,"pcr");
+    h+=card("PATIENTS — START HERE",'<div class="rounded-xl bg-blue-50 border border-blue-200 p-3 text-sm mb-3"><b>On scene priority:</b> Get patient information, complaint, assessment, vitals, care/refusal and signature documented first. Incident details can be completed later.</div><div id="jfdPatients"></div><div class="mt-3 flex flex-wrap gap-2">'+btn("+ Add Patient","jfdAddPatient({})","primary")+'</div>');
+    h+=responseUi(unitRows);
+    h+=card("Incident Details — Complete Later",'<div class="grid md:grid-cols-2 gap-3">'+field("rIncidentTypes","Incident Type(s)",d?.incident_types||"")+field("rLocationType","Location Type",d?.location_type||"")+field("rPrimaryUse","Primary Use",d?.primary_use||"")+area("rActions","Actions Taken","")+area("rNarrative","Narrative",d?.narrative||"","md:col-span-2")+field("rCompletedBy","Report Completed By",(d?.completed_by)||((profile?.first_name||"")+" "+(profile?.last_name||""))+'</div>');
+    h+=actionBar("pcr");
+    setTimeout(()=>jfdRenderPatients(saved),0);
+    return h;
+  }
+  window.fireReportForm=fireFormNew;
+  window.pcrReportForm=pcrFormNew;
+  const baseCollect=window.collectReportFormData;
+  window.collectReportFormData=function(){
+    const data={};
+    $("incidentReportForm")?.querySelectorAll("input,select,textarea").forEach(el=>{
+      if(!el.id||el.type==="checkbox"||el.matches("[data-runit]")||el.closest("[data-unit-row]"))return;
+      data[el.id]=el.value;
+    });
+    data.responding_apparatus=[...document.querySelectorAll("[data-unit-row]")].map(row=>({
+      apparatus_id:Number(row.dataset.unitRow||0),unit_number:row.querySelector("b")?.textContent||"",
+      times:Object.fromEntries([...row.querySelectorAll("input[type=datetime-local]")].map((x,n)=>[["enroute","on_scene","cancelled","clear"][n],x.value])),
+      crew:JSON.parse(row.dataset.crew||"[]")
+    }));
+    data.additional_personnel=[...document.querySelectorAll("[data-report-person]:checked")].map(x=>Number(x.dataset.reportPerson));
+    if(window.currentReportKind==="pcr")data.patients=collectPatients();
+    data.exposures=window.jfdRepeats?.exposures||[];data.casualties=window.jfdRepeats?.casualties||[];data.vehicles=window.jfdRepeats?.vehicles||[];data.hazards=window.jfdRepeats?.hazards||[];
+    data.jasper_validation_version="2026-09-28";
+    return data;
+  };
+  window.applyPreviousReportValues=function(data){
+    if(!data||typeof data!=="object")return;
+    const scalar={...data};delete scalar.patients;delete scalar.exposures;delete scalar.casualties;delete scalar.vehicles;delete scalar.hazards;delete scalar.responding_apparatus;delete scalar.additional_personnel;
+    $("incidentReportForm")?.querySelectorAll("input,select,textarea").forEach(el=>{const v=scalar[el.id];if(v===undefined||v===null)return;if(el.type==="checkbox")el.checked=!!v;else el.value=String(v)});
+    if(window.currentReportKind==="pcr"){window.jfdRenderPatients(data.patients||[])}
+    window.jfdRepeats={exposures:data.exposures||[],casualties:data.casualties||[],vehicles:data.vehicles||[],hazards:data.hazards||[]};
+    ["exposures","casualties","vehicles","hazards"].forEach(jfdRenderRepeats);
+  };
+  window.validateReportForNeris=function(data,apiChecked){
+    const errors=[];
+    if(!data.rCad&&!$("reportModal")?.dataset.cad)errors.push("Incident/CAD number is required.");
+    if(!data.rNerisType)errors.push("NERIS incident type is required.");
+    if(!data.rLocation)errors.push("Incident location is required.");
+    if(!data.rCallArrival||!data.rCallAnswered||!data.rCallCreate)errors.push("Call Arrival, Call Answered, and Call Create are required.");
+    else if(new Date(data.rCallArrival)>new Date(data.rCallAnswered)||new Date(data.rCallAnswered)>new Date(data.rCallCreate))errors.push("Call times must be Call Arrival ≤ Call Answered ≤ Call Create.");
+    if(!(data.responding_apparatus||[]).some(x=>x.unit_number))errors.push("At least one responding department unit is required.");
+    if(!data.rNarrative)errors.push("Outcome narrative is required.");
+    if(window.currentReportKind==="pcr"){
+      if(!(data.patients||[]).length)errors.push("At least one patient is required for a PCR.");
+      (data.patients||[]).forEach((p,i)=>{
+        if(!p.name)errors.push("Patient "+(i+1)+": patient name is required.");
+        if(!p.chief)errors.push("Patient "+(i+1)+": chief complaint is required.");
+        if(!p.evaluation)errors.push("Patient "+(i+1)+": patient care evaluation is required.");
+        if(p.refusalType){
+          if(!p.riskAdvised)errors.push("Patient "+(i+1)+": refusal risk-advisement acknowledgment is required.");
+          if(!p.signature)errors.push("Patient "+(i+1)+": refusal signature is required.");
+        }
+      });
+    }
+    if(errors.length)return {ok:false,errors};
+    return {ok:true,errors:[]};
+  };
+  window.renderReportChooser=function(i,d,units){
+    setReportIncidentContext(i,d);$("reportModalTitle").textContent="Create Report";$("reportModalSub").textContent=(i.location||"")+(i.cad?" · CAD "+i.cad:"")+" · Start with the work you need to do now";
+    $("incidentReportForm").classList.add("hiddenx");$("reportChooser").classList.remove("hiddenx");
+    $("reportChooser").innerHTML='<div class="max-w-4xl mx-auto"><h3 class="text-xl font-black mb-2">Choose a report</h3><p class="text-sm text-slate-500 mb-5">CAD/Active911 information is already attached. Missing information never prevents the report from being created.</p><div class="grid md:grid-cols-2 gap-4"><button type="button" onclick="openIncidentReportFromChooser(\'fire\')" class="border-2 border-slate-200 hover:border-red-500 rounded-2xl p-6 text-left"><div class="text-2xl">🔥</div><div class="text-lg font-black mt-2">Fire Incident Report</div><div class="text-sm text-slate-500 mt-1">Incident, fire, hazards, exposures, casualties and vehicles.</div></button><button type="button" onclick="openIncidentReportFromChooser(\'pcr\')" class="border-2 border-slate-200 hover:border-blue-500 rounded-2xl p-6 text-left"><div class="text-2xl">🚑</div><div class="text-lg font-black mt-2">Patient Care Report</div><div class="text-sm text-slate-500 mt-1">Patient-first workflow. Document assessment/refusal quickly, then finish the incident later.</div></button></div></div>';
+  };
+})();
+
 window.rmsBoot();
 </script>
