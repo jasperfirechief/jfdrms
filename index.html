@@ -461,11 +461,11 @@ function ensureReportModal(){
 }
 function closeReportModal(){const m=$("reportModal");if(!m)return;m.classList.add("hiddenx");$("reportChooser").innerHTML="";$("incidentReportForm").innerHTML="";$("incidentReportForm").classList.add("hiddenx");$("reportIncidentBanner")?.classList.add("hiddenx");$("reportModal").dataset.incidentId="";$("reportModal").dataset.cad="";$("reportModal").dataset.standalone=""}
 function reportInput(id,label,value="",type="text",required=false,cls=""){return '<label class="text-sm font-semibold '+cls+'">'+label+(required?' *':'')+'<input id="'+id+'" type="'+type+'" value="'+esc(value??"")+'" '+(required?'required':'')+' class="w-full border rounded-lg p-2 mt-1 bg-white"></label>'}
-function reportSelect(id,label,opts,value="",required=false,cls=""){opts=Array.isArray(opts)?opts:(opts==null?[]:[opts]);return '<label class="text-sm font-semibold '+cls+'">'+label+(required?' *':'')+'<select id="'+id+'" '+(required?'required':'')+' class="w-full border rounded-lg p-2 mt-1 bg-white"><option value="">Select...</option>'+opts.map(o=>'<option value="'+esc(o)+'" '+(String(o)===String(value)?'selected':'')+'>'+esc(o)+'</option>').join("")+'</select></label>'}
+function reportSelect(id,label,opts,value="",required=false,cls=""){let list;if(Array.isArray(opts))list=opts;else if(opts&&typeof opts[Symbol.iterator]==="function"&&typeof opts!=="string")list=Array.from(opts);else if(opts&&typeof opts==="object")list=Object.values(opts);else list=opts==null||opts===""?[]:[opts];return '<label class="text-sm font-semibold '+cls+'">'+label+(required?' *':'')+'<select id="'+id+'" '+(required?'required':'')+' class="w-full border rounded-lg p-2 mt-1 bg-white"><option value="">Select...</option>'+list.map(o=>'<option value="'+esc(o)+'" '+(String(o)===String(value)?'selected':'')+'>'+esc(o)+'</option>').join("")+'</select></label>}
 function reportArea(id,label,value="",cls=""){return '<label class="text-sm font-semibold '+cls+'">'+label+'<textarea id="'+id+'" rows="4" class="w-full border rounded-lg p-2 mt-1">'+esc(value??"")+'</textarea></label>'}
 function reportSection(title,body){return '<section class="border rounded-xl p-4 bg-slate-50"><h3 class="font-black text-lg mb-3">'+title+'</h3><div class="grid md:grid-cols-2 gap-3">'+body+'</div></section>'}
 function reportResponseSection(unitRows=[]){
-  const selected=new Set((unitRows||[]).map(u=>Number(u.apparatus_id)).filter(Boolean));
+  const selected=new Set();
   const options=apparatus.filter(a=>a.active!==false).sort((a,b)=>String(a.unit_number||"").localeCompare(String(b.unit_number||""))).map(a=>{
     const stationName=(stations.find(s=>Number(s.station_id)===Number(a.station_id))||{}).station_name||"";
     return '<label class="flex items-center gap-2 border rounded-lg p-2 bg-white text-sm"><input type="checkbox" data-report-apparatus-check="'+Number(a.apparatus_id)+'" '+(selected.has(Number(a.apparatus_id))?'checked':'')+' onchange="toggleReportApparatus('+Number(a.apparatus_id)+',this.checked)" class="h-4 w-4"><span class="font-semibold">'+esc(a.unit_number||"Apparatus")+'<span class="text-xs text-slate-500"> · '+esc(a.apparatus_type||"")+(stationName?" · "+esc(stationName):"")+'</span></span></label>'
@@ -546,7 +546,7 @@ function removeReportApparatus(id){
   const cb=document.querySelector('[data-report-apparatus-check="'+Number(id)+'"]');if(cb)cb.checked=false;
   const box=$("reportResponseUnits");if(box&&!box.querySelector(".report-response-unit"))box.innerHTML='<p class="text-sm text-slate-500">No apparatus selected yet.</p>';
 }
-async function refreshReportApparatusCrews(dateOverride){
+async function refreshReportApparatusCrews_DISABLED(dateOverride){
   const date=dateOverride||$("rDate")?.value||today();
   const rows=[...document.querySelectorAll(".report-response-unit")];
   if(!rows.length){await refreshOffDutyPersonnel(date);return}
