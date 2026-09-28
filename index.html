@@ -897,12 +897,19 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       select("","Response Mode",["Emergent","Non Emergent"],"")+'</div></div>').join("");
     return card("Response",'<p class="text-xs text-slate-500 mb-3">CAD/Active911 response data is preloaded. Add or correct units without retyping the incident times.</p><div class="grid md:grid-cols-2 gap-2">'+checks+'</div><div id="jfdUnitRows" class="space-y-2 mt-3">'+(rows||'<p class="text-sm text-slate-500">Select responding apparatus above.</p>')+'</div><div class="mt-3 flex flex-wrap gap-2">'+btn("Refresh Crew","refreshReportApparatusCrews($('rDate')?.value||today())","primary")+'</div>');
   }
+  window.jfdRemoveReportUnit=function(id){document.querySelector('[data-unit-row="'+Number(id)+'"]')?.remove();const cb=document.querySelector('[data-runit="'+Number(id)+'"]');if(cb)cb.checked=false;};
   window.jfdSyncUnits=function(){
-    const box=$("jfdUnitRows"); if(!box)return;
+    const box=$("jfdUnitRows");if(!box)return;
     const selected=[...document.querySelectorAll("[data-runit]:checked")].map(x=>Number(x.dataset.runit));
     const existing=new Set([...box.querySelectorAll("[data-unit-row]")].map(x=>Number(x.dataset.unitRow)));
-    selected.forEach(id=>{if(existing.has(id))return;const ap=apparatus.find(a=>Number(a.apparatus_id)===id);if(!ap)return;const d=document.createElement("div");d.innerHTML='<div class="border rounded-xl p-3" data-unit-row="'+id+'"><div class="flex justify-between"><b>'+esc(ap.unit_number)+'</b><button type="button" onclick="this.closest(\'[data-unit-row]\').remove();document.querySelector(\'[data-runit=\\''+id+'\\']\').checked=false" class="text-red-600 font-bold">Remove</button></div><div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-2 mt-2">'+field("","En Route","","datetime-local")+field("","On Scene","","datetime-local")+field("","Cancelled","","datetime-local")+field("","Cleared","","datetime-local")+select("","Response Mode",["Emergent","Non Emergent"],"")+'</div></div>';box.appendChild(d.firstElementChild)});
-    [...box.querySelectorAll("[data-unit-row]")].forEach(r=>{if(!selected.includes(Number(r.dataset.unitRow))){r.remove()}});
+    selected.forEach(id=>{
+      if(existing.has(id))return;
+      const ap=apparatus.find(a=>Number(a.apparatus_id)===id);if(!ap)return;
+      const d=document.createElement("div");
+      d.innerHTML='<div class="border rounded-xl p-3" data-unit-row="'+id+'"><div class="flex justify-between"><b>'+esc(ap.unit_number)+'</b><button type="button" onclick="jfdRemoveReportUnit('+id+')" class="text-red-600 font-bold">Remove</button></div><div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-2 mt-2">'+field("","En Route","","datetime-local")+field("","On Scene","","datetime-local")+field("","Cancelled","","datetime-local")+field("","Cleared","","datetime-local")+select("","Response Mode",["Emergent","Non Emergent"],"")+'</div></div>';
+      box.appendChild(d.firstElementChild);
+    });
+    [...box.querySelectorAll("[data-unit-row]")].forEach(r=>{if(!selected.includes(Number(r.dataset.unitRow)))r.remove()});
   };
   function actionBar(kind){return '<div class="sticky bottom-0 z-10 bg-white/95 backdrop-blur border-t pt-3 flex flex-wrap justify-between gap-2"><div class="flex flex-wrap gap-2">'+btn("Save Draft","saveReportDraft(window.currentReportKind)")+btn("Save & Add Another Patient","jfdSaveAndContinuePatient()")+'</div><div class="flex flex-wrap gap-2">'+btn("Close","closeReportModal()")+btn("Validate & Finish","validateAndFinishReport(window.currentReportKind)","primary")+'</div></div>'}
   function patientCard(p,index){
