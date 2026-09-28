@@ -546,7 +546,7 @@ function removeReportApparatus(id){
   const cb=document.querySelector('[data-report-apparatus-check="'+Number(id)+'"]');if(cb)cb.checked=false;
   const box=$("reportResponseUnits");if(box&&!box.querySelector(".report-response-unit"))box.innerHTML='<p class="text-sm text-slate-500">No apparatus selected yet.</p>';
 }
-async async function refreshReportApparatusCrews(dateOverride){
+async function refreshReportApparatusCrews(dateOverride){
   const date=dateOverride||$("rDate")?.value||today();
   const rows=[...document.querySelectorAll(".report-response-unit")];
   if(!rows.length){await refreshOffDutyPersonnel(date);return}
