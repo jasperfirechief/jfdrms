@@ -648,7 +648,7 @@ async function startIncidentReport(kind){
   $("reportChooser").classList.add("hiddenx");$("incidentReportForm").classList.remove("hiddenx");
   $("reportModalTitle").textContent=kind==="fire"?"Fire Incident Report":"Patient Care Report";
   $("reportModalSub").textContent="CAD "+(i.cad||"")+" · "+(i.location||"")+" · Available CAD information has been pre-populated. Missing information can be entered manually.";setReportIncidentContext(i,d);
-  $("incidentReportForm").innerHTML=kind==="fire"?fireReportForm(i,d,meta,unitRows):pcrReportForm(i,d,meta,unitRows);
+  $("incidentReportForm").innerHTML=kind==="fire"?window.fireReportForm(i,d,meta,unitRows):window.pcrReportForm(i,d,meta,unitRows);
   if(firstReport) applyPreviousReportValues(firstReport);
   bindReportForm(kind); try{await refreshReportApparatusCrews(iDateForReport(i.dispatch_time));}catch(e){console.error("Report apparatus refresh failed",e);}
   if(firstReport?.additional_personnel?.length){
