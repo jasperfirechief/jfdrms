@@ -595,7 +595,8 @@ function setReportIncidentContext(i,d){const m=$("reportModal");if(!m)return;con
 function openIncidentReportFromChooser(kind){
   try{
     const m=$("reportModal");
-    if(!m||!m.dataset.incidentId)return alert("No incident is attached to this report.");
+    if(!m)return alert("Report window is not available.");
+    if(m.dataset.standalone==="1" || !m.dataset.incidentId)return startStandaloneReport(kind);
     return startIncidentReport(kind);
   }catch(e){
     console.error("Incident report open failed",e);
@@ -606,10 +607,11 @@ function openIncidentReportFromChooser(kind){
 function newReport(){
   if(!canOps())return alert("You must be on duty.");
   const m=ensureReportModal();m.dataset.incidentId="";m.dataset.cad="";m.dataset.standalone="1";m.classList.remove("hiddenx");
-  $("reportModalTitle").textContent="Patient Care Report";$("reportModalSub").textContent="Standalone patient care report";
-  $("reportChooser").classList.add("hiddenx");$("incidentReportForm").classList.remove("hiddenx");
-  const i={cad:"",type:"EMS",location:"",dispatch_time:""};const d={call_type:"EMS"};const meta={station:"",shift:""};
-  $("incidentReportForm").innerHTML=pcrReportForm(i,d,meta,[]);bindReportForm("pcr");setTimeout(jfdBindSignaturePads,0);
+  $("reportModalTitle").textContent="Create Report";$("reportModalSub").textContent="Select a report type";
+  $("reportIncidentBanner")?.classList.add("hiddenx");
+  $("incidentReportForm").classList.add("hiddenx");
+  $("reportChooser").classList.remove("hiddenx");
+  $("reportChooser").innerHTML='<div class="max-w-4xl mx-auto"><h3 class="text-xl font-black mb-2">Choose a report</h3><p class="text-sm text-slate-500 mb-5">Create a new report. Incident and CAD information can be added manually.</p><div class="grid md:grid-cols-2 gap-4"><button type="button" onclick="openIncidentReportFromChooser(\'fire\')" class="border-2 border-slate-200 hover:border-red-500 rounded-2xl p-6 text-left"><div class="font-black text-lg">Fire Incident Report</div><div class="text-sm text-slate-500 mt-1">Document a fire, alarm, hazard, MVA, or other fire incident.</div></button><button type="button" onclick="openIncidentReportFromChooser(\'pcr\')" class="border-2 border-slate-200 hover:border-blue-500 rounded-2xl p-6 text-left"><div class="font-black text-lg">Patient Care Report</div><div class="text-sm text-slate-500 mt-1">Document patient assessment, treatment, vitals, transport, or refusal.</div></button></div></div>';
 }
 function startStandaloneReport(kind){
   try{
@@ -628,8 +630,40 @@ function startStandaloneReport(kind){
     alert("Unable to open the report form: "+(e?.message||String(e)));
   }
 }
-async function createIncidentReport(id){if(!canOps())return alert("You must be on duty.");const incidentId=Number(id);if(!incidentId)return alert("This incident does not have a report record yet.");const dr=await db.from("incident_details").select("cad").eq("incident_id",incidentId).maybeSingle();if(dr.error)return alert(dr.error.message);if(!dr.data?.cad)return alert("The incident report record is missing its CAD number.");return createIncidentReportByCad(dr.data.cad)}
-async function createIncidentReportByCad(cad){if(!canOps())return alert("You must be on duty.");if(!cad)return alert("This incident has no CAD number, but reports can still be created manually.");const r=await db.from("incidents").select("*").eq("cad",cad).maybeSingle();if(r.error)return alert(r.error.message);if(!r.data)return alert("Incident not found.");let dr=await db.from("incident_details").select("*").eq("cad",cad).maybeSingle();if(dr.error)return alert(dr.error.message);if(!dr.data){const ins=await db.from("incident_details").insert({cad,status:"draft",report_by:me?.id||null,incident_date:iDateForReport(r.data.dispatch_time)}).select("*").maybeSingle();if(ins.error)return alert("Could not initialize the incident report: "+ins.error.message);dr=ins}const ur=await db.from("incident_units").select("*").eq("incident_id",dr.data.incident_id).order("incident_unit_id");if(ur.error)return alert(ur.error.message);const m=ensureReportModal();m.dataset.incidentId=String(dr.data.incident_id);m.dataset.cad=String(r.data.cad||cad);m.dataset.standalone="";m.classList.remove("hiddenx");await openIncidentReportForm("pcr",r.data,dr.data,ur.data||[]);}
+async function createIncidentReport(id){
+  if(!canOps())return alert("You must be on duty.");
+  const incidentId=Number(id);
+  if(!incidentId)return alert("This incident does not have a report record yet.");
+  let dr=await db.from("incident_details").select("*").eq("incident_id",incidentId).maybeSingle();
+  if(dr.error)return alert(dr.error.message);
+  const ir=await db.from("incidents").select("*").eq("cad",dr.data?.cad||"").maybeSingle();
+  if(ir.error)return alert(ir.error.message);
+  let r=ir.data;
+  if(!r){
+    const fallback=await db.from("incidents").select("*").eq("id",incidentId).maybeSingle();
+    if(fallback.error)return alert(fallback.error.message);
+    r=fallback.data;
+  }
+  if(!r)return alert("Incident not found.");
+  if(!dr.data){
+    const ins=await db.from("incident_details").insert({incident_id:incidentId,cad:r.cad||null,status:"draft",report_by:me?.id||null,incident_date:iDateForReport(r.dispatch_time)}).select("*").maybeSingle();
+    if(ins.error)return alert("Could not initialize the incident report: "+ins.error.message);
+    dr=ins;
+  }
+  const ur=await db.from("incident_units").select("*").eq("incident_id",incidentId).order("incident_unit_id");
+  if(ur.error)return alert(ur.error.message);
+  const m=ensureReportModal();m.dataset.incidentId=String(incidentId);m.dataset.cad=String(r.cad||dr.data?.cad||"");m.dataset.standalone="";m.classList.remove("hiddenx");
+  renderReportChooser(r,dr.data,ur.data||[]);
+}
+async function createIncidentReportByCad(cad){
+  if(!canOps())return alert("You must be on duty.");
+  if(!cad)return alert("This incident has no CAD number, but reports can still be created manually.");
+  const r=await db.from("incidents").select("*").eq("cad",cad).maybeSingle();if(r.error)return alert(r.error.message);if(!r.data)return alert("Incident not found.");
+  let dr=await db.from("incident_details").select("*").eq("cad",cad).maybeSingle();if(dr.error)return alert(dr.error.message);
+  if(!dr.data){const ins=await db.from("incident_details").insert({cad,status:"draft",report_by:me?.id||null,incident_date:iDateForReport(r.data.dispatch_time)}).select("*").maybeSingle();if(ins.error)return alert("Could not initialize the incident report: "+ins.error.message);dr=ins}
+  const ur=await db.from("incident_units").select("*").eq("incident_id",dr.data.incident_id).order("incident_unit_id");if(ur.error)return alert(ur.error.message);
+  const m=ensureReportModal();m.dataset.incidentId=String(dr.data.incident_id);m.dataset.cad=String(r.data.cad||cad);m.dataset.standalone="";m.classList.remove("hiddenx");renderReportChooser(r.data,dr.data,ur.data||[]);
+}
 
 async function openIncidentReportForm(kind,i,d,unitRows=[]){window.currentReportKind=kind;const m=ensureReportModal();m.dataset.standalone="";$("reportChooser").classList.add("hiddenx");$("incidentReportForm").classList.remove("hiddenx");$("reportModalTitle").textContent=kind==="fire"?"Fire Incident Report":"Patient Care Report";$("reportModalSub").textContent="CAD "+(i.cad||"")+" · "+(i.location||"")+" · Available CAD information has been pre-populated. Missing information can be entered manually.";setReportIncidentContext(i,d);const stationNames=[...new Set((unitRows||[]).map(u=>u.station_snapshot).filter(Boolean))].join(", ");const meta={station:stationNames,officer:"",crew:"",units:(unitRows||[]).map(u=>u.unit_number_snapshot).filter(Boolean).join(", "),lat:i.latitude??"",lng:i.longitude??"",shift:$("staffShift")?.value||""};const reportList=Array.isArray(i.reports)?i.reports:[];const firstReport=reportList.length?(reportList[0]?.data||reportList[0]||null):null;$("incidentReportForm").innerHTML=kind==="fire"?window.fireReportForm(i,d,meta,unitRows):window.pcrReportForm(i,d,meta,unitRows);if(firstReport)applyPreviousReportValues(firstReport);bindReportForm(kind);try{await refreshReportApparatusCrews(iDateForReport(i.dispatch_time));}catch(e){console.error("Report apparatus refresh failed",e)}$("rDate")?.addEventListener("change",()=>refreshReportApparatusCrews($("rDate").value));}
 
