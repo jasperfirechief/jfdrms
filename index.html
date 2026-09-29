@@ -1093,7 +1093,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
         if(!p.name)errors.push("Patient "+(i+1)+": patient name is required.");
         if(!p.chief)errors.push("Patient "+(i+1)+": chief complaint is required.");
         if(!p.evaluation)errors.push("Patient "+(i+1)+": patient care evaluation is required.");
-        if(p.refusedCare||p.refusedTransport){
+        if(p.refusedCare||p.refusedTransport||p.minorRefusal){
           if(!p.riskAdvised)errors.push("Patient "+(i+1)+": refusal risk-advisement acknowledgment is required.");
           if(!p.refusalSigner)errors.push("Patient "+(i+1)+": Patient / Guardian Name is required for refusal.");
           if(!p.signature)errors.push("Patient "+(i+1)+": refusal signature is required.");
