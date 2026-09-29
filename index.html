@@ -904,31 +904,27 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     '<div class="grid md:grid-cols-3 gap-3">'+
     field("rDate","Incident Date",/^\\d{4}-\\d{2}-\\d{2}/.test(String(i.dispatch_time||""))?String(i.dispatch_time).slice(0,10):"","date")+
     field("rCad","CAD / Incident Number",i.cad||"")+
-    field("rCall","Call Type",d?.call_type||i.type||"")+
+    select("rCall","Call Type",CALL_TYPES,d?.call_type||i.type||"")+
     field("rLocation","Location",i.location||"","text","md:col-span-2")+
-    field("rStation","Station",m.station||"")+
+    select("rLocationType","Location Type",LOCATION_TYPES,d?.location_type||"")+
+    select("rPrimaryUse","Primary Use Type",USE_TYPES,d?.primary_use||d?.primary_use_type||"","md:col-span-2")+
+    select("rSecondaryUse","Secondary Use Type",USE_TYPES,d?.secondary_use||d?.secondary_use_type||"","md:col-span-2")+
+    select("rStation","Station",(stations||[]).map(s=>s.station_name||("Station "+s.station_id)),m.station||"")+
     select("rShift","Shift",["A","B","C"],m.shift||"")+
-    field("rCallArrival","Call Arrival",localDateTime(i.call_arrival||i.dispatch_time),"datetime-local")+
-    field("rCallAnswered","Call Answered",localDateTime(i.call_answered||i.dispatch_time),"datetime-local")+
-    field("rCallCreate","Call Create",localDateTime(i.call_create||i.dispatch_time),"datetime-local")+
-    field("rDispatch","Dispatch Time",localDateTime(i.dispatch_time),"datetime-local")+
-    field("rEnroute","First Unit En Route",localDateTime(i.enroute_time||i.enroute_at),"datetime-local")+
-    field("rOnscene","First Unit On Scene",localDateTime(d?.arrival_time||i.on_scene_time),"datetime-local")+
-    field("rCancelled","Cancelled",localDateTime(i.cancelled_time||i.cancelled_at),"datetime-local")+
-    field("rCleared","Last Unit Cleared",localDateTime(d?.clear_time),"datetime-local")+
     field("rLatitude","Latitude",i.latitude??"","number")+field("rLongitude","Longitude",i.longitude??"","number")+
-    field("rNerisType","NERIS Incident Type",d?.neris_incident_type||"","text","md:col-span-2")+
+    select("rIncidentType","Incident Type",INCIDENT_TYPES,d?.incident_type||d?.incident_types||"","md:col-span-2")+
+    select("rNerisType","NERIS Incident Type",INCIDENT_TYPES,d?.neris_incident_type||d?.incident_type||"","md:col-span-2")+
     '</div>');
-  function responseUi(unitRows){
-    const selected=(unitRows||[]).map(u=>Number(u.apparatus_id)).filter(Boolean);
-    const checks=apparatus.filter(a=>a.active!==false).sort((a,b)=>String(a.unit_number).localeCompare(String(b.unit_number))).map(a=>'<label class="flex items-center gap-2 border rounded-lg p-2 bg-white"><input type="checkbox" data-runit="'+Number(a.apparatus_id)+'" '+(selected.includes(Number(a.apparatus_id))?"checked":"")+' onchange="jfdSyncUnits()"> <b>'+esc(a.unit_number)+'</b><span class="text-xs text-slate-500">'+esc(a.apparatus_type||"")+'</span></label>').join("");
-    const rows=(unitRows||[]).map(u=>'<div class="border rounded-xl p-3" data-unit-row="'+Number(u.apparatus_id||0)+'"><div class="flex justify-between"><b>'+esc(u.unit_number_snapshot||"Unit")+'</b><button type="button" onclick="this.closest(\'[data-unit-row]\').remove()" class="text-red-600 font-bold">Remove</button></div><div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-2 mt-2">'+
-      field("","En Route",localDateTime(u.enroute_time),"datetime-local","")+
-      field("","On Scene",localDateTime(u.on_scene_time),"datetime-local","")+
-      field("","Cancelled",localDateTime(u.cancelled_time),"datetime-local","")+
-      field("","Cleared",localDateTime(u.in_service_time),"datetime-local","")+
-      select("","Response Mode",["Emergent","Non Emergent"],"")+'</div></div>').join("");
-    return card("Response",'<p class="text-xs text-slate-500 mb-3">CAD/Active911 response data is preloaded. Add or correct units without retyping the incident times.</p><div class="grid md:grid-cols-2 gap-2">'+checks+'</div><div id="jfdUnitRows" class="space-y-2 mt-3">'+(rows||'<p class="text-sm text-slate-500">Select responding apparatus above.</p>')+'</div><div class="mt-3 flex flex-wrap gap-2">'+btn("Refresh Crew","refreshReportApparatusCrews($('rDate')?.value||today())","primary")+'</div>');
+  function responseUi(unitRows,iForResponse){
+    const checks=apparatus.filter(a=>a.active!==false).sort((a,b)=>String(a.unit_number).localeCompare(String(b.unit_number))).map(a=>'<label class="flex items-center gap-2 border rounded-lg p-2 bg-white"><input type="checkbox" data-runit="'+Number(a.apparatus_id)+'" onchange="jfdSyncUnits()"> <b>'+esc(a.unit_number)+'</b><span class="text-xs text-slate-500">'+esc(a.apparatus_type||"")+'</span></label>').join("");
+    const dispatch=card("Dispatch",'<p class="text-xs text-slate-500 mb-3">Dispatch/CAD information is kept separate from firefighter response information. CAD values are pre-populated when available and remain editable.</p><div class="grid md:grid-cols-2 lg:grid-cols-4 gap-3">'+
+      field("rCallArrival","Call Arrival",localDateTime(iForResponse?.call_arrival||iForResponse?.dispatch_time),"datetime-local")+
+      field("rCallAnswered","Call Answered",localDateTime(iForResponse?.call_answered||iForResponse?.dispatch_time),"datetime-local")+
+      field("rCallCreate","Call Create",localDateTime(iForResponse?.call_create||iForResponse?.dispatch_time),"datetime-local")+
+      field("rDispatch","Dispatch Time",localDateTime(iForResponse?.dispatch_time),"datetime-local")+
+      '</div>');
+    const response=card("Response",'<p class="text-xs text-slate-500 mb-3">Select the apparatus that actually responded. CAD/Active911 does not automatically select response units.</p><div class="grid md:grid-cols-2 gap-2">'+checks+'</div><div id="jfdUnitRows" class="space-y-2 mt-3"><p class="text-sm text-slate-500">Select responding apparatus above.</p></div><div class="mt-3 flex flex-wrap gap-2">'+btn("Refresh Crew","refreshReportApparatusCrews($('rDate')?.value||today())","primary")+'</div><div class="mt-4 border-t pt-4"><div id="reportOffDutyPersonnel">'+renderOffDutyPersonnel([])+'</div></div>');
+    return dispatch+response;
   }
   window.jfdRemoveReportUnit=function(id){document.querySelector('[data-unit-row="'+Number(id)+'"]')?.remove();const cb=document.querySelector('[data-runit="'+Number(id)+'"]');if(cb)cb.checked=false;};
   window.jfdSyncUnits=function(){
@@ -1023,7 +1019,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   function fireFormNew(i,d,m,unitRows){
     window.jfdRepeats={exposures:d?.exposures||[],casualties:d?.casualties||[],vehicles:d?.vehicles||[],hazards:d?.hazards||[]};
     let h=incidentHeader(i,d,m,"fire");
-    h+=responseUi(unitRows);
+    h+=responseUi(unitRows,i);
     h+=card("Incident & Location Details",'<div class="grid md:grid-cols-2 gap-3">'+field("rLocationType","Location Type",d?.location_type||"")+field("rPrimaryUse","Primary Use",d?.primary_use||"")+select("rLocationInUse","Location In Use",["Yes","No"],d?.location_in_use||"")+select("rUsedAsIntended","Used as Intended",["Yes","No"],d?.used_as_intended||"")+field("rVacancy","Cause for Vacancy",d?.cause_for_vacancy||"")+field("rPerson","Person Involved",d?.person_involved||"")+'</div>');
     h+=card("Incident Types & Actions",field("rIncidentTypes","Incident Type(s)",d?.incident_types||"","text","md:col-span-2")+area("rActions","Actions Taken",d?.actions_taken||"","md:col-span-2"));
     h+=fireDetails(i,d);
@@ -1048,7 +1044,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     const saved=d?.patients||d?.pcr?.patients||[];
     let h=pcrIncidentHeader(i,d,m);
     h+=card("PATIENTS — START HERE",'<div class="rounded-xl bg-blue-50 border border-blue-200 p-3 text-sm mb-3"><b>On scene priority:</b> Get patient information, complaint, assessment, vitals, care/refusal and signature documented first. Incident details can be completed later.</div><div id="jfdPatients"></div><div class="mt-3 flex flex-wrap gap-2">'+btn("+ Add Patient","jfdAddPatient({})","primary")+'</div>');
-    h+=responseUi(unitRows);
+    h+=responseUi(unitRows,i);
     h+=card("Incident Details — Complete Later",'<div class="grid md:grid-cols-2 gap-3">'+select("rPersonInvolved","Person Involved",["Patient","Guardian","Bystander","Witness","Other"],d?.person_involved||"")+select("rUsedAsIntended","Used as Intended",["Yes","No","Unknown"],d?.used_as_intended||"")+select("rVacancy","Cause for Vacancy",["New Construction / Remodel","Abandoned","For Sale / Lease","Foreclosure","State of Damage / Decay","Seasonal / Occasionally Occupied","Unknown"],d?.cause_for_vacancy||"")+area("rActions","Actions Taken",d?.actions_taken||"")+area("rNarrative","Narrative",d?.narrative||"","md:col-span-2")+field("rCompletedBy","Report Completed By",(d?.completed_by)||((profile?.first_name||"")+" "+(profile?.last_name||"")))+'</div>');
     h+=actionBar("pcr");
     setTimeout(()=>{jfdRenderPatients(saved);jfdBindSignaturePads();},0);
