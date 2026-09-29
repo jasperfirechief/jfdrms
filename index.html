@@ -460,9 +460,7 @@ async function validateIncidentForNeris(currentKind,currentData,incidentId,cad){
       if(!p.name)errors.push("Patient "+(i+1)+": patient name is required.");
       if(!p.chief)errors.push("Patient "+(i+1)+": chief complaint is required.");
       if(!p.evaluation)errors.push("Patient "+(i+1)+": patient care evaluation is required.");
-      if(p.refusedCare||p.refusedTransport||p.minorRefusal){
-        if(!p.riskAdvised)errors.push("Patient "+(i+1)+": refusal risk-advisement acknowledgment is required.");
-        if(!p.refusalSigner)errors.push("Patient "+(i+1)+": Patient / Guardian Name is required for refusal.");
+      if(p.refusedCare||p.refusedTransport||p.minorRefusal){if(!p.refusalSigner)errors.push("Patient "+(i+1)+": Patient / Guardian Name is required for refusal.");
         if(!p.signature)errors.push("Patient "+(i+1)+": refusal signature is required.");
       }
     });
@@ -1023,7 +1021,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       card("Patient Care Evaluation",'<div class="grid md:grid-cols-2 gap-3">'+select(id+"_evaluation","Patient Care Evaluation",["Evaluated and cared for","Evaluated and refused care","Evaluated, no care required","Refused evaluation/care","Support services provided","DOA"],p.evaluation||"")+select(id+"_status","Patient Status",["Improved","Unchanged","Worsened"],p.status||"")+select(id+"_transport","Transported By",["EMS Unit","Other Agency","No Transport"],p.transport||"")+select(id+"_transportDisposition","Transport Disposition",["Transport by EMS Unit","Transport by Other Agency","Patient Refused Transport","Non-Patient Transport","No Transport"],p.transportDisposition||"")+'</div>'+patientRefusalHtml(id,p))+
       card("Vitals & Assessment",'<div id="'+id+'_vitals" class="space-y-2">'+(p.vitals||[]).map((v,j)=>'<div class="grid grid-cols-5 gap-2" data-vital="'+j+'">'+field("","Time",v.time||"","time")+field("","O2 / SpO₂",v.o2||"")+field("","Pulse",v.pulse||"")+field("","Resp",v.resp||"")+field("","BP",v.bp||"")+'</div>').join("")+'</div><div class="mt-3 flex flex-wrap gap-2">'+btn("+ Add Vital","jfdAddVital("+index+")")+'</div>'+
       '<div class="grid md:grid-cols-3 gap-3 mt-3">'+area(id+"_history","Medical History",p.history||"")+area(id+"_meds","Medications",p.meds||"")+area(id+"_allergies","Known Allergies",p.allergies||"")+'</div>')+
-      card("Treatment / Equipment / Narrative",area(id+"_equipment","Equipment Used / Replaced",p.equipment||"")+area(id+"_narrative","Narrative",p.narrative||""))+
+      card("Equipment & Narrative",area(id+"_equipment","Equipment Used / Replaced",p.equipment||"")+area(id+"_narrative","Narrative",p.narrative||""))+
       '</article>';
   }
   window.jfdBindSignaturePads=function(){
@@ -1074,7 +1072,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       const canvas=cardEl.querySelector("#p"+i+"_signaturePad");
       const vitals=[...cardEl.querySelectorAll("[data-vital]")].map(v=>{const x=[...v.querySelectorAll("input")];return {time:x[0]?.value||"",o2:x[1]?.value||"",pulse:x[2]?.value||"",resp:x[3]?.value||"",bp:x[4]?.value||""}}).filter(v=>Object.values(v).some(Boolean));
       const minorPatients=[...cardEl.querySelectorAll("[data-minor-row]")].map(row=>({name:row.querySelector('input[id$="_name"]')?.value||"",dob:row.querySelector('input[id$="_dob"]')?.value||""}));
-      return {name:g("name"),dob:g("dob"),gender:g("gender"),address:g("address"),chief:g("chief"),injury:g("injury"),evaluation:g("evaluation"),status:g("status"),transport:g("transport"),transportDisposition:g("transportDisposition"),refusedCare:c("refusedCare"),refusedTransport:c("refusedTransport"),minorRefusal:c("minorRefusal"),minorPatients,refusalSigner:g("refusalSigner"),refusalTime:g("refusalTime"),riskAdvised:c("risk"),signature:canvas?.toDataURL("image/png")||"",vitals,history:g("history"),meds:g("meds"),allergies:g("allergies"),narrative:g("narrative"),equipment:g("equipment")};
+      return {name:g("name"),dob:g("dob"),gender:g("gender"),address:g("address"),chief:g("chief"),injury:g("injury"),evaluation:g("evaluation"),status:g("status"),transport:g("transport"),transportDisposition:g("transportDisposition"),refusedCare:c("refusedCare"),refusedTransport:c("refusedTransport"),minorRefusal:c("minorRefusal"),minorPatients,refusalSigner:g("refusalSigner"),refusalTime:g("refusalTime"),signature:canvas?.toDataURL("image/png")||"",vitals,history:g("history"),meds:g("meds"),allergies:g("allergies"),narrative:g("narrative"),equipment:g("equipment")};
     });
   }
   const NERIS_INVESTIGATION_TYPES=[{"value":"INVESTIGATED_ON_SCENE_RESOURCE","label":"Investigated By On-Scene Operational Resources"},{"value":"INVESTIGATED_BY_ARSON_FIRE_INVESTIGATOR","label":"Investigated By Formal Arson / Fire Investigator"},{"value":"INVESTIGATED_BY_OUTSIDE_AGENCY","label":"Investigated By Outside Fire Agency"},{"value":"INVESTIGATED_BY_STATE_FIRE_MARSHAL","label":"Investigated By State Fire Marshal"},{"value":"INVESTIGATED_BY_INSURANCE","label":"Investigated By Insurance"},{"value":"INVESTIGATED_BY_NONFIRE_LAW_ENFORCEMENT","label":"Investigated By Law Enforcement (Nonfire)"},{"value":"INVESTIGATED_BY_OTHER","label":"Investigated By Other"}];
@@ -1196,7 +1194,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   function pcrFormNew(i,d,m,unitRows){
     const saved=d?.patients||d?.pcr?.patients||[];
     let h=pcrIncidentHeader(i,d,m);
-    h+=card("PATIENTS — START HERE",'<div class="rounded-xl bg-blue-50 border border-blue-200 p-3 text-sm mb-3"><b>On scene priority:</b> Get patient information, complaint, assessment, vitals, care/refusal and signature documented first. Incident details can be completed later.</div><div id="jfdPatients"></div><div class="mt-3 flex flex-wrap gap-2">'+btn("+ Add Patient","jfdAddPatient({})","primary")+'</div>');
+    h+=card("PATIENTS — START HERE",'<div class="rounded-xl bg-blue-50 border border-blue-200 p-3 text-sm mb-3"><b>On scene priority:</b> Get patient information, complaint, assessment, vitals, care/refusal and signature documented first. The remaining narrative and report details can be completed later.</div><div id="jfdPatients"></div><div class="mt-3 flex flex-wrap gap-2">'+btn("+ Add Patient","jfdAddPatient({})","primary")+'</div>');
     h+=responseUi(unitRows,i);
     h+=card("Report Completion",field("rCompletedBy","Report Completed By",(d?.completed_by)||((profile?.first_name||"")+" "+(profile?.last_name||""))));
     h+=actionBar("pcr");
