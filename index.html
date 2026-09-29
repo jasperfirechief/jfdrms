@@ -661,8 +661,8 @@ function startStandaloneReport(kind){
   const i={cad:"",type:"",location:"",dispatch_time:"",latitude:"",longitude:""};
   const d={}; const meta={station:"",officer:"",crew:"",units:"",lat:"",lng:""};
   $("reportChooser").classList.add("hiddenx");$("incidentReportForm").classList.remove("hiddenx");
-  $("reportModalTitle").textContent="Patient Care Report";
-  $("reportModalSub").textContent="Standalone manual report · no incident or CAD data attached";$("reportIncidentBanner")?.classList.add("hiddenx");
+  $("reportModalTitle").textContent=kind==="fire"?"Fire Incident Report":"Patient Care Report";
+  $("reportModalSub").textContent=kind==="fire"?"Standalone manual fire incident report · no incident or CAD data attached":"Standalone manual patient care report · no incident or CAD data attached";$("reportIncidentBanner")?.classList.add("hiddenx");
   $("incidentReportForm").innerHTML=kind==="fire"?window.fireReportForm(i,d,meta,[]):window.pcrReportForm(i,d,meta,[]);
   bindReportForm(kind); try{refreshReportApparatusCrews(iDateForReport(i.dispatch_time)).catch(e=>console.error("Report apparatus refresh failed",e));}catch(e){console.error("Report apparatus refresh failed",e);} $("rDate")?.addEventListener("change",()=>refreshReportApparatusCrews($("rDate").value));
   }catch(e){
