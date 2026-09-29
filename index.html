@@ -1142,7 +1142,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     if(errors.length)return {ok:false,errors};
     return {ok:true,errors:[]};
   };
-  window.renderReportChooser=function(i,d,units){setReportIncidentContext(i,d);$("reportModalTitle").textContent="Patient Care Report";$("reportModalSub").textContent=(i.location||"")+(i.cad?" · CAD "+i.cad:"")+" · Patient-first reporting";$("reportChooser").classList.add("hiddenx");$("incidentReportForm").classList.remove("hiddenx");openIncidentReportForm("pcr",i,d,units||[]);};
+  // Keep the normal report-type chooser. Patient-first workflow is handled inside the PCR form itself.
 })();
 
 window.rmsBoot();
