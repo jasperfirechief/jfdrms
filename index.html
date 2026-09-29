@@ -969,7 +969,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       field("rLongitude","Longitude",i.longitude??"","number")+
       select("rShift","Shift",["A","B","C"],m.shift||"")+
       jfdNerisSelect("rPrimaryIncidentType","Primary Incident Type",NERIS_INCIDENT_TYPES,d?.primary_incident_type||d?.neris_incident_type||d?.incident_type||"","md:col-span-2")+
-      jfdNerisSelect("rSecondaryIncidentType","Secondary Incident Type (optional)",NERIS_INCIDENT_TYPES,d?.secondary_incident_type||"","md:col-span-2")+
+      '<div class="md:col-span-3"><div id="jfdIncidentTypes"></div><button type="button" onclick="jfdAddIncidentType()" class="mt-2 bg-white border px-3 py-2 rounded-lg font-bold text-sm">+ Add Incident Type</button></div>'+
       '</div>');
     return card('<span class="text-red-600">JASPER FIRE DEPARTMENT</span><div class="text-xs text-slate-500 font-semibold mt-1">PATIENT CARE REPORT</div>',
       '<div class="grid md:grid-cols-3 gap-3">'+
@@ -1057,11 +1057,14 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       return {name:g("name"),dob:g("dob"),gender:g("gender"),address:g("address"),chief:g("chief"),injury:g("injury"),evaluation:g("evaluation"),status:g("status"),transport:g("transport"),transportDisposition:g("transportDisposition"),refusedCare:c("refusedCare"),refusedTransport:c("refusedTransport"),minorRefusal:c("minorRefusal"),refusalSigner:g("refusalSigner"),refusalTime:g("refusalTime"),riskAdvised:c("risk"),signature:canvas?.toDataURL("image/png")||"",vitals,history:g("history"),meds:g("meds"),allergies:g("allergies"),treatment:g("treatment"),equipment:g("equipment"),comments:g("comments")};
     });
   }
+  const NERIS_INVESTIGATION_TYPES=[{"value":"INVESTIGATED_ON_SCENE_RESOURCE","label":"Investigated By On-Scene Operational Resources"},{"value":"INVESTIGATED_BY_ARSON_FIRE_INVESTIGATOR","label":"Investigated By Formal Arson / Fire Investigator"},{"value":"INVESTIGATED_BY_OUTSIDE_AGENCY","label":"Investigated By Outside Fire Agency"},{"value":"INVESTIGATED_BY_STATE_FIRE_MARSHAL","label":"Investigated By State Fire Marshal"},{"value":"INVESTIGATED_BY_INSURANCE","label":"Investigated By Insurance"},{"value":"INVESTIGATED_BY_NONFIRE_LAW_ENFORCEMENT","label":"Investigated By Law Enforcement (Nonfire)"},{"value":"INVESTIGATED_BY_OTHER","label":"Investigated By Other"}];
+  const NERIS_DISPLACE_CAUSES=[{"value":"FIRE","label":"Fire"},{"value":"SMOKE","label":"Smoke"},{"value":"WATER","label":"Water"},{"value":"UTILITIES","label":"Utilities"},{"value":"HAZARDOUS_SITUATION","label":"Hazardous Situation"},{"value":"COLLAPSE","label":"Collapse"},{"value":"OTHER","label":"Other"}];
+  const NERIS_ACTION_TACTICS=[{"value":"EMERGENCY_MEDICAL_CARE","label":"Emergency Medical Care"},{"value":"COMMAND_AND_CONTROL","label":"Command And Control"},{"value":"FORCIBLE_ENTRY","label":"Forcible Entry"},{"value":"INVESTIGATION","label":"Investigation"},{"value":"SUPPRESSION","label":"Suppression"},{"value":"CONTAINMENT","label":"Containment"},{"value":"VENTILATION","label":"Ventilation"},{"value":"SEARCH_STRUCTURE","label":"Search Structure"},{"value":"NON_STRUCTURE_SEARCH","label":"Non-Structure Search"},{"value":"SALVAGE_AND_OVERHAUL","label":"Salvage And Overhaul"},{"value":"PERSONNEL_CONTAMINATION_REDUCTION","label":"Personnel Contamination Reduction"},{"value":"HAZARDOUS_SITUATION_MITIGATION","label":"Hazardous Situation Mitigation"},{"value":"PROVIDE_EVACUATION_SUPPORT","label":"Provide Evacuation Support"},{"value":"PROVIDE_EQUIPMENT","label":"Provide Equipment"},{"value":"PROVIDE_SERVICES","label":"Provide Services"},{"value":"INFORMATION_ENFORCEMENT","label":"Information / Enforcement"}];
   function fireDetails(i,d){
     return card("Fire Details",'<div class="grid md:grid-cols-2 gap-3">'+
       select("rFireLoc","Fire Location",["Structure","Outside"],d?.fire_location||"")+field("rFloor","Floor of Origin",d?.floor_of_origin||"")+
       select("rWater","Water Supply",["Hydrant","Tank Water","Shuttle","Other","Nurse from Other Apparatus","Draft from Static Source","Supply From Fire Boat","Foam / Water Additive"],d?.water_supply||"")+select("rInvestigation","Investigation Required?",["Yes","No"],d?.investigation||"")+
-      field("rInvestigationType","Investigation Type",d?.investigation_type||"")+select("rCondition","Condition",["No Smoke/Fire Showing","Smoke Showing","Smoke and Fire Showing","Structure Involved","Fire Spread Beyond Structure","Fire Out Upon Arrival"],d?.condition||"")+
+      jfdNerisSelect("rInvestigationType","Investigation Type",NERIS_INVESTIGATION_TYPES,d?.investigation_type||"")+select("rCondition","Condition",["No Smoke/Fire Showing","Smoke Showing","Smoke and Fire Showing","Structure Involved","Fire Spread Beyond Structure","Fire Out Upon Arrival"],d?.condition||"")+
       select("rDamageType","Damage Type",["No Damage","Minor","Moderate","Major"],d?.damage_type||"")+select("rRoom","Room Type",["Assembly","Bathroom","Bedroom","Kitchen","Living Space","Hallway/Foyer","Garage","Balcony/Porch/Deck","Basement","Attic","Office","Utility Room","Other","Unknown"],d?.room_type||"")+
       select("rCause","Cause",["Operating Equipment","Electrical","Battery/Power Storage","Heat From Another Object","Explosives/Fireworks","Smoking Materials/Illicit Drugs","Open Flame","Cooking","Chemical","Act Of Nature","Incendiary","Other Heat Source","Unable to be Determined"],d?.cause||"")+field("rAcres","Wildfire Acres Burned",d?.wildfire_acres||"","number")+
       select("rSmokePresence","Smoke Alarm",["Present","Not Present","Unknown"],d?.smoke_alarm_presence||"")+select("rSmokeWorking","Smoke Alarm Working",["Yes","No"],d?.smoke_alarm_working||"")+select("rFireAlarm","Fire Alarm",["Present","Not Present","Not Applicable"],d?.fire_alarm||"")+select("rOtherAlarm","Other Alarm",["Present","Not Present","Not Applicable"],d?.other_alarm||"")+select("rSuppression","Suppression System",["Present","Not Present","Not Applicable"],d?.suppression_system||"")+select("rCookingSuppression","Cooking Fire Suppression",["Present","Not Present","Not Applicable"],d?.cooking_suppression||"")+
@@ -1071,6 +1074,35 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     const body='<div id="jfd_'+key+'">'+(rows||[]).map(renderRow).join("")+'</div><div class="mt-3">'+btn("+ Add "+label,"jfdAddRepeat('"+key+"')","primary")+'</div>';
     return card(title,body);
   }
+  window.jfdIncidentTypes=[];
+  window.jfdAids={fd:[],nonfd:[]};
+  window.jfdAddIncidentType=function(){window.jfdIncidentTypes.push("");jfdRenderIncidentTypes();};
+  window.jfdRemoveIncidentType=function(i){window.jfdIncidentTypes.splice(i,1);jfdRenderIncidentTypes();};
+  function jfdRenderIncidentTypes(){
+    const box=$("jfdIncidentTypes");if(!box)return;
+    box.innerHTML=(window.jfdIncidentTypes||[]).map((v,i)=>'<div class="flex items-end gap-2 mb-2"><div class="flex-1">'+jfdNerisSelect("rIncidentType_"+i,"Incident Type "+(i+2),NERIS_INCIDENT_TYPES,v)+'</div><button type="button" onclick="jfdRemoveIncidentType('+i+')" class="border px-3 py-2 rounded-lg text-sm font-bold text-red-600">Remove</button></div>').join("");
+  }
+  window.jfdRenderActionControls=function(){
+    const box=$("jfdActionControls");if(!box)return;
+    const yes=$("rActionTaken")?.checked===true,no=$("rNoActionTaken")?.checked===true;
+    if(yes&&no){if($("rNoActionTaken"))$("rNoActionTaken").checked=false;}
+    const action=$("rActionTaken")?.checked===true,none=$("rNoActionTaken")?.checked===true;
+    box.innerHTML=(action?'<div class="grid md:grid-cols-2 gap-3">'+multiSelect("rActionsTaken","Actions Taken",NERIS_ACTION_TACTICS,[],"md:col-span-2")+area("rActionDetails","Action Details / Other Actions","","md:col-span-2")+'</div>':"")+
+      (none?'<div class="grid md:grid-cols-2 gap-3">'+jfdNerisSelect("rNoActionReason","No Action Reason",[{"value":"CANCELLED","label":"Cancelled"},{"value":"STAGED_STANDBY","label":"Staged / Standby"},{"value":"NO_INCIDENT_FOUND","label":"No Incident Found"}])+'</div>':"");
+  };
+  window.jfdAddAid=function(kind){(window.jfdAids[kind]||(window.jfdAids[kind]=[])).push({direction:"",type:"",agency:""});jfdRenderAids();};
+  window.jfdRemoveAid=function(kind,i){window.jfdAids[kind].splice(i,1);jfdRenderAids();};
+  function jfdRenderAids(){
+    const render=(kind,boxId)=>{
+      const box=$(boxId);if(!box)return;
+      box.innerHTML=(window.jfdAids[kind]||[]).map((x,i)=>'<div class="border rounded-lg p-3 mb-2"><div class="flex justify-between items-center mb-2"><b>'+((kind==="fd")?"Fire Department Aid":"Non-Fire Department Aid")+' '+(i+1)+'</b><button type="button" onclick="jfdRemoveAid(\''+kind+'\','+i+')" class="text-red-600 font-bold">Remove</button></div><div class="grid md:grid-cols-3 gap-2">'+
+        select("","Direction",["Given","Received"],x.direction)+
+        jfdNerisSelect("","Aid Type",NERIS_AID_TYPES,x.type)+
+        field("","Agency",x.agency||"")+
+        '</div></div>').join("");
+    };
+    render("fd","jfdFdAid");render("nonfd","jfdNonFdAid");
+  }
   window.jfdRepeats={exposures:[],casualties:[],vehicles:[],hazards:[]};
   window.jfdAddRepeat=function(key){(window.jfdRepeats[key]||(window.jfdRepeats[key]=[])).push({});jfdRenderRepeats(key)};
   window.jfdRemoveRepeat=function(key,i){window.jfdRepeats[key].splice(i,1);jfdRenderRepeats(key)};
@@ -1078,10 +1110,10 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     const box=$("jfd_"+key);if(!box)return;
     const arr=window.jfdRepeats[key]||[];
     box.innerHTML=arr.map((x,i)=>{
-      if(key==="exposures")return '<div class="border rounded-xl p-3 mb-2"><div class="flex justify-between"><b>Exposure '+(i+1)+'</b><button type="button" onclick="jfdRemoveRepeat(\'exposures\','+i+')" class="text-red-600 font-bold">Remove</button></div><div class="grid md:grid-cols-2 gap-2 mt-2">'+field("","Displacement Count",x.displacement||"0","number")+field("","Cause",x.cause||"")+select("","Damage Type",["No Damage","Minor","Moderate","Major"],x.damage||"")+select("","Exposure Type",["External","Internal"],x.type||"")+'</div></div>';
+      if(key==="exposures")return '<div class="border rounded-xl p-3 mb-2"><div class="flex justify-between"><b>Exposure '+(i+1)+'</b><button type="button" onclick="jfdRemoveRepeat(\'exposures\','+i+')" class="text-red-600 font-bold">Remove</button></div><div class="grid md:grid-cols-2 gap-2 mt-2">'+field("","Displacement Count",x.displacement||"0","number")+jfdNerisSelect("","Cause for Displacement",NERIS_DISPLACE_CAUSES,x.cause||"")+jfdNerisSelect("","Damage Type",[{value:"NO_DAMAGE",label:"No Damage"},{value:"MINOR_DAMAGE",label:"Minor"},{value:"MODERATE_DAMAGE",label:"Moderate"},{value:"MAJOR_DAMAGE",label:"Major"}],x.damage||"")+select("","Exposure Type",["External","Internal"],x.type||"")+'</div></div>';
       if(key==="casualties")return '<div class="border rounded-xl p-3 mb-2"><div class="flex justify-between"><b>Casualty / Rescue '+(i+1)+'</b><button type="button" onclick="jfdRemoveRepeat(\'casualties\','+i+')" class="text-red-600 font-bold">Remove</button></div><div class="grid md:grid-cols-2 gap-2 mt-2">'+select("","FF / Non-FF",["Firefighter","Non-Firefighter"],x.ff||"")+field("","Birth Month & Year",x.dob||"")+select("","Gender",["Male","Female","Transgender Male","Transgender Female","Other","Unknown"],x.gender||"")+select("","Race",["American Indian or Alaska Native","Asian","Black or African American","Middle Eastern or North African","Hispanic or Latino","Native Hawaiian or Pacific Islander","White","Other","Unknown"],x.race||"")+select("","Casualty Type",["Uninjured","Injured Nonfatal","Injured Fatal"],x.status||"")+select("","Rescue Type",["Rescued By Firefighter","Rescued By Firefighter RIT","Rescued By Non-firefighter","Evacuation Assisted By Firefighter","Self-Evacuation","No Rescue Needed"],x.rescue||"")+'</div></div>';
       if(key==="vehicles")return '<div class="border rounded-xl p-3 mb-2"><div class="flex justify-between"><b>Vehicle '+(i+1)+'</b><button type="button" onclick="jfdRemoveRepeat(\'vehicles\','+i+')" class="text-red-600 font-bold">Remove</button></div><div class="grid md:grid-cols-3 gap-2 mt-2">'+field("","Make",x.make||"")+field("","Model",x.model||"")+field("","Year",x.year||"","number")+field("","License Plate / VIN",x.vin||"")+field("","Owner",x.owner||"")+field("","Insurance Company",x.insurance||"")+'</div></div>';
-      return '<div class="border rounded-xl p-3 mb-2"><div class="flex justify-between"><b>Hazard '+(i+1)+'</b><button type="button" onclick="jfdRemoveRepeat(\'hazards\','+i+')" class="text-red-600 font-bold">Remove</button></div><div class="grid md:grid-cols-2 gap-2 mt-2">'+select("","Hazard Type",["HAZMAT","Electrical Hazard","Power Generation","CSST","Medical Oxygen"],x.type||"")+field("","Details",x.details||"")+field("","Chemical / Material",x.chemical||"")+field("","Disposition",x.disposition||"")+'</div></div>';
+      return '<div class="border rounded-xl p-3 mb-2"><div class="flex justify-between"><b>Hazard '+(i+1)+'</b><button type="button" onclick="jfdRemoveRepeat(\'hazards\','+i+')" class="text-red-600 font-bold">Remove</button></div><div class="grid md:grid-cols-2 gap-2 mt-2">'+select("","Hazard Type",["HAZMAT","Electrical Hazard","Power Generation","CSST","Medical Oxygen"],x.type||"")+field("","Details",x.details||"")+field("","Chemical / Material",x.chemical||"")+select("","Disposition",["None","Contained","Released","Cleaned Up","Other"],x.disposition||"")+ '<label class="flex items-center gap-2 text-sm font-semibold md:col-span-2"><input type="checkbox" '+(x.chemicalReleased?"checked":"")+' data-hazard-released="'+i+'"> Chemical released / spilled</label></div></div>';
     }).join("");
   }
   const NERIS_LOCATION_TYPES=[{"value":"AIRCRAFT","label":"Aircraft"},{"value":"AIRPORT","label":"Airport"},{"value":"ARENA","label":"Arena"},{"value":"AUTOMOBILE","label":"Automobile"},{"value":"BANK","label":"Bank"},{"value":"BAR","label":"Bar"},{"value":"BUS","label":"Bus"},{"value":"BICYCLE","label":"Bicycle"},{"value":"BUS_STATION","label":"Bus-station"},{"value":"CAFE","label":"Cafe"},{"value":"CLASSROOM","label":"Classroom"},{"value":"CLUB","label":"Club"},{"value":"CONSTRUCTION","label":"Construction"},{"value":"CONVENTION_CENTER","label":"Convention-center"},{"value":"GOVERNMENT","label":"Government"},{"value":"HOSPITAL","label":"Hospital"},{"value":"HOTEL","label":"Hotel"},{"value":"INDUSTRIAL","label":"Industrial"},{"value":"LIBRARY","label":"Library"},{"value":"MOTORCYCLE","label":"Motorcycle"},{"value":"MUSEUM","label":"Museum"},{"value":"OFFICE","label":"Office"},{"value":"OTHER","label":"Other"},{"value":"OUTDOORS","label":"Outdoors"},{"value":"PARKING","label":"Parking"},{"value":"PLACE_OF_WORSHIP","label":"Place-of-worship"},{"value":"PRISON","label":"Prison"},{"value":"PUBLIC","label":"Public"},{"value":"PUBLIC_TRANSPORT","label":"Public-transport"},{"value":"RESIDENCE","label":"Residence"},{"value":"RESTAURANT","label":"Restaurant"},{"value":"SCHOOL","label":"School"},{"value":"SHOPPING_AREA","label":"Shopping-area"},{"value":"STADIUM","label":"Stadium"},{"value":"STORE","label":"Store"},{"value":"STREET","label":"Street"},{"value":"THEATER","label":"theater"},{"value":"TRAIN","label":"Train"},{"value":"TRAIN_STATION","label":"Train-station"},{"value":"TRUCK","label":"Truck"},{"value":"UNDERWAY","label":"Underway"},{"value":"UNKNOWN","label":"Unknown"},{"value":"WAREHOUSE","label":"Warehouse"},{"value":"WATER","label":"Water"},{"value":"WATERCRAFT","label":"Watercraft"}];
@@ -1103,20 +1135,25 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       select("rPeoplePresent","People Present",["Yes","No"],d?.people_present||"")+
       jfdNerisSelect("rSecondaryUse","Secondary Location Use (optional)",NERIS_LOCATION_USES,d?.secondary_use||"","md:col-span-2")+
       '</div>');
-    h+=card("Incident Types & Actions",'<div class="grid md:grid-cols-2 gap-3">'+
-      '<div class="md:col-span-2 text-xs text-slate-500">NERIS allows multiple incident types, with one primary type. This report uses a primary and optional secondary type; no third type is requested here.</div>'+
-      '</div>'+area("rActions","Actions Taken",d?.actions_taken||"","md:col-span-2"));
+    window.jfdIncidentTypes=(d?.incident_types||[]).filter(Boolean);
+    if(!window.jfdIncidentTypes.length&&d?.secondary_incident_type)window.jfdIncidentTypes=[d.secondary_incident_type];
+    h+=card("Actions Taken",'<div class="space-y-3">'+
+      '<div class="flex flex-wrap gap-5">'+
+      '<label class="flex items-center gap-2 text-sm font-semibold"><input id="rActionTaken" type="checkbox" '+(d?.action_taken?"checked":"")+' onchange="jfdRenderActionControls()"> Action Taken</label>'+
+      '<label class="flex items-center gap-2 text-sm font-semibold"><input id="rNoActionTaken" type="checkbox" '+(d?.no_action_taken?"checked":"")+' onchange="jfdRenderActionControls()"> No Action Taken</label>'+
+      '</div><div id="jfdActionControls"></div></div>');
+    setTimeout(()=>{jfdRenderIncidentTypes();jfdRenderActionControls();},0);
     h+=fireDetails(i,d);
     h+=repeatedSection("Exposures","exposures","Exposure",window.jfdRepeats.exposures,x=>x);
     h+=repeatedSection("Casualties / Rescues","casualties","Casualty / Rescue",window.jfdRepeats.casualties,x=>x);
     h+=repeatedSection("Hazards","hazards","Hazard",window.jfdRepeats.hazards,x=>x);
     h+=repeatedSection("Vehicles","vehicles","Vehicle",window.jfdRepeats.vehicles,x=>x);
-    h+=card("Mutual Aid / Non-FD Aid",'<div class="grid md:grid-cols-2 gap-3">'+
-      select("rAidDirection","Aid Direction",["Given","Received"],d?.aid_direction||d?.mutual_aid_direction||"")+
-      jfdNerisSelect("rAidType","Aid Type",NERIS_AID_TYPES,d?.aid_type||"")+
-      area("rAidDepartments","Fire Department(s) Providing / Receiving Aid",d?.aid_departments||d?.mutual_agencies||"","md:col-span-2")+
-      multiSelect("rNonFdAid","Non-FD Aid",NERIS_NONFD_AID_TYPES,d?.non_fd_aid||[],"md:col-span-2")+
+    window.jfdAids={fd:d?.aid_records||[],nonfd:d?.nonfd_aid_records||[]};
+    h+=card("Mutual Aid / Non-FD Aid",'<div class="grid md:grid-cols-2 gap-4">'+
+      '<div class="border rounded-xl p-3"><div class="font-black mb-2">Fire Department Aid</div><div id="jfdFdAid"></div><button type="button" onclick="jfdAddAid(\'fd\')" class="mt-2 bg-white border px-3 py-2 rounded-lg font-bold text-sm">+ Add Aid Given or Received</button></div>'+
+      '<div class="border rounded-xl p-3"><div class="font-black mb-2">Non-Fire Department Aid</div><div id="jfdNonFdAid"></div><button type="button" onclick="jfdAddAid(\'nonfd\')" class="mt-2 bg-white border px-3 py-2 rounded-lg font-bold text-sm">+ Add Aid Given or Received</button></div>'+
       '</div>');
+    setTimeout(jfdRenderAids,0);
     h+=card("Narrative & Completion",area("rNarrative","Narrative",d?.narrative||"","md:col-span-2")+field("rCompletedBy","Report Completed By",(d?.completed_by)||((profile?.first_name||"")+" "+(profile?.last_name||""))));
     h+=actionBar("fire");
     return h;
@@ -1155,13 +1192,16 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     }));
     data.additional_personnel=[...document.querySelectorAll("[data-report-person]:checked")].map(x=>Number(x.dataset.reportPerson));
     if(window.currentReportKind==="pcr")data.patients=collectPatients();
+    data.incident_types=[data.rPrimaryIncidentType,...[...document.querySelectorAll("[id^='rIncidentType_']")].map(x=>x.value).filter(Boolean)];
+    data.action_taken=$("rActionTaken")?.checked===true;data.no_action_taken=$("rNoActionTaken")?.checked===true;
     data.exposures=window.jfdRepeats?.exposures||[];data.casualties=window.jfdRepeats?.casualties||[];data.vehicles=window.jfdRepeats?.vehicles||[];data.hazards=window.jfdRepeats?.hazards||[];
-    data.jasper_validation_version="2026-09-28";
+    data.aid_records=[...(window.jfdAids?.fd||[])];data.nonfd_aid_records=[...(window.jfdAids?.nonfd||[])];
+    data.jasper_validation_version="2026-09-29";
     return data;
   };
   window.applyPreviousReportValues=function(data){
     if(!data||typeof data!=="object")return;
-    const scalar={...data};delete scalar.patients;delete scalar.exposures;delete scalar.casualties;delete scalar.vehicles;delete scalar.hazards;delete scalar.responding_apparatus;delete scalar.additional_personnel;
+    const scalar={...data};delete scalar.patients;delete scalar.exposures;delete scalar.casualties;delete scalar.vehicles;delete scalar.hazards;delete scalar.responding_apparatus;delete scalar.additional_personnel;delete scalar.incident_types;delete scalar.aid_records;delete scalar.nonfd_aid_records;
     $("incidentReportForm")?.querySelectorAll("input,select,textarea").forEach(el=>{
       const v=scalar[el.id];if(v===undefined||v===null)return;
       if(el.multiple&&Array.isArray(v)){[...el.options].forEach(o=>o.selected=v.includes(o.value));return;}
@@ -1170,8 +1210,10 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     if(data.rNerisType&&!$("rPrimaryIncidentType")?.value&&$("rPrimaryIncidentType"))$("rPrimaryIncidentType").value=String(data.rNerisType);
     if(data.rIncidentType&&!$("rPrimaryIncidentType")?.value&&$("rPrimaryIncidentType"))$("rPrimaryIncidentType").value=String(data.rIncidentType);
     if(window.currentReportKind==="pcr"){window.jfdRenderPatients(data.patients||[])}
+    window.jfdIncidentTypes=(data.incident_types||[]).slice(1);window.jfdRenderIncidentTypes?.();
+    window.jfdAids={fd:data.aid_records||[],nonfd:data.nonfd_aid_records||[]};window.jfdRenderAids?.();
     window.jfdRepeats={exposures:data.exposures||[],casualties:data.casualties||[],vehicles:data.vehicles||[],hazards:data.hazards||[]};
-    ["exposures","casualties","vehicles","hazards"].forEach(jfdRenderRepeats);
+    ["exposures","casualties","vehicles","hazards"].forEach(jfdRenderRepeats);window.jfdRenderActionControls?.();
   };
   window.validateReportForNeris=function(data,apiChecked){
     const errors=[];
