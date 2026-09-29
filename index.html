@@ -958,18 +958,37 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   const btn=(label,fn,kind="border")=>'<button type="button" onclick="'+fn+'" class="'+(kind==="primary"?"bg-red-600 text-white":kind==="blue"?"bg-blue-700 text-white":"border bg-white")+' px-3 py-2 rounded-lg font-bold text-sm">'+label+'</button>';
   const nerisSelect=(id,label,opts,val="",cls="")=>{const list=Array.isArray(opts)?opts:[];return '<label class="text-sm font-semibold '+cls+'">'+esc(label)+'<select id="'+id+'" class="w-full border rounded-lg p-2 mt-1 bg-white"><option value="">Select...</option>'+list.map(o=>'<option value="'+esc(o.value)+'" '+(String(o.value)===String(val)?"selected":"")+'>'+esc(o.label)+'</option>').join("")+'</select></label>';};
   const multiSelect=(id,label,opts,vals=[],cls="")=>{const selected=new Set(Array.isArray(vals)?vals:[]);return '<label class="text-sm font-semibold '+cls+'">'+esc(label)+'<select id="'+id+'" multiple size="6" class="w-full border rounded-lg p-2 mt-1 bg-white">'+opts.map(o=>'<option value="'+esc(o.value)+'" '+(selected.has(o.value)?"selected":"")+'>'+esc(o.label)+'</option>').join("")+'</select><span class="block text-xs text-slate-500 mt-1">Hold Ctrl (Windows) or Command (Mac) to select more than one.</span></label>';};
-  const incidentHeader=(i,d,m,kind)=>card('<span class="text-red-600">JASPER FIRE DEPARTMENT</span><div class="text-xs text-slate-500 font-semibold mt-1">'+(kind==="pcr"?"PATIENT CARE REPORT":"FIRE INCIDENT REPORT")+'</div>',
-    '<div class="grid md:grid-cols-3 gap-3">'+
-    field("rDate","Incident Date",/^\\d{4}-\\d{2}-\\d{2}/.test(String(i.dispatch_time||""))?String(i.dispatch_time).slice(0,10):"","date")+
-    field("rCad","CAD / Incident Number",i.cad||"")+
-    select("rCall","Call Type",CALL_TYPES,d?.call_type||i.type||"")+
-    field("rLocation","Location",i.location||"","text","md:col-span-3")+
-    field("rLatitude","Latitude",i.latitude??"","number")+
-    field("rLongitude","Longitude",i.longitude??"","number")+
-    select("rShift","Shift",["A","B","C"],m.shift||"")+
-    nerisSelect("rPrimaryIncidentType","Primary Incident Type",NERIS_INCIDENT_TYPES,d?.primary_incident_type||d?.neris_incident_type||d?.incident_type||"","md:col-span-2")+
-    nerisSelect("rSecondaryIncidentType","Secondary Incident Type (optional)",NERIS_INCIDENT_TYPES,d?.secondary_incident_type||"","md:col-span-2")+
-    '</div>');
+  const nerisSelect=(id,label,opts,val="",cls="")=>{const list=Array.isArray(opts)?opts:[];return '<label class="text-sm font-semibold '+cls+'">'+esc(label)+'<select id="'+id+'" class="w-full border rounded-lg p-2 mt-1 bg-white"><option value="">Select...</option>'+list.map(o=>'<option value="'+esc(o.value)+'" '+(String(o.value)===String(val)?"selected":"")+'>'+esc(o.label)+'</option>').join("")+'</select></label>';};
+  const multiSelect=(id,label,opts,vals=[],cls="")=>{const selected=new Set(Array.isArray(vals)?vals:[]);return '<label class="text-sm font-semibold '+cls+'">'+esc(label)+'<select id="'+id+'" multiple size="6" class="w-full border rounded-lg p-2 mt-1 bg-white">'+opts.map(o=>'<option value="'+esc(o.value)+'" '+(selected.has(o.value)?"selected":"")+'>'+esc(o.label)+'</option>').join("")+'</select><span class="block text-xs text-slate-500 mt-1">Hold Ctrl (Windows) or Command (Mac) to select more than one.</span></label>';};
+  const incidentHeader=(i,d,m,kind)=>{
+    if(kind==="fire")return card('<span class="text-red-600">JASPER FIRE DEPARTMENT</span><div class="text-xs text-slate-500 font-semibold mt-1">FIRE INCIDENT REPORT</div>',
+      '<div class="grid md:grid-cols-3 gap-3">'+
+      field("rDate","Incident Date",/^\\d{4}-\\d{2}-\\d{2}/.test(String(i.dispatch_time||""))?String(i.dispatch_time).slice(0,10):"","date")+
+      field("rCad","CAD / Incident Number",i.cad||"")+
+      select("rCall","Call Type",CALL_TYPES,d?.call_type||i.type||"")+
+      field("rLocation","Location",i.location||"","text","md:col-span-3")+
+      field("rLatitude","Latitude",i.latitude??"","number")+
+      field("rLongitude","Longitude",i.longitude??"","number")+
+      select("rShift","Shift",["A","B","C"],m.shift||"")+
+      nerisSelect("rPrimaryIncidentType","Primary Incident Type",NERIS_INCIDENT_TYPES,d?.primary_incident_type||d?.neris_incident_type||d?.incident_type||"","md:col-span-2")+
+      nerisSelect("rSecondaryIncidentType","Secondary Incident Type (optional)",NERIS_INCIDENT_TYPES,d?.secondary_incident_type||"","md:col-span-2")+
+      '</div>');
+    return card('<span class="text-red-600">JASPER FIRE DEPARTMENT</span><div class="text-xs text-slate-500 font-semibold mt-1">PATIENT CARE REPORT</div>',
+      '<div class="grid md:grid-cols-3 gap-3">'+
+      field("rDate","Incident Date",/^\\d{4}-\\d{2}-\\d{2}/.test(String(i.dispatch_time||""))?String(i.dispatch_time).slice(0,10):"","date")+
+      field("rCad","CAD / Incident Number",i.cad||"")+
+      select("rCall","Call Type",CALL_TYPES,d?.call_type||i.type||"")+
+      field("rLocation","Location",i.location||"","text","md:col-span-2")+
+      select("rLocationType","Location Type",LOCATION_TYPES,d?.location_type||"")+
+      select("rPrimaryUse","Primary Use Type",USE_TYPES,d?.primary_use||d?.primary_use_type||"","md:col-span-2")+
+      select("rSecondaryUse","Secondary Use Type",USE_TYPES,d?.secondary_use||d?.secondary_use_type||"","md:col-span-2")+
+      select("rStation","Station",(stations||[]).map(s=>s.station_name||("Station "+s.station_id)),m.station||"")+
+      select("rShift","Shift",["A","B","C"],m.shift||"")+
+      field("rLatitude","Latitude",i.latitude??"","number")+field("rLongitude","Longitude",i.longitude??"","number")+
+      select("rIncidentType","Incident Type",INCIDENT_TYPES,d?.incident_type||d?.incident_types||"","md:col-span-2")+
+      select("rNerisType","NERIS Incident Type",INCIDENT_TYPES,d?.neris_incident_type||d?.incident_type||"","md:col-span-2")+
+      '</div>');
+  };
   function responseUi(unitRows,iForResponse){
     const checks=apparatus.filter(a=>a.active!==false).sort((a,b)=>String(a.unit_number).localeCompare(String(b.unit_number))).map(a=>'<label class="flex items-center gap-2 border rounded-lg p-2 bg-white"><input type="checkbox" data-runit="'+Number(a.apparatus_id)+'" onchange="jfdSyncUnits()"> <b>'+esc(a.unit_number)+'</b><span class="text-xs text-slate-500">'+esc(a.apparatus_type||"")+'</span></label>').join("");
     const dispatch=card("Dispatch",'<p class="text-xs text-slate-500 mb-3">Dispatch/CAD information is kept separate from firefighter response information. CAD values are pre-populated when available and remain editable.</p><div class="grid md:grid-cols-2 lg:grid-cols-4 gap-3">'+
