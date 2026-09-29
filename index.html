@@ -1087,7 +1087,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     const yes=$("rActionTaken")?.checked===true,no=$("rNoActionTaken")?.checked===true;
     if(yes&&no){if($("rNoActionTaken"))$("rNoActionTaken").checked=false;}
     const action=$("rActionTaken")?.checked===true,none=$("rNoActionTaken")?.checked===true;
-    box.innerHTML=(action?'<div class="grid md:grid-cols-2 gap-3">'+multiSelect("rActionsTaken","Actions Taken",NERIS_ACTION_TACTICS,[],"md:col-span-2")+area("rActionDetails","Action Details / Other Actions","","md:col-span-2")+'</div>':"")+
+    box.innerHTML=(action?'<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">'+NERIS_ACTION_TACTICS.map(o=>'<label class="flex items-center gap-2 border rounded-lg p-2 bg-white text-sm"><input type="checkbox" name="rActionsTaken" value="'+esc(o.value)+'"> '+esc(o.label)+'</label>').join("")+'</div><p class="text-xs text-slate-500 mt-2">Select all actions that apply. Additional details can be documented in the Narrative.</p>':"")+
       (none?'<div class="grid md:grid-cols-2 gap-3">'+jfdNerisSelect("rNoActionReason","No Action Reason",[{"value":"CANCELLED","label":"Cancelled"},{"value":"STAGED_STANDBY","label":"Staged / Standby"},{"value":"NO_INCIDENT_FOUND","label":"No Incident Found"}])+'</div>':"");
   };
   window.jfdAddAid=function(kind){(window.jfdAids[kind]||(window.jfdAids[kind]=[])).push({direction:"",type:"",agency:""});jfdRenderAids();};
@@ -1143,6 +1143,11 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       '<label class="flex items-center gap-2 text-sm font-semibold"><input id="rNoActionTaken" type="checkbox" '+(d?.no_action_taken?"checked":"")+' onchange="jfdRenderActionControls()"> No Action Taken</label>'+
       '</div><div id="jfdActionControls"></div></div>');
     setTimeout(()=>{jfdRenderIncidentTypes();jfdRenderActionControls();},0);
+    h+=card("Owner / Occupant Information",'<div class="grid md:grid-cols-2 gap-4">'+
+      '<div class="border rounded-xl p-3"><h4 class="font-black mb-2">Owner</h4>'+field("rOwnerName","Owner Name",d?.owner_name||"")+field("rOwnerAddress","Owner Address",d?.owner_address||"")+field("rOwnerPhone","Owner Phone",d?.owner_phone||"","tel")+'</div>'+
+      '<div class="border rounded-xl p-3"><h4 class="font-black mb-2">Occupant</h4>'+field("rOccupantName","Occupant Name",d?.occupant_name||"")+field("rOccupantAddress","Occupant Address",d?.occupant_address||"")+field("rOccupantPhone","Occupant Phone",d?.occupant_phone||"","tel")+'</div>'+
+      '<div class="border rounded-xl p-3 md:col-span-2"><h4 class="font-black mb-2">Property Insurance</h4><div class="grid md:grid-cols-3 gap-2">'+field("rInsuranceCompany","Insurance Company",d?.insurance_company||"")+field("rInsurancePhone","Insurance Phone",d?.insurance_phone||"","tel")+field("rInsurancePolicy","Policy Number",d?.insurance_policy||"")+'</div></div>'+
+      '</div>');
     h+=fireDetails(i,d);
     h+=repeatedSection("Exposures","exposures","Exposure",window.jfdRepeats.exposures,x=>x);
     h+=repeatedSection("Casualties / Rescues","casualties","Casualty / Rescue",window.jfdRepeats.casualties,x=>x);
@@ -1194,6 +1199,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     if(window.currentReportKind==="pcr")data.patients=collectPatients();
     data.incident_types=[data.rPrimaryIncidentType,...[...document.querySelectorAll("[id^='rIncidentType_']")].map(x=>x.value).filter(Boolean)];
     data.action_taken=$("rActionTaken")?.checked===true;data.no_action_taken=$("rNoActionTaken")?.checked===true;
+    data.actions_taken=[...document.querySelectorAll("input[name='rActionsTaken']:checked")].map(x=>x.value);
     data.exposures=window.jfdRepeats?.exposures||[];data.casualties=window.jfdRepeats?.casualties||[];data.vehicles=window.jfdRepeats?.vehicles||[];data.hazards=window.jfdRepeats?.hazards||[];
     data.aid_records=[...(window.jfdAids?.fd||[])];data.nonfd_aid_records=[...(window.jfdAids?.nonfd||[])];
     data.jasper_validation_version="2026-09-29";
@@ -1214,6 +1220,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     window.jfdAids={fd:data.aid_records||[],nonfd:data.nonfd_aid_records||[]};window.jfdRenderAids?.();
     window.jfdRepeats={exposures:data.exposures||[],casualties:data.casualties||[],vehicles:data.vehicles||[],hazards:data.hazards||[]};
     ["exposures","casualties","vehicles","hazards"].forEach(jfdRenderRepeats);window.jfdRenderActionControls?.();
+    if(data.actions_taken?.length){setTimeout(()=>[...document.querySelectorAll("input[name='rActionsTaken']")].forEach(x=>x.checked=data.actions_taken.includes(x.value)),0);}
   };
   window.validateReportForNeris=function(data,apiChecked){
     const errors=[];
