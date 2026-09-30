@@ -16,7 +16,7 @@ async function token(){
 }
 
 function payload(){
-  const dispatch="2026-09-30T07:10:00Z",enroute="2026-09-30T07:10:30Z",scene="2026-09-30T07:14:00Z",clear="2026-09-30T07:35:00Z";
+  const dispatch="2026-09-30T06:50:00Z",enroute="2026-09-30T06:51:00Z",scene="2026-09-30T06:54:00Z",clear="2026-09-30T07:05:00Z";
   const location={country:"US",state:"AL",postal_community:"Jasper",place_type:"RESIDENCE",number:701,street:"5TH ST W"},point={crs:4326,geometry:{type:"Point",coordinates:[-87.283454,33.846481]}};
   return {
     base:{department_neris_id:DEPARTMENT_ID,incident_number:"JFD-TEST-FIRE-20260930-01",location,point,outcome_narrative:"TEST ONLY - JFD RMS NERIS test submission. Structure fire test; no real incident reporting. Test record created for integration validation."},
@@ -37,7 +37,7 @@ export default async function handler(req,res){
     const sr=await fetch(BASE_URL+"/incident/"+encodeURIComponent(DEPARTMENT_ID),{method:"POST",headers:{"Authorization":"Bearer "+t,"Content-Type":"application/json","User-Agent":"JasperFireDepartmentRMS/1.0"},body:JSON.stringify(p)});
     const st=await sr.text();let sd;try{sd=JSON.parse(st)}catch{sd={raw:st}};
     if(!sr.ok)return res.status(502).json({ok:false,stage:"submit",status:sr.status,details:sd,payload:p});
-    const reportData={rCad:"JFD-TEST-FIRE-20260930-01",rCall:"STRUCTURE FIRE",rDate:"2026-09-27",rShift:"A",rLocation:"701 5TH ST W, JASPER, AL",rLatitude:"33.846481",rLongitude:"-87.283454",rPrimaryIncidentType:"FIRE||STRUCTURE_FIRE||STRUCTURAL_INVOLVEMENT_FIRE",rLocationType:"RESIDENCE",rFireLoc:"Structure",rCondition:"Smoke and Fire Showing",rDamageType:"Moderate",rCause:"Operating Equipment",rWater:"Tank Water",rInvestigation:"No",rNarrative:"TEST ONLY - JFD RMS NERIS test submission. Structure fire test; no real incident reporting. Test record created for integration validation.",responding_apparatus:[{unit_number:"JA",times:{enroute:"2026-09-30T07:10:30Z",on_scene:"2026-09-30T07:14:00Z",clear:"2026-09-30T07:35:00Z"},crew:[]}]};
+    const reportData={rCad:"JFD-TEST-FIRE-20260930-01",rCall:"STRUCTURE FIRE",rDate:"2026-09-27",rShift:"A",rLocation:"701 5TH ST W, JASPER, AL",rLatitude:"33.846481",rLongitude:"-87.283454",rPrimaryIncidentType:"FIRE||STRUCTURE_FIRE||STRUCTURAL_INVOLVEMENT_FIRE",rLocationType:"RESIDENCE",rFireLoc:"Structure",rCondition:"Smoke and Fire Showing",rDamageType:"Moderate",rCause:"Operating Equipment",rWater:"Tank Water",rInvestigation:"No",rNarrative:"TEST ONLY - JFD RMS NERIS test submission. Structure fire test; no real incident reporting. Test record created for integration validation.",responding_apparatus:[{unit_number:"JA",times:{enroute:"2026-09-30T06:51:00Z",on_scene:"2026-09-30T06:54:00Z",clear:"2026-09-30T07:05:00Z"},crew:[]}]};
     const pdfDoc=await PDFDocument.create(),reg=await pdfDoc.embedFont(StandardFonts.Helvetica),bold=await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const page=pdfDoc.addPage([612,792]);let y=748;
     page.drawText("JASPER FIRE DEPARTMENT",{x:42,y,font:bold,size:20,color:rgb(.65,.02,.02)});y-=28;
