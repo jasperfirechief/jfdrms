@@ -99,17 +99,49 @@ function incidentSections(incident) {
   return [{title:"GENERAL INCIDENT REPORT",rows}];
 }
 
-async function makeIncidentPdf(incident) {
-  const reports=Array.isArray(incident.reports)?incident.reports:[];
-  const sections=incidentSections(incident);
-  for(const report of reports){
-    const data=report?.data||{};
-    sections.push({
-      title:String(report.report_type||"INCIDENT REPORT").startsWith("pcr_")?"PATIENT CARE REPORT":"INCIDENT REPORT",
-      rows:Object.entries(data).filter(([,v])=>v!==null&&v!==undefined&&v!=="").map(([k,v])=>[k,String(typeof v==="object"?JSON.stringify(v):v)])
-    });
+async function makeReportPdf(incident, report) {
+  const data=report?.data||{};
+  const kind=String(report?.report_type||"").startsWith("pcr_")?"PATIENT CARE REPORT":"FIRE INCIDENT REPORT";
+  const sections=[{
+    title:"REPORT SUMMARY",
+    rows:[
+      ["CAD / Incident",incident?.cad||data.rCad||data.cad||data.incident_number],
+      ["Date",fmtDate(incident?.dispatch_time||data.rDate||data.date)],
+      ["Time",incident?.dispatch_time?fmtDateTime(incident.dispatch_time).split(", ").slice(1).join(", "):data.rTime],
+      ["Type",data.rPrimaryIncidentType||incident?.type||data.rCallType],
+      ["Location",incident?.location||data.rLocation||data.location],
+      ["Report Status",report?.status||"Draft"]
+    ]
+  }];
+  if(kind==="PATIENT CARE REPORT"){
+    const patients=Array.isArray(data.patients)?data.patients:[];
+    if(!patients.length) sections.push({title:"PATIENT CARE",rows:[["Patient","No patient information entered."]]});
+    for(let n=0;n<patients.length;n++){
+      const p=patients[n]||{};
+      const name=[p.firstName,p.lastName].filter(Boolean).join(" ")||p.name||"Patient "+(n+1);
+      sections.push({title:"PATIENT "+(n+1)+" • "+name,rows:[
+        ["Patient",name],["DOB",p.dob],["Age",p.age],["Sex",p.sex],["Address",p.address],
+        ["Chief Complaint",p.chiefComplaint||p.complaint],["Care Provided",p.careProvided],
+        ["Initial Vitals",p.vitals?.[0]?JSON.stringify(p.vitals[0]):""],
+        ["Additional Vitals",Array.isArray(p.vitals)&&p.vitals.length>1?p.vitals.slice(1).map(v=>JSON.stringify(v)).join(" | "):""],
+        ["BLS Care",Array.isArray(p.careMethods)?p.careMethods.join(", "):p.careMethods],
+        ["Treatment Notes",p.careNotes||p.treatmentNotes],
+        ["Disposition",p.disposition],["Transport Unit",p.transportUnit||p.transportVehicle],
+        ["Transport Agency",p.transportAgency],["Destination",p.destination],
+        ["Refusal",p.refusal?JSON.stringify(p.refusal):""]
+      ]});
+    }
+  } else {
+    sections.push({title:"INCIDENT DETAILS",rows:[
+      ["Call Type",data.rCallType||incident?.type],["Narrative",data.rNarrative||data.narrative||incident?.narrative],
+      ["Actions / Outcome",data.rActionsTaken||data.actionsTaken||data.outcome],
+      ["Property / Responsible Party",data.propertyOwner||data.responsibleParty],
+      ["Injuries / Damage",data.injuries||data.propertyDamage],
+      ["Responding Apparatus",Array.isArray(data.responding_apparatus)?data.responding_apparatus.map(x=>JSON.stringify(x)).join(" | "):""]
+    ]});
   }
-  return makeTablePdf("INCIDENT REPORT • "+clean(incident.cad||incident.cad_number||incident.incident_number||"Incident"),sections);
+  sections.push({title:"DEPARTMENTAL / NERIS INCIDENT DATA",rows:Object.entries(data).filter(([k,v])=>v!==null&&v!==undefined&&v!==""&&!["patients","responding_apparatus"].includes(k)).map(([k,v])=>[k,String(typeof v==="object"?JSON.stringify(v):v)])});
+  return makeTablePdf(kind+" • "+clean(incident?.cad||data.rCad||data.cad||"Report"),sections);
 }
 
 async function makeStaffingPdf(date, rows) {
@@ -156,19 +188,30 @@ export default async function handler(req,res) {
     if(!SUPABASE_SERVICE_KEY) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured in Vercel.");
     const shiftEnd=chicagoDate(now),shiftStart=previousDate(shiftEnd);
     const startUtc=zoned7amUtc(shiftStart).toISOString(),endUtc=zoned7amUtc(shiftEnd).toISOString();
-    const staffing=await supa("daily_staffing?select=*&shift_date=eq."+shiftStart+"&order=station,apparatus");
-    const checks=await supa("apparatus_checks?select=*&shift_date=eq."+shiftStart+"&order=station,apparatus_name");
+    const staffing=await supa("daily_staffing?select=*&staffing_date=eq."+shiftStart+"&order=shift");
+    const checks=await supa("apparatus_checks?select=*&check_date=eq."+shiftStart+"&order=apparatus_id,check_time");
     const incidents=await supa("incidents?select=*&dispatch_time=gte."+encodeURIComponent(startUtc)+"&dispatch_time=lt."+encodeURIComponent(endUtc)+"&order=dispatch_time");
+    const standalone=await supa("standalone_reports?select=*&created_at=gte."+encodeURIComponent(startUtc)+"&created_at=lt."+encodeURIComponent(endUtc)+"&order=created_at");
     const attachments=[];
     const staffingPdf=await makeStaffingPdf(shiftStart,staffing||[]);
-    attachments.push({content:Buffer.from(staffingPdf).toString("base64"),filename:"Staffing Report.pdf"});
+    attachments.push({content:Buffer.from(staffingPdf).toString("base64"),filename:"01 - Daily Staffing Report.pdf"});
     const checksPdf=await makeChecksPdf(shiftStart,checks||[]);
-    attachments.push({content:Buffer.from(checksPdf).toString("base64"),filename:"Apparatus Checks.pdf"});
-    let reportCount=0;
+    attachments.push({content:Buffer.from(checksPdf).toString("base64"),filename:"02 - Apparatus Checks.pdf"});
+    let reportCount=0,attachmentNumber=3;
     for(const incident of incidents||[]){
-      const pdf=await makeIncidentPdf(incident);
-      attachments.push({content:Buffer.from(pdf).toString("base64"),filename:(clean(incident.cad||incident.cad_number||incident.incident_number||"Incident"))+" - Incident Report.pdf"});
-      reportCount+=(Array.isArray(incident.reports)?incident.reports.length:0);
+      for(let idx=0;idx<(Array.isArray(incident.reports)?incident.reports.length:0);idx++){
+        const report=incident.reports[idx];
+        const pdf=await makeReportPdf(incident,report);
+        const label=String(report?.report_type||"report").startsWith("pcr_")?"PCR":"Fire Report";
+        attachments.push({content:Buffer.from(pdf).toString("base64"),filename:String(attachmentNumber++).padStart(2,"0")+" - "+clean(incident.cad||"Incident")+" - "+label+" "+(idx+1)+".pdf"});
+        reportCount++;
+      }
+    }
+    for(const report of standalone||[]){
+      const pdf=await makeReportPdf({},report);
+      const label=String(report?.report_type||"report").startsWith("pcr_")?"PCR":"Fire Report";
+      attachments.push({content:Buffer.from(pdf).toString("base64"),filename:String(attachmentNumber++).padStart(2,"0")+" - Standalone - "+label+".pdf"});
+      reportCount++;
     }
     await sendEmail(attachments,shiftStart,shiftEnd,(incidents||[]).length,reportCount);
     return res.status(200).json({ok:true,shift_start:shiftStart,shift_end:shiftEnd,incidents:(incidents||[]).length,reports:reportCount,attachments:attachments.length});
