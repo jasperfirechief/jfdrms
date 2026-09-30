@@ -1233,7 +1233,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     data.actions_taken=[...document.querySelectorAll("input[name='rActionsTaken']:checked")].map(x=>x.value);
     data.exposures=window.jfdRepeats?.exposures||[];data.casualties=window.jfdRepeats?.casualties||[];data.vehicles=window.jfdRepeats?.vehicles||[];data.hazards=window.jfdRepeats?.hazards||[];
     data.aid_records=[...(window.jfdAids?.fd||[])];data.nonfd_aid_records=[...(window.jfdAids?.nonfd||[])];
-    data.jasper_validation_version="2026-09-29";
+    data.jasper_validation_version="2026-09-30";
     return data;
   };
   window.applyPreviousReportValues=function(data){
@@ -1256,6 +1256,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   window.validateReportForNeris=function(data,apiChecked){
     const errors=[];
     if(!data.rCad&&!$("reportModal")?.dataset.cad)errors.push("Incident/CAD number is required.");
+    if(!data.rDispatchIncidentNumber&&!data.rCad&&!$("reportModal")?.dataset.cad)errors.push("Dispatch Incident Number is required.");
     if(!data.rPrimaryIncidentType&&!data.rNerisType)errors.push("Primary incident type is required.");
     if(!data.rLocation)errors.push("Incident location is required.");
     if(!data.rCallArrival||!data.rCallAnswered||!data.rCallCreate)errors.push("Call Arrival, Call Answered, and Call Create are required.");
