@@ -436,7 +436,14 @@ window.adminSubmitReport=async function(cad,idx){
   if(!result.ok)return alert(result.error);
   reports[idx]={...rep,status:"submitted_to_neris",neris:result.neris,updated_at:new Date().toISOString()};
   const u=await db.from("incidents").update({reports,updated_at:new Date().toISOString()}).eq("cad",cad);
-  if(u.error)return alert(u.error.message);alert("Submitted to NERIS.");await renderNerisReviewQueue();await loadIncidents();
+  if(u.error)return alert(u.error.message);
+  alert("Submitted to NERIS.");
+  await renderNerisReviewQueue();
+  await loadIncidents();
+  }catch(err){
+    console.error("adminSubmitReport failed:",err);
+    alert("Unable to review/submit this report: "+(err?.message||String(err)));
+  }
 }
 async function incidentIdForCad(cad){const r=await db.from("incidents").select("id").eq("cad",cad).maybeSingle();return r.data?.id||null;}
 async function validateIncidentForNeris(currentKind,currentData,incidentId,cad){
