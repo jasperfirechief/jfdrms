@@ -867,11 +867,10 @@ function buildNerisPayload(data){
   const payload={
     base:{
       incident_number:String(incidentNumber),
-      incident_types:incidentTypes,
-      incident_final_type_primary:incidentTypes.map((x,i)=>i===0),
       location,
       outcome_narrative:data.rNarrative||""
     },
+    incident_types:incidentTypes,
     dispatch:{
       incident_number:String(data.rDispatchIncidentNumber||incidentNumber),
       call_arrival:callArrival,
@@ -893,15 +892,16 @@ function buildNerisPayload(data){
     const fire={};
     if(data.rWater)fire.water_supply=mapWater[data.rWater]||data.rWater;
     if(data.rInvestigation)fire.investigation_needed=mapInvest[data.rInvestigation]||data.rInvestigation;
-    if(data.rInvestigationType)fire.investigation_types=Array.isArray(data.rInvestigationType)?data.rInvestigationType:[data.rInvestigationType];
-    const location_detail={
-      type:data.rFireLoc==="Outside"?"OUTSIDE":"STRUCTURE"
-    };
-    if(data.rCondition)location_detail.arrival_condition=mapCondition[data.rCondition]||data.rCondition;
-    if(data.rDamageType)location_detail.damage_type=mapDamage[data.rDamageType]||data.rDamageType;
-    if(data.rFloor!==undefined&&data.rFloor!=="")location_detail.floor_of_origin=Number(data.rFloor);
-    if(data.rRoom)location_detail.room_of_origin_type=mapRoom[data.rRoom]||data.rRoom;
-    if(data.rCause)location_detail.cause=mapCause[data.rCause]||data.rCause;
+    fire.investigation_types=Array.isArray(data.rInvestigationType)?data.rInvestigationType:(data.rInvestigationType?[data.rInvestigationType]:[]);
+    const outside=data.rFireLoc==="Outside";
+    const location_detail=outside?{OUTSIDE:{}}:{STRUCTURE:{}};
+    const ld=outside?location_detail.OUTSIDE:location_detail.STRUCTURE;
+    if(data.rCondition&&!outside)ld.arrival_condition=mapCondition[data.rCondition]||data.rCondition;
+    if(data.rDamageType&&!outside)ld.damage_type=mapDamage[data.rDamageType]||data.rDamageType;
+    if(data.rFloor!==undefined&&data.rFloor!==""&&!outside)ld.floor_of_origin=Number(data.rFloor);
+    if(data.rRoom&&!outside)ld.room_of_origin_type=mapRoom[data.rRoom]||data.rRoom;
+    if(data.rCause)ld.cause=mapCause[data.rCause]||data.rCause;
+    if(!outside&&data.rProgressionEvident!==undefined&&data.rProgressionEvident!=="")ld.progression_evident=data.rProgressionEvident==="Yes";
     fire.location_detail=location_detail;
     if(!structureIncident&&data.rAcres)fire.acres_burned=Number(data.rAcres);
     payload.fire_detail=fire;
