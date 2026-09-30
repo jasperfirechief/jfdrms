@@ -6,6 +6,9 @@ export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ ok: false, error: "GET only" });
   if (!clientId || !clientSecret || !departmentId) return res.status(500).json({ ok: false, error: "NERIS test configuration missing" });
 
+  const action = new URL(req.url, "http://localhost").searchParams.get("action") || "validate";
+  if (!["validate", "submit"].includes(action)) return res.status(400).json({ ok: false, error: "Use action=validate or action=submit" });
+
   const basic = Buffer.from(clientId + ":" + clientSecret).toString("base64");
   const tokenResponse = await fetch(baseUrl + "/token", {
     method: "POST",
@@ -21,20 +24,38 @@ export default async function handler(req, res) {
     incident_types: [{ type: "FIRE||STRUCTURE_FIRE||ROOM_AND_CONTENTS_FIRE" }],
     dispatch: {
       incident_number: "TEST-20260930-001",
-      call_create: "2026-09-30T02:00:00Z",
-      call_answered: "2026-09-30T02:01:00Z",
+      call_create: "2026-09-30T01:58:00Z",
+      call_answered: "2026-09-30T02:00:00Z",
       call_arrival: "2026-09-30T02:07:00Z",
       location: {},
       unit_responses: []
     }
   };
 
+  const headers = { Authorization: "Bearer " + tokenData.access_token, "Content-Type": "application/json", "User-Agent": "JasperFireDepartmentRMS/1.0" };
+
   const validationResponse = await fetch(baseUrl + "/incident/" + encodeURIComponent(departmentId) + "/validate", {
-    method: "POST",
-    headers: { Authorization: "Bearer " + tokenData.access_token, "Content-Type": "application/json", "User-Agent": "JasperFireDepartmentRMS/1.0" },
-    body: JSON.stringify(payload)
+    method: "POST", headers, body: JSON.stringify(payload)
   });
   const validationText = await validationResponse.text();
-  let details; try { details = JSON.parse(validationText); } catch { details = { raw: validationText }; }
-  return res.status(200).json({ ok: validationResponse.ok, submitted: false, stage: "validation", status: validationResponse.status, details });
+  let validationDetails; try { validationDetails = JSON.parse(validationText); } catch { validationDetails = { raw: validationText }; }
+
+  if (!validationResponse.ok) return res.status(200).json({ ok: false, submitted: false, stage: "validation", status: validationResponse.status, details: validationDetails });
+  if (action === "validate") return res.status(200).json({ ok: true, validated: true, submitted: false, stage: "validation", status: validationResponse.status, details: validationDetails });
+
+  const submitResponse = await fetch(baseUrl + "/incident/" + encodeURIComponent(departmentId), {
+    method: "POST", headers, body: JSON.stringify(payload)
+  });
+  const submitText = await submitResponse.text();
+  let submitDetails; try { submitDetails = JSON.parse(submitText); } catch { submitDetails = { raw: submitText }; }
+
+  return res.status(200).json({
+    ok: submitResponse.ok,
+    validated: true,
+    submitted: submitResponse.ok,
+    stage: "submission",
+    status: submitResponse.status,
+    neris_incident_id: submitDetails?.uid || submitDetails?.neris_id || submitDetails?.incident?.uid || submitDetails?.incident?.neris_id || null,
+    details: submitDetails
+  });
 }
