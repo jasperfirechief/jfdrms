@@ -21,7 +21,7 @@ export default async function handler(req,res){
   const results=[];
   for(const type of selected){
     const group=type.split("||")[0];
-    const isStructure=/^FIRE\\|\\|STRUCTURE_FIRE\\|\\|/.test(type);
+    const isStructure=type.includes("||STRUCTURE_FIRE||");
     const isCooking=/CONFINED_COOKING_APPLIANCE_FIRE/.test(type);
     const isFire=group==="FIRE";
     const isHaz=group==="HAZSIT";
