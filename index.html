@@ -903,7 +903,7 @@ function buildNerisPayload(data){
   const patients=Array.isArray(data.patients)?data.patients:[];
   if(patients.length){
     const careMap={"Evaluated and cared for":"PATIENT_EVALUATED_CARE_PROVIDED","Evaluated and refused care":"PATIENT_EVALUATED_REFUSED_CARE","Evaluated, no care required":"PATIENT_EVALUATED_NO_CARE_REQUIRED","Refused evaluation/care":"PATIENT_REFUSED_EVALUATION_CARE","Support services provided":"PATIENT_SUPPORT_SERVICES_PROVIDED","DOA":"PATIENT_DEAD_ON_ARRIVAL"};
-    const statusMap={Improved:"IMPROVED",Unchanged:"UNCHANGED,Worsened:"WORSE"};
+    const statusMap={Improved:"IMPROVED",Unchanged:"UNCHANGED",Worsened:"WORSE"};
     const transportMap={"Transport by EMS Unit":"TRANSPORT_BY_EMS_UNIT","Transport by Other Agency":"OTHER_AGENCY_TRANSPORT","Patient Refused Transport":"PATIENT_REFUSED_TRANSPORT","Non-Patient Transport":"NONPATIENT_TRANSPORT","No Transport":"NO_TRANSPORT"};
     payload.medical=patients.map((p,i)=>({
       patient_care_report:String(p.careReport||data.rCad||incidentNumber||("JFD-P"+(i+1))),
