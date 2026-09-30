@@ -1008,9 +1008,9 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     if(kind==="fire")return card('<span class="text-red-600">JASPER FIRE DEPARTMENT</span><div class="text-xs text-slate-500 font-semibold mt-1">FIRE INCIDENT REPORT</div>',
       '<div class="grid md:grid-cols-3 gap-3">'+
       field("rDate","Incident Date",/^\\d{4}-\\d{2}-\\d{2}/.test(String(i.dispatch_time||""))?String(i.dispatch_time).slice(0,10):"","date")+
-      field("rCad","CAD / Incident Number",i.cad||"", "text", true)+
+      field("rCad","CAD / Incident Number",i.cad||"","text","",true)+
       select("rCall","Call Type",CALL_TYPES,d?.call_type||i.type||"")+
-      field("rLocation","Location",i.location||"","text",true,"md:col-span-3")+
+      field("rLocation","Location",i.location||"","text","md:col-span-3",true)+
       field("rLatitude","Latitude",i.latitude??"","number")+
       field("rLongitude","Longitude",i.longitude??"","number")+
       select("rShift","Shift",["A","B","C"],m.shift||"")+
