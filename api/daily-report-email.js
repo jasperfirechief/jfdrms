@@ -96,7 +96,7 @@ export default async function handler(req,res){
   if(process.env.CRON_SECRET){const auth=req.headers.authorization||"";if(auth!=="Bearer "+process.env.CRON_SECRET)return res.status(401).json({error:"Unauthorized"})}
   try{
     const now=new Date(),hour=chicagoHour(now);
-    if(hour!==9)return res.status(200).json({ok:true,skipped:true,reason:"Outside 9 AM America/Chicago delivery window."});
+    if(hour!==8)return res.status(200).json({ok:true,skipped:true,reason:"Outside 8 AM America/Chicago delivery window."});
     if(!SUPABASE_SERVICE_KEY)throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured in Vercel.");
     const shiftEnd=chicagoDate(now),shiftStart=previousDate(shiftEnd),startUtc=zoned7amUtc(shiftStart).toISOString(),endUtc=zoned7amUtc(shiftEnd).toISOString();
     const existing=await supa("daily_report_email_runs?select=run_id,status,sent_at&shift_start=eq."+shiftStart+"&shift_end=eq."+shiftEnd+"&limit=1");
