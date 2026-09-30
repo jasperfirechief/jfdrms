@@ -6,8 +6,5 @@
   "dependencies": {
     "ai": "latest",
     "pdf-lib": "1.17.1"
-  },
-  "scripts": {
-    "build": "node scripts/check-client-syntax.js"
   }
 }
