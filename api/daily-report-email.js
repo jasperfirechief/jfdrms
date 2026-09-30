@@ -67,10 +67,44 @@ function reportRows(incident,detail,report){
   rows.push(["Report Completed By",report.rCompletedBy],["Report Submitted",report.submitted_at?fmtDateTime(report.submitted_at):""]);
   return rows;
 }
-async function makeIncidentPdf(incident,detail,report){
-  const title=report.report_type==="pcr_neris_v2"?"PATIENT CARE REPORT (PCR NERIS v2)":"FIRE INCIDENT REPORT (NERIS v2)";
-  const rows=reportRows(incident,detail,report);
-  return makePdf(title,[{title:"INCIDENT INFORMATION",rows:rows.slice(0,15)},{title:"REPORT DETAILS",rows:rows.slice(15)}]);
+async function makeIncidentPdf(incident,detail,reports){
+  const list=Array.isArray(reports)?reports.filter(Boolean):[];
+  const pdf=await PDFDocument.create(),regular=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
+  const W=612,H=792,margin=40,contentW=W-margin*2,red=rgb(.78,.05,.05),gray=rgb(.35,.39,.45);
+  function pageHeader(page,titleText){
+    let y=H-margin;
+    page.drawText("JASPER FIRE DEPARTMENT",{x:margin,y,size:16,font:bold,color:red});y-=22;
+    page.drawText(titleText,{x:margin,y,size:12,font:bold});y-=20;
+    page.drawText("CAD / Incident: "+clean(incident.cad||incident.incident_number),{x:margin,y,size:9,font:regular});y-=14;
+    page.drawText("Location: "+clean(incident.location||"Location not provided"),{x:margin,y,size:9,font:regular});y-=20;
+    return y;
+  }
+  function drawRows(page,y,rows){
+    for(const row of rows){const label=clean(row[0]),value=clean(row[1]);if(!value)continue;
+      const words=value.split(/\s+/),lines=[];let line="";
+      for(const w of words){const t=line?line+" "+w:w;if(regular.widthOfTextAtSize(t,9)>contentW-120){if(line)lines.push(line);line=w}else line=t}if(line)lines.push(line);
+      page.drawText(label,{x:margin,y,size:8,font:bold,color:gray});
+      page.drawText(lines[0]||"",{x:margin+120,y,size:9,font:regular});y-=14;
+      for(const more of lines.slice(1)){page.drawText(more,{x:margin+120,y,size:9,font:regular});y-=12}
+      if(y<55){page=pdf.addPage([W,H]);y=pageHeader(page,"DEPARTMENTAL INCIDENT DETAIL");}
+    }
+    return {page,y};
+  }
+  let page=pdf.addPage([W,H]),y=pageHeader(page,"GENERAL INCIDENT REPORT");
+  page.drawText("PUBLIC INCIDENT SUMMARY",{x:margin,y,size:11,font:bold,color:red});y-=18;
+  const narrative=list.map(r=>r.data?.rNarrative).filter(Boolean).join("\n\n")||detail?.narrative||"No narrative entered.";
+  y=drawRows(page,y,[["Incident Date",fmtDate(incident.dispatch_time)],["Primary Type",list[0]?.data?.rPrimaryIncidentType||incident.type],["Narrative",narrative]]).y;
+  page.drawText("This first page is the general report suitable for routine release to the property owner, insurer or assisting agency.",{x:margin,y:size=8,font:regular,color:gray});
+  for(const report of list){
+    page=pdf.addPage([W,H]);y=pageHeader(page,report.report_type==="pcr_neris_v2"?"PATIENT CARE REPORT":"FIRE / INCIDENT REPORT");
+    const rows=reportRows(incident,detail,report);
+    const result=drawRows(page,y,rows);page=result.page;y=result.y;
+  }
+  page=pdf.addPage([W,H]);y=pageHeader(page,"FULL DEPARTMENTAL RECORD");
+  const detailRows=[["Report Count",String(list.length)],["Report Statuses",list.map(r=>r.status||"").join(", ")],["NERIS IDs",list.map(r=>r.neris?.neris_incident_id||r.neris_incident_id).filter(Boolean).join(", ")],["CAD / Dispatch Record",JSON.stringify({cad:incident.cad,type:incident.type,dispatch_time:incident.dispatch_time,location:incident.location,units:incident.incident_units||[]})]];
+  const result=drawRows(page,y,detailRows);page=result.page;
+  const pages=pdf.getPages();pages.forEach((p,i)=>p.drawText("Jasper Fire Department • "+clean(incident.cad||"Incident")+" • Page "+(i+1)+" of "+pages.length,{x:margin,y:18,size:7,font:regular,color:gray}));
+  return pdf.save();
 }
 async function makeStaffingPdf(shiftStart,shiftEnd,staffing,assignments){
   const rows=[
@@ -109,11 +143,11 @@ export default async function handler(req,res){
     attachments.push({content:Buffer.from(staffingPdf).toString("base64"),type:"application/pdf",filename:"Jasper-Fire-Daily-Staffing-"+shiftStart+".pdf",disposition:"attachment"});
     let reportCount=0;
     for(const incident of incidents||[]){
-      const detail=Array.isArray(incident.incident_details)?incident.incident_details[0]:incident.incident_details,reports=Array.isArray(incident.reports)?incident.reports:[];
-      for(const report of reports){
-        if(report.status&&report.status!=="submitted")continue;
-        const pdf=await makeIncidentPdf(incident,detail,report),suffix=report.report_type==="pcr_neris_v2"?"PCR":"Fire-Incident";
-        attachments.push({content:Buffer.from(pdf).toString("base64"),type:"application/pdf",filename:incident.cad+"_"+suffix+"_"+report.report_id+".pdf",disposition:"attachment"});reportCount++;
+      const detail=Array.isArray(incident.incident_details)?incident.incident_details[0]:incident.incident_details,reports=Array.isArray(incident.reports)?incident.reports.filter(r=>!r.status||r.status==="submitted"):[];
+      if(reports.length){
+        const pdf=await makeIncidentPdf(incident,detail,reports);
+        attachments.push({content:Buffer.from(pdf).toString("base64"),type:"application/pdf",filename:incident.cad+"_JFD-Incident-Report.pdf",disposition:"attachment"});
+        reportCount+=reports.length;
       }
     }
     if(attachments.length>20)throw new Error("Daily report packet has more than 20 PDF attachments; split delivery is required.");
