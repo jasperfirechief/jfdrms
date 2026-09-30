@@ -1,3 +1,4 @@
+import { makePdf } from "./report-pdf.js";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 const SUPABASE_URL = "https://audgtwcctdoiptuekqvn.supabase.co";
@@ -101,77 +102,7 @@ function incidentSections(incident) {
 
 async function makeIncidentPdf(incident) {
   const reports=Array.isArray(incident?.reports)?incident.reports:[];
-  const detail=Array.isArray(incident?.incident_details)?incident.incident_details[0]:incident?.incident_details||{};
-  const allData=reports.map(r=>r?.data||{});
-  const sections=[{
-    title:"INCIDENT SUMMARY",
-    rows:[
-      ["CAD / Incident",incident?.cad||incident?.cad_number||incident?.incident_number||allData[0]?.rCad],
-      ["Date",fmtDate(incident?.dispatch_time||incident?.incident_date||allData[0]?.rDate||allData[0]?.date)],
-      ["Time",incident?.dispatch_time?fmtDateTime(incident.dispatch_time).split(", ").slice(1).join(", "):allData[0]?.rTime],
-      ["Call Type",allData.find(d=>d.rCallType)?.rCallType||incident?.type||incident?.incident_type],
-      ["Primary Incident Type",allData.find(d=>d.rPrimaryIncidentType)?.rPrimaryIncidentType],
-      ["Location",incident?.location||incident?.address||incident?.location_address||allData.find(d=>d.rLocation)?.rLocation],
-      ["Incident Narrative",allData.map(d=>d.rNarrative||d.narrative).filter(Boolean).join("\n\n")||detail.narrative||incident?.narrative||"No narrative entered."],
-      ["Reports Included",reports.length],
-      ["Report Types",reports.map(r=>String(r?.report_type||"Report").startsWith("pcr_")?"Patient Care Report":"Fire Incident Report").join(", ")]
-    ]
-  }];
-
-  for(let idx=0;idx<reports.length;idx++){
-    const report=reports[idx]||{},data=report.data||{};
-    const isPcr=String(report.report_type||"").startsWith("pcr_");
-    const title=(isPcr?"PATIENT CARE REPORT ":"FIRE INCIDENT REPORT ")+(idx+1);
-    const rows=[
-      ["Report Status",report.status||"Draft"],
-      ["Report Created",fmtDateTime(report.created_at)],
-      ["Report Updated",fmtDateTime(report.updated_at)]
-    ];
-    if(isPcr){
-      const patients=Array.isArray(data.patients)?data.patients:[];
-      if(!patients.length) rows.push(["Patient","No patient information entered."]);
-      for(let n=0;n<patients.length;n++){
-        const p=patients[n]||{};
-        const name=[p.firstName,p.lastName].filter(Boolean).join(" ")||p.name||"Patient "+(n+1);
-        rows.push(
-          ["Patient "+(n+1),name],["DOB",p.dob],["Age",p.age],["Sex",p.sex],["Address",p.address],
-          ["Chief Complaint",p.chiefComplaint||p.complaint],["Care Provided",p.careProvided],
-          ["Initial Vitals",p.vitals?.[0]?JSON.stringify(p.vitals[0]):""],
-          ["Additional Vitals",Array.isArray(p.vitals)&&p.vitals.length>1?p.vitals.slice(1).map(v=>JSON.stringify(v)).join(" | "):""],
-          ["BLS Care",Array.isArray(p.careMethods)?p.careMethods.join(", "):p.careMethods],
-          ["Treatment Notes",p.careNotes||p.treatmentNotes],
-          ["Disposition",p.disposition],["Transport Unit",p.transportUnit||p.transportVehicle],
-          ["Transport Agency",p.transportAgency],["Destination",p.destination],
-          ["Refusal / Signatures",p.refusal?JSON.stringify(p.refusal):""]
-        );
-      }
-      rows.push(
-        ["PCR Narrative",data.rNarrative||data.narrative],
-        ["PCR Data",Object.entries(data).filter(([k,v])=>v!==null&&v!==undefined&&v!==""&&!["patients","responding_apparatus"].includes(k)).map(([k,v])=>k+": "+String(typeof v==="object"?JSON.stringify(v):v)).join(" | ")]
-      );
-    } else {
-      rows.push(
-        ["Call Type",data.rCallType||incident?.type],
-        ["Incident Narrative",data.rNarrative||data.narrative||incident?.narrative],
-        ["Actions / Outcome",data.rActionsTaken||data.actionsTaken||data.outcome],
-        ["Property / Responsible Party",data.propertyOwner||data.responsibleParty],
-        ["Injuries / Damage",data.injuries||data.propertyDamage],
-        ["Responding Apparatus",Array.isArray(data.responding_apparatus)?data.responding_apparatus.map(x=>JSON.stringify(x)).join(" | "):""],
-        ["Fire Report Data",Object.entries(data).filter(([k,v])=>v!==null&&v!==undefined&&v!==""&&!["patients","responding_apparatus"].includes(k)).map(([k,v])=>k+": "+String(typeof v==="object"?JSON.stringify(v):v)).join(" | ")]
-      );
-    }
-    sections.push({title,rows});
-  }
-
-  const mergedData={};
-  for(const data of allData) for(const [k,v] of Object.entries(data)) if(v!==null&&v!==undefined&&v!=="") mergedData[k]=v;
-  sections.push({
-    title:"DEPARTMENTAL / NERIS INCIDENT DATA",
-    rows:Object.entries(mergedData)
-      .filter(([k])=>!["patients","responding_apparatus"].includes(k))
-      .map(([k,v])=>[k,String(typeof v==="object"?JSON.stringify(v):v)])
-  });
-  return makeTablePdf("INCIDENT REPORT • "+clean(incident?.cad||incident?.cad_number||incident?.incident_number||"Incident"),sections);
+  return makePdf(incident,reports);
 }
 
 async function makeStaffingPdf(date, rows) {
