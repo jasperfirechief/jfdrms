@@ -17,12 +17,12 @@ async function token(){
 
 function payload(){
   const dispatch="2026-09-27T13:38:55Z",enroute="2026-09-27T13:39:20Z",scene="2026-09-27T13:43:10Z",clear="2026-09-27T14:22:00Z";
-  const location={country:"US",state:"AL",postal_community:"Jasper",place_type:"RESIDENCE",number:701,street:"5TH ST W",point:{crs:4326,geometry:{type:"Point",coordinates:[-87.283454,33.846481]}}};
+  const location={country:"US",state:"AL",postal_community:"Jasper",place_type:"RESIDENCE",number:701,street:"5TH ST W"},point={crs:4326,geometry:{type:"Point",coordinates:[-87.283454,33.846481]}};
   return {
-    base:{department_neris_id:DEPARTMENT_ID,incident_number:"2026-22426",location,outcome_narrative:"TEST ONLY - JFD RMS NERIS test submission. Structure fire test; no real incident reporting. Test record created for integration validation."},
-    incident_types:["FIRE||STRUCTURE_FIRE||STRUCTURAL_INVOLVEMENT_FIRE"],
-    dispatch:{incident_number:"2026-22426",call_arrival:dispatch,call_answered:enroute,call_create:scene,location,unit_responses:[{reported_unit_id:"JA",dispatch:dispatch,enroute_to_scene:enroute,on_scene:scene,unit_clear:clear,unable_to_dispatch:false}]},
-    fire_detail:{location_detail:{STRUCTURE:{arrival_condition:"SMOKE_FIRE_SHOWING",progression_evident:true,damage_type:"MODERATE_DAMAGE",floor_of_origin:1,room_of_origin_type:"KITCHEN",cause:"OPERATING_EQUIPMENT"}},water_supply:"TANK_WATER",investigation_needed:"NO",investigation_types:[]},
+    base:{department_neris_id:DEPARTMENT_ID,incident_number:"2026-22426",location,point,outcome_narrative:"TEST ONLY - JFD RMS NERIS test submission. Structure fire test; no real incident reporting. Test record created for integration validation."},
+    incident_types:[{type:"FIRE||STRUCTURE_FIRE||STRUCTURAL_INVOLVEMENT_FIRE"}],
+    dispatch:{incident_number:"2026-22426",call_arrival:dispatch,call_answered:enroute,call_create:scene,location,point,unit_responses:[{reported_unit_id:"JA",dispatch:dispatch,enroute_to_scene:enroute,on_scene:scene,unit_clear:clear,unable_to_dispatch:false}]},
+    fire_detail:{location_detail:{type:"STRUCTURE",arrival_condition:"SMOKE_FIRE_SHOWING",progression_evident:true,damage_type:"MODERATE_DAMAGE",floor_of_origin:1,room_of_origin_type:"KITCHEN",cause:"OPERATING_EQUIPMENT"},water_supply:"TANK_WATER",investigation_needed:"NO",investigation_types:[]},
     smoke_alarm:{presence:{type_rr_presence:"PRESENT"}},fire_alarm:{presence:{type_rr_presence:"NOT_PRESENT"}},other_alarm:{presence:{type_rr_presence:"NOT_APPLICABLE"}},fire_suppression:{presence:{type_rr_presence:"NOT_PRESENT"}}
   };
 }
