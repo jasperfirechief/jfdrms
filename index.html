@@ -851,7 +851,7 @@ function buildNerisPayload(data){
   const primaryType=data.rPrimaryIncidentType||data.rNerisType||data.rIncidentType||"FIRE||STRUCTURE_FIRE||STRUCTURAL_INVOLVEMENT_FIRE";
   const selectedTypes=Array.isArray(data.incident_types)?data.incident_types.filter(Boolean):[];
   const incidentTypes=[primaryType,...selectedTypes.filter(x=>x!==primaryType),...(data.rSecondaryIncidentType?[data.rSecondaryIncidentType]:[])].filter(Boolean).filter((x,i,a)=>a.indexOf(x)===i);
-  const location=buildNerisLocation(data.rLocation,data.rLatitude,data.rLongitude);
+  const location=buildNerisLocation(data.rLocation,data.rLatitude,data.rLongitude); const point=location.point||null; delete location.point;
   const units=(data.responding_apparatus||[]).filter(u=>u.unit_number).map(u=>{
     const t=u.times||{};
     return {
@@ -870,7 +870,7 @@ function buildNerisPayload(data){
       location,
       outcome_narrative:data.rNarrative||""
     },
-    incident_types:incidentTypes,
+    incident_types:incidentTypes.map(x=>({type:x})),
     dispatch:{
       incident_number:String(data.rDispatchIncidentNumber||incidentNumber),
       call_arrival:callArrival,
