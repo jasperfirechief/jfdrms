@@ -1262,7 +1262,10 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   function jfdRenderIncidentTypes(){
     const box=$("jfdIncidentTypes");if(!box)return;
     box.innerHTML=(window.jfdIncidentTypes||[]).map((v,i)=>'<div class="flex items-end gap-2 mb-2"><div class="flex-1">'+jfdNerisSelect("rIncidentType_"+i,"Incident Type "+(i+2),NERIS_INCIDENT_TYPES,v)+'</div><button type="button" onclick="jfdRemoveIncidentType('+i+')" class="border px-3 py-2 rounded-lg text-sm font-bold text-red-600">Remove</button></div>').join("");
-  }
+    box.innerHTML=(window.jfdIncidentTypes||[]).map((v,i)=>{
+      const remove="jfdRemoveIncidentType("+i+")";
+      return '<div class="flex items-end gap-2 mb-2"><div class="flex-1">'+jfdNerisSelect("rIncidentType_"+i,"Incident Type "+(i+2),NERIS_INCIDENT_TYPES,v)+'</div><button type="button" onclick="'+remove+'" class="border px-3 py-2 rounded-lg text-sm font-bold text-red-600">Remove</button></div>';
+    }).join("");
   window.jfdRenderActionControls=function(){
     const box=$("jfdActionControls");if(!box)return;
     const yes=$("rActionTaken")?.checked===true,no=$("rNoActionTaken")?.checked===true;
