@@ -1,4 +1,4 @@
-const BASE_URL = String(process.env.NERIS_BASE_URL || "https://api.neris.fsri.org/v1").replace(/\/$/,"");
+const BASE_URL = String(process.env.NERIS_BASE_URL || "https://test.neris.fsri.org/v1").replace(/\/$/,"");
 const CLIENT_ID = String(process.env.NERIS_CLIENT_ID || "");
 const CLIENT_SECRET = String(process.env.NERIS_CLIENT_SECRET || "");
 const DEPARTMENT_ID = String(process.env.NERIS_DEPARTMENT_ID || "");
