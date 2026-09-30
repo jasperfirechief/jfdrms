@@ -949,44 +949,44 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
 /* ===== JFD INCIDENT / PCR WORKFLOW REBUILD ===== */
 (function(){
   const oldFire=window.fireReportForm, oldPcr=window.pcrReportForm;
-  const field=(id,label,val="",type="text",cls="")=>'<label class="text-sm font-semibold '+cls+'">'+esc(label)+'<input id="'+id+'" type="'+type+'" value="'+esc(val??"")+'" class="w-full border rounded-lg p-2 mt-1 bg-white"></label>';
-  const select=(id,label,opts,val="",cls="")=>{const list=Array.isArray(opts)?opts:(opts&&typeof opts==="object"?Object.values(opts):[]);return '<label class="text-sm font-semibold '+cls+'">'+esc(label)+'<select id="'+id+'" class="w-full border rounded-lg p-2 mt-1 bg-white"><option value="">Select...</option>'+list.map(o=>'<option value="'+esc(o)+'" '+(String(o)===String(val)?"selected":"")+'>'+esc(o)+'</option>').join("")+'</select></label>';};
+  const field=(id,label,val="",type="text",cls="",required=false)=>'<label class="text-sm font-semibold '+cls+'">'+esc(label)+(required?' <span class="text-red-600">*</span>':"")+'<input id="'+id+'" type="'+type+'" value="'+esc(val??"")+'" class="w-full border rounded-lg p-2 mt-1 bg-white"'+(required?" required":"")+'></label>';
+  const select=(id,label,opts,val="",cls="",required=false)=>{const list=Array.isArray(opts)?opts:(opts&&typeof opts==="object"?Object.values(opts):[]);return '<label class="text-sm font-semibold '+cls+'">'+esc(label)+(required?' <span class="text-red-600">*</span>':"")+'<select id="'+id+'" class="w-full border rounded-lg p-2 mt-1 bg-white"'+(required?" required":"")+'><option value="">Select...</option>'+list.map(o=>'<option value="'+esc(o)+'" '+(String(o)===String(val)?"selected":"")+'>'+esc(o)+'</option>').join("")+'</select></label>';};
   const area=(id,label,val="",cls="")=>'<label class="text-sm font-semibold '+cls+'">'+esc(label)+'<textarea id="'+id+'" rows="4" class="w-full border rounded-lg p-2 mt-1 bg-white">'+esc(val??"")+'</textarea></label>';
   const card=(title,body,extra="")=>'<section class="rounded-2xl border bg-white shadow-sm p-4 sm:p-5 '+extra+'"><h3 class="text-lg font-black mb-3">'+title+'</h3>'+body+'</section>';
   const btn=(label,fn,kind="border")=>'<button type="button" onclick="'+fn+'" class="'+(kind==="primary"?"bg-red-600 text-white":kind==="blue"?"bg-blue-700 text-white":"border bg-white")+' px-3 py-2 rounded-lg font-bold text-sm">'+label+'</button>';
-  const jfdNerisSelect=(id,label,opts,val="",cls="")=>{const list=Array.isArray(opts)?opts:[];return '<label class="text-sm font-semibold '+cls+'">'+esc(label)+'<select id="'+id+'" class="w-full border rounded-lg p-2 mt-1 bg-white"><option value="">Select...</option>'+list.map(o=>'<option value="'+esc(o.value)+'" '+(String(o.value)===String(val)?"selected":"")+'>'+esc(o.label)+'</option>').join("")+'</select></label>';};
+  const jfdNerisSelect=(id,label,opts,val="",cls="",required=false)=>{const list=Array.isArray(opts)?opts:[];return '<label class="text-sm font-semibold '+cls+'">'+esc(label)+(required?' <span class="text-red-600">*</span>':"")+'<select id="'+id+'" class="w-full border rounded-lg p-2 mt-1 bg-white"'+(required?" required":"")+'><option value="">Select...</option>'+list.map(o=>'<option value="'+esc(o.value)+'" '+(String(o.value)===String(val)?"selected":"")+'>'+esc(o.label)+'</option>').join("")+'</select></label>';};
   const multiSelect=(id,label,opts,vals=[],cls="")=>{const selected=new Set(Array.isArray(vals)?vals:[]);return '<label class="text-sm font-semibold '+cls+'">'+esc(label)+'<select id="'+id+'" multiple size="6" class="w-full border rounded-lg p-2 mt-1 bg-white">'+opts.map(o=>'<option value="'+esc(o.value)+'" '+(selected.has(o.value)?"selected":"")+'>'+esc(o.label)+'</option>').join("")+'</select><span class="block text-xs text-slate-500 mt-1">Hold Ctrl (Windows) or Command (Mac) to select more than one.</span></label>';};
   const incidentHeader=(i,d,m,kind)=>{
     if(kind==="fire")return card('<span class="text-red-600">JASPER FIRE DEPARTMENT</span><div class="text-xs text-slate-500 font-semibold mt-1">FIRE INCIDENT REPORT</div>',
       '<div class="grid md:grid-cols-3 gap-3">'+
       field("rDate","Incident Date",/^\\d{4}-\\d{2}-\\d{2}/.test(String(i.dispatch_time||""))?String(i.dispatch_time).slice(0,10):"","date")+
-      field("rCad","CAD / Incident Number",i.cad||"")+
+      field("rCad","CAD / Incident Number",i.cad||"","text","",true)+
       select("rCall","Call Type",CALL_TYPES,d?.call_type||i.type||"")+
-      field("rLocation","Location",i.location||"","text","md:col-span-3")+
+      field("rLocation","Location",i.location||"","text","md:col-span-3",true)+
       field("rLatitude","Latitude",i.latitude??"","number")+
       field("rLongitude","Longitude",i.longitude??"","number")+
       select("rShift","Shift",["A","B","C"],m.shift||"")+
-      jfdNerisSelect("rPrimaryIncidentType","Primary Incident Type",NERIS_INCIDENT_TYPES,d?.primary_incident_type||d?.neris_incident_type||d?.incident_type||"","md:col-span-2")+
+      jfdNerisSelect("rPrimaryIncidentType","Primary Incident Type",NERIS_INCIDENT_TYPES,d?.primary_incident_type||d?.neris_incident_type||d?.incident_type||"","md:col-span-2",true)+
       '<div class="md:col-span-3"><div id="jfdIncidentTypes"></div><button type="button" onclick="jfdAddIncidentType()" class="mt-2 bg-white border px-3 py-2 rounded-lg font-bold text-sm">+ Add Incident Type</button></div>'+
       '</div>');
     return card('<span class="text-red-600">JASPER FIRE DEPARTMENT</span><div class="text-xs text-slate-500 font-semibold mt-1">PATIENT CARE REPORT</div>',
       '<div class="grid md:grid-cols-3 gap-3">'+
       field("rDate","Incident Date",/^\\d{4}-\\d{2}-\\d{2}/.test(String(i.dispatch_time||""))?String(i.dispatch_time).slice(0,10):"","date")+
-      field("rCad","CAD / Incident Number",i.cad||"")+
+      field("rCad","CAD / Incident Number",i.cad||"","text","",true)+
       select("rCall","Call Type",CALL_TYPES,d?.call_type||i.type||"")+
-      field("rLocation","Location",i.location||"","text","md:col-span-3")+
+      field("rLocation","Location",i.location||"","text","md:col-span-3",true)+
       field("rLatitude","Latitude",i.latitude??"","number")+
       field("rLongitude","Longitude",i.longitude??"","number")+
       select("rShift","Shift",["A","B","C"],m.shift||"")+
-      jfdNerisSelect("rPrimaryIncidentType","Primary Incident Type",NERIS_INCIDENT_TYPES,d?.primary_incident_type||d?.neris_incident_type||d?.incident_type||"","md:col-span-2")+
+      jfdNerisSelect("rPrimaryIncidentType","Primary Incident Type",NERIS_INCIDENT_TYPES,d?.primary_incident_type||d?.neris_incident_type||d?.incident_type||"","md:col-span-2",true)+
       jfdNerisSelect("rSecondaryIncidentType","Secondary Incident Type (optional)",NERIS_INCIDENT_TYPES,d?.secondary_incident_type||"","md:col-span-2")+
       '</div>');
   };function responseUi(unitRows,iForResponse){
     const checks=apparatus.filter(a=>a.active!==false).sort((a,b)=>String(a.unit_number).localeCompare(String(b.unit_number))).map(a=>'<label class="flex items-center gap-2 border rounded-lg p-2 bg-white"><input type="checkbox" data-runit="'+Number(a.apparatus_id)+'" onchange="jfdSyncUnits()"> <b>'+esc(a.unit_number)+'</b><span class="text-xs text-slate-500">'+esc(a.apparatus_type||"")+'</span></label>').join("");
     const dispatch=card("Dispatch",'<p class="text-xs text-slate-500 mb-3">Dispatch/CAD information is kept separate from firefighter response information. CAD values are pre-populated when available and remain editable.</p><div class="grid md:grid-cols-2 lg:grid-cols-4 gap-3">'+
-      field("rCallArrival","Call Arrival",localDateTime(iForResponse?.call_arrival||iForResponse?.dispatch_time),"datetime-local")+
-      field("rCallAnswered","Call Answered",localDateTime(iForResponse?.call_answered||iForResponse?.dispatch_time),"datetime-local")+
-      field("rCallCreate","Call Create",localDateTime(iForResponse?.call_create||iForResponse?.dispatch_time),"datetime-local")+
+      field("rDispatchIncidentNumber","Dispatch Incident Number",iForResponse?.dispatch_incident_number||iForResponse?.cad||"","text","",true)+field("rCallArrival","Call Arrival",localDateTime(iForResponse?.call_arrival||iForResponse?.dispatch_time),"datetime-local","",true)+
+      field("rCallAnswered","Call Answered",localDateTime(iForResponse?.call_answered||iForResponse?.dispatch_time),"datetime-local","",true)+
+      field("rCallCreate","Call Create",localDateTime(iForResponse?.call_create||iForResponse?.dispatch_time),"datetime-local","",true)+
       field("rDispatch","Dispatch Time",localDateTime(iForResponse?.dispatch_time),"datetime-local")+
       '</div>');
     const response=card("Response",'<p class="text-xs text-slate-500 mb-3">Select the apparatus that actually responded. CAD/Active911 does not automatically select response units.</p><div class="grid md:grid-cols-2 gap-2">'+checks+'</div><div id="jfdUnitRows" class="space-y-2 mt-3"><p class="text-sm text-slate-500">Select responding apparatus above.</p></div><div class="mt-3 flex flex-wrap gap-2">'+btn("Refresh Crew","refreshReportApparatusCrews($('rDate')?.value||today())","primary")+'</div><div class="mt-4 border-t pt-4"><div id="reportOffDutyPersonnel">'+renderOffDutyPersonnel([])+'</div></div>');
@@ -1192,13 +1192,13 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     return card('<span class="text-blue-700">JASPER FIRE DEPARTMENT</span><div class="text-xs text-slate-500 font-semibold mt-1">PATIENT CARE REPORT</div>',
       '<div class="grid md:grid-cols-3 gap-3">'+
       field("rDate","Incident Date",/^\\d{4}-\\d{2}-\\d{2}/.test(String(i.dispatch_time||""))?String(i.dispatch_time).slice(0,10):"","date")+
-      field("rCad","CAD / Incident Number",i.cad||"")+
+      field("rCad","CAD / Incident Number",i.cad||"","text","",true)+
       select("rCall","Call Type",CALL_TYPES,call)+
-      field("rLocation","Location",i.location||"","text","md:col-span-3")+
+      field("rLocation","Location",i.location||"","text","md:col-span-3",true)+
       field("rLatitude","Latitude",i.latitude??"","number")+
       field("rLongitude","Longitude",i.longitude??"","number")+
       select("rShift","Shift",["A","B","C"],m.shift||"")+
-      jfdNerisSelect("rPrimaryIncidentType","Primary Incident Type",NERIS_INCIDENT_TYPES,d?.primary_incident_type||d?.neris_incident_type||d?.incident_type||"","md:col-span-2")+
+      jfdNerisSelect("rPrimaryIncidentType","Primary Incident Type",NERIS_INCIDENT_TYPES,d?.primary_incident_type||d?.neris_incident_type||d?.incident_type||"","md:col-span-2",true)+
       '<div class="md:col-span-3"><div id="jfdIncidentTypes"></div><button type="button" onclick="jfdAddIncidentType()" class="mt-2 bg-white border px-3 py-2 rounded-lg font-bold text-sm">+ Add Incident Type</button></div>'+
       '</div>');
   }
