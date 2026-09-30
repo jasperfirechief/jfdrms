@@ -1,0 +1,40 @@
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+
+const text=v=>String(v??"").replace(/\s+/g," ").trim();
+function flatten(v,p="",out=[]){if(v===null||v===undefined||v==="")return out;if(Array.isArray(v)){v.forEach((x,i)=>flatten(x,p+"["+i+"]",out));return out}if(typeof v==="object"){Object.entries(v).forEach(([k,x])=>flatten(x,p?(p+"."+k):k,out));return out}out.push((p?p+": ":"")+String(v));return out}
+function wrap(page,font,s,x,y,w,size=9,lh=12){const words=String(s||"").split(/\s+/);let line="";for(const word of words){const t=line?line+" "+word:word;if(font.widthOfTextAtSize(t,size)>w&&line){if(y<50)return y;page.drawText(line,{x,y,font,size,color:rgb(.1,.15,.2)});y-=lh;line=word}else line=t}if(line){page.drawText(line,{x,y,font,size,color:rgb(.1,.15,.2)});y-=lh}return y}
+function title(t){return String(t||"").startsWith("pcr_")?"PATIENT CARE REPORT":String(t||"").startsWith("fire_")?"FIRE INCIDENT REPORT":"INCIDENT REPORT"}
+async function makePdf(incident,reports){
+ const pdf=await PDFDocument.create(),font=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold),W=612,H=792,m=42;
+ let page=pdf.addPage([W,H]),y=H-m;
+ page.drawText("JASPER FIRE DEPARTMENT",{x:m,y,font:bold,size:18,color:rgb(.65,.02,.02)});y-=25;
+ page.drawText("GENERAL INCIDENT REPORT",{x:m,y,font:bold,size:12});y-=24;
+ page.drawText("CAD / Incident: "+text(incident?.cad||incident?.incident_number),{x:m,y,font:bold,size:10});y-=15;
+ page.drawText("Type: "+text(reports?.[0]?.data?.rPrimaryIncidentType||incident?.type||"Incident"),{x:m,y,font,size:10});y-=15;
+ page.drawText("Location: "+text(incident?.location||"Location not provided"),{x:m,y,font,size:10});y-=25;
+ page.drawText("PUBLIC INCIDENT SUMMARY",{x:m,y,font:bold,size:11});y-=18;
+ y=wrap(page,font,bold,reports.map(r=>r?.data?.rNarrative).filter(Boolean).join("\n\n")||"No narrative entered.",m,y,W-2*m,10,14);
+ y-=10;page.drawText("Detailed departmental information follows.",{x:m,y,font,size:8,color:rgb(.4,.4,.4)});
+ for(const rep of reports){
+   page=pdf.addPage([W,H]);y=H-m;
+   page.drawText("JASPER FIRE DEPARTMENT",{x:m,y,font:bold,size:16,color:rgb(.65,.02,.02)});y-=22;
+   page.drawText(title(rep?.report_type),{x:m,y,font:bold,size:13});y-=18;
+   page.drawText("CAD / Incident: "+text(incident?.cad||incident?.incident_number),{x:m,y,font,size:9});y-=22;
+   const lines=flatten(rep?.data||{});
+   for(const line of lines){if(y<55){page=pdf.addPage([W,H]);y=H-m}y=wrap(page,font,bold,line,m,y,W-2*m,8,11)}
+ }
+ page=pdf.addPage([W,H]);y=H-m;
+ page.drawText("JASPER FIRE DEPARTMENT",{x:m,y,font:bold,size:16,color:rgb(.65,.02,.02)});y-=22;
+ page.drawText("DEPARTMENT DETAIL / RECORD",{x:m,y,font:bold,size:13});y-=22;
+ for(const line of flatten({incident,report_count:reports.length,report_statuses:reports.map(r=>r?.status||"")})){if(y<55){page=pdf.addPage([W,H]);y=H-m}y=wrap(page,font,bold,line,m,y,W-2*m,8,11)}
+ return pdf.save()
+}
+export default async function handler(req,res){
+ if(req.method!=="POST")return res.status(405).json({ok:false,error:"Method not allowed"});
+ try{
+  const body=typeof req.body==="string"?JSON.parse(req.body):req.body||{};
+  const pdf=await makePdf(body.incident||{},Array.isArray(body.reports)?body.reports:[]);
+  res.setHeader("Content-Type","application/pdf");res.setHeader("Content-Disposition",'inline; filename="JFD Incident Report.pdf"');
+  return res.status(200).send(Buffer.from(pdf));
+ }catch(e){console.error("JFD report PDF error",e);return res.status(500).json({ok:false,error:e?.message||"Report generation failed"})}
+}
