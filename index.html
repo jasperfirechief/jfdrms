@@ -919,7 +919,7 @@ function buildNerisPayload(data){
       patient_care_report_id:String(p.careReport||data.rCad||incidentNumber||("JFD-P"+(i+1))),
       patient_care_evaluation:careMap[p.evaluation]||p.evaluation,
       ...(p.status?{patient_status:statusMap[p.status]||p.status}:{}),
-      ...(p.transportDisposition?{transport_disposition:transportMap[p.transportDisposition]||p.transportDisposition}:p.transport?{medical_disposition:transportMap[p.transport]||p.transport}:{})
+      ...(p.transportDisposition?{transport_disposition:transportMap[p.transportDisposition]||p.transportDisposition}:p.transport?{transport_disposition:transportMap[p.transport]||p.transport}:{})
     }));
   }
   const hazardIncident=incidentTypes.some(x=>/^HAZSIT\\|/.test(String(x)));
