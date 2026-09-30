@@ -1279,7 +1279,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       box.innerHTML=(window.jfdAids[kind]||[]).map((x,i)=>{
         const title=kind==="fd"?"Fire Department Aid":"Non-Fire Department Aid";
         const removeAttr="jfdRemoveAid("+JSON.stringify(kind)+","+i+")";
-        return "<div><b>"+title+" "+(i+1)+"</b><button type=\"button\" data-aid-kind=\""+kind+"\" data-aid-index=\""+i+"\" onclick=\"jfdRemoveAid(this.dataset.aidKind,Number(this.dataset.aidIndex))\">Remove</button></div>";
+        return `<div><b>${title} ${i+1}</b><button type="button" data-aid-kind="${esc(kind)}" data-aid-index="${i}" onclick="jfdRemoveAid(this.dataset.aidKind,Number(this.dataset.aidIndex))">Remove</button></div>`;
       }).join("");
     };
     render("fd","jfdFdAid");render("nonfd","jfdNonFdAid");
