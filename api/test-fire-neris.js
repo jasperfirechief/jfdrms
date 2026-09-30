@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { makePdf } from "./report-pdf.js";
 
 const BASE_URL=String(process.env.NERIS_BASE_URL||"https://api-test.neris.fsri.org/v1").replace(/\/$/,"");
 const CLIENT_ID=String(process.env.NERIS_CLIENT_ID||"");
@@ -38,14 +38,9 @@ export default async function handler(req,res){
     const st=await sr.text();let sd;try{sd=JSON.parse(st)}catch{sd={raw:st}};
     if(!sr.ok)return res.status(502).json({ok:false,stage:"submit",status:sr.status,details:sd,payload:p});
     const reportData={rCad:"JFD-TEST-FIRE-20260930-01",rCall:"STRUCTURE FIRE",rDate:"2026-09-27",rShift:"A",rLocation:"701 5TH ST W, JASPER, AL",rLatitude:"33.846481",rLongitude:"-87.283454",rPrimaryIncidentType:"FIRE||STRUCTURE_FIRE||STRUCTURAL_INVOLVEMENT_FIRE",rLocationType:"RESIDENCE",rFireLoc:"Structure",rCondition:"Smoke and Fire Showing",rDamageType:"Moderate",rCause:"Operating Equipment",rWater:"Tank Water",rInvestigation:"No",rNarrative:"TEST ONLY - JFD RMS NERIS test submission. Structure fire test; no real incident reporting. Test record created for integration validation.",responding_apparatus:[{unit_number:"JA",times:{enroute:"2026-09-30T06:51:00Z",on_scene:"2026-09-30T06:54:00Z",clear:"2026-09-30T07:05:00Z"},crew:[]}]};
-    const pdfDoc=await PDFDocument.create(),reg=await pdfDoc.embedFont(StandardFonts.Helvetica),bold=await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    const page=pdfDoc.addPage([612,792]);let y=748;
-    page.drawText("JASPER FIRE DEPARTMENT",{x:42,y,font:bold,size:20,color:rgb(.65,.02,.02)});y-=28;
-    page.drawText("FIRE INCIDENT REPORT • NERIS TEST",{x:42,y,font:bold,size:13});y-=24;
-    for(const [label,value] of [["CAD / Incident","JFD-TEST-FIRE-20260930-01"],["Call Type","STRUCTURE FIRE"],["Location","701 5TH ST W, JASPER, AL"],["Incident Type","FIRE — STRUCTURE FIRE — STRUCTURAL INVOLVEMENT FIRE"],["Date","09/30/2026"],["Arrival Condition","Smoke and Fire Showing"],["Damage","Moderate"],["Cause","Operating Equipment"],["Narrative",reportData.rNarrative]]){page.drawText(label,{x:42,y,font:bold,size:8});y-=11;const words=String(value||"").split(/\\s+/);let line="";for(const word of words){const tt=line?line+" "+word:word;if(reg.widthOfTextAtSize(tt,9)>510&&line){page.drawText(line,{x:42,y,font:reg,size:9});y-=12;line=word}else line=tt}if(line){page.drawText(line,{x:42,y,font:reg,size:9});y-=12}y-=5;}
-    page.drawText("NERIS TEST SUBMISSION",{x:42,y,font:bold,size:11});y-=16;page.drawText("Validation and submission were performed against the NERIS test environment.",{x:42,y,font:reg,size:8});
-    const pdf=await pdfDoc.save();
-    if(BREVO_API_KEY&&BREVO_FROM_EMAIL){
+    const incident={cad:"JFD-TEST-FIRE-20260930-01",type:"STRUCTURE FIRE",location:"701 5TH ST W, JASPER, AL",dispatch_time:"2026-09-30T06:50:00Z",latitude:33.846481,longitude:-87.283454};
+    const report={report_type:"fire_neris_v2",status:"submitted_to_neris",data:{rCad:"JFD-TEST-FIRE-20260930-01",rCall:"STRUCTURE FIRE",rDate:"2026-09-30",rShift:"A",rLocation:incident.location,rLatitude:"33.846481",rLongitude:"-87.283454",rPrimaryIncidentType:"FIRE||STRUCTURE_FIRE||STRUCTURAL_INVOLVEMENT_FIRE",rLocationType:"RESIDENCE",rFireLoc:"Structure",rCondition:"Smoke and Fire Showing",rDamageType:"Moderate",rCause:"Operating Equipment",rWater:"Tank Water",rInvestigation:"No",rNarrative:"TEST ONLY - JFD RMS NERIS test submission. Structure fire test; no real incident reporting. Test record created for integration validation.",rSmokePresence:"Present",rFireAlarm:"Not Present",rOtherAlarm:"Not Applicable",rSuppression:"Not Present",responding_apparatus:[{unit_number:"JA",times:{enroute:"2026-09-30T06:51:00Z",on_scene:"2026-09-30T06:54:00Z",clear:"2026-09-30T07:05:00Z"},crew:[]}]}}; 
+    const pdf=await makePdf(incident,[report]);    if(BREVO_API_KEY&&BREVO_FROM_EMAIL){
       const er=await fetch("https://api.brevo.com/v3/smtp/email",{method:"POST",headers:{"api-key":BREVO_API_KEY,"Content-Type":"application/json","accept":"application/json"},body:JSON.stringify({sender:{email:BREVO_FROM_EMAIL,name:"Jasper Fire Department"},to:[{email:"firechief@jaspercity.com"}],subject:"JFD RMS TEST - Fire Report - NERIS JFD-TEST-FIRE-20260930-01",textContent:"JFD RMS test fire report. NERIS validation and test submission succeeded. Attached is the fire report PDF.",attachment:[{content:Buffer.from(pdf).toString("base64"),name:"JFD-TEST-FIRE-20260930-01 - JFD Fire Report - NERIS TEST.pdf"}]})});
       const et=await er.text();let ed;try{ed=JSON.parse(et)}catch{ed={raw:et}};
       return res.status(er.ok?200:502).json({ok:er.ok,neris_incident_id:sd?.uid||sd?.neris_id||sd?.incident?.uid||sd?.incident?.neris_id||null,neris_response:sd,email:er.ok?ed:null,email_error:er.ok?null:ed});
