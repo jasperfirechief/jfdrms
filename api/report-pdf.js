@@ -23,7 +23,7 @@ export async function makePdf(incident={},reports=[]){
  const patients=pcr.flatMap(r=>Array.isArray(r?.data?.patients)?r.data.patients:[]);
 
  // PAGE 1: actual report-facing/basic information, not technical NERIS detail.
- top("FIRE INCIDENT REPORT","Page 1 contains the incident/property information intended for the owner, occupant, insurance documentation, and basic incident record.");
+ top("FIRE INCIDENT REPORT","Front page of the JFD paper Fire Incident Report.");
  heading("INCIDENT INFORMATION");
  kv("CAD / Incident Number",incident.cad||fd.rCad);
  kv("Incident Date",date(fd.rDate||incident.dispatch_time));
@@ -53,8 +53,23 @@ export async function makePdf(incident={},reports=[]){
  const vehicles=Array.isArray(fd.vehicles)?fd.vehicles:[];
  if(vehicles.length){heading("VEHICLE / PROPERTY INVOLVED");vehicles.forEach((v,i)=>{kv("Vehicle #"+(i+1),[v.year,v.make,v.model,v.vehicle,v.description].filter(Boolean).join(" "));kv("Owner",v.owner);kv("Insurance",v.insurance);kv("License / VIN",v.vin||v.license||v.license_vin)})}
  else {heading("VEHICLE / PROPERTY INVOLVED");kv("Vehicle #1",fd.rVehicle1);kv("Year",fd.rYear1);kv("Make",fd.rMake1);kv("Model",fd.rModel1);kv("License / VIN",fd.rVin1)}
- heading("BASIC INCIDENT DESCRIPTION");
- wrap(fd.rNarrative||incident.narrative||"No basic incident description was entered.",9,13);
+ heading("INCIDENT ACTION / RESPONSE");
+ kv("Action Taken",fd.rActionTaken||fd.action_taken);
+ kv("No Action Taken",fd.rNoActionTaken||fd.no_action_taken);
+ kv("Actions / Tactics",Array.isArray(fd.actions_taken)?fd.actions_taken.join(", "):fd.rActionsTaken);
+ kv("Water Supply",fd.rWater||fd.water_supply);
+ kv("Investigation",fd.rInvestigation||fd.investigation);
+ kv("Fire Location",fd.rFireLoc||fd.fire_location);
+ kv("Floor / Room", [fd.rFloor||fd.floor_of_origin,fd.rRoom||fd.room_type].filter(Boolean).join(" / "));
+ kv("Condition",fd.rCondition||fd.condition);
+ kv("Cause",fd.rCause||fd.cause);
+ kv("Alarms / Suppression", [fd.rFireAlarm,fd.rOtherAlarm,fd.rSuppression,fd.rCookingSuppression].filter(Boolean).join(" / "));
+ kv("Exposures",Array.isArray(fd.exposures)?fd.exposures.map(x=>typeof x==="object"?JSON.stringify(x):x).join("; "):fd.exposures);
+ kv("Casualties / Rescues",Array.isArray(fd.casualties)?fd.casualties.map(x=>typeof x==="object"?JSON.stringify(x):x).join("; "):fd.casualties);
+ kv("Hazards / HAZMAT",Array.isArray(fd.hazards)?fd.hazards.map(x=>typeof x==="object"?JSON.stringify(x):x).join("; "):fd.hazards||fd.rHazmat);
+ heading("NARRATIVE");
+ wrap(fd.rNarrative||incident.narrative||"No narrative entered.",9,13);
+ kv("Person Completing Report",fd.rCompletedBy||fd.completedBy||fd.report_completed_by);
  page.drawText("JFD RMS • Fire Incident Report • Page 1",{x:m,y:38,font:F.reg,size:7,color:rgb(.4,.4,.4)});
 
  // Technical fire record.
@@ -88,7 +103,7 @@ export async function makePdf(incident={},reports=[]){
  // Every patient gets a separate page group. No other patient's information is placed on that group.
  for(let i=0;i<patients.length;i++){
    const p=patients[i]||{};
-   top("PATIENT CARE REPORT","Patient "+(i+1)+" • This page group contains information for this patient only.");
+   top("PATIENT CARE REPORT","Patient "+(i+1)+" • Front page of the JFD paper Patient Care Report. This page group contains information for this patient only.");
    heading("PATIENT INFORMATION");
    kv("Patient Name",p.name);kv("Date of Birth",date(p.dob));kv("Age",p.age);kv("Sex",p.sex);kv("Patient Address",p.address);kv("Patient Phone",p.phone);
    kv("Incident / CAD",incident.cad||fd.rCad);kv("Incident Date",date(fd.rDate||incident.dispatch_time));kv("Incident Time",time(fd.rDateTime||fd.rDispatch||incident.dispatch_time));kv("Incident Location",fd.rLocation||incident.location);
@@ -110,6 +125,11 @@ export async function makePdf(incident={},reports=[]){
    kv("Transporting Agency / Unit",p.transportAgency||p.transportUnit||p.vehicle);
    kv("Destination",p.destination);
    kv("Disposition Narrative",p.dispositionNarrative);
+   kv("Vehicle / Insurance",p.vehicleInfo||p.vehicleInsurance||p.insurance);
+   kv("Equipment Used / Replaced",p.equipmentUsed||p.equipmentReplaced||p.equipment);
+   heading("NARRATIVE");
+   wrap(p.narrative||p.comments||"No narrative entered.",9,13);
+   kv("Person Completing Report",p.completedBy||p.reportCompletedBy||p.provider||"JFD RMS user / electronic record");
    if(p.refusedCare||p.refusedTransport||p.minorRefusal){
      heading("REFUSAL / SIGNATURES");
      kv("Refusal Type",[p.refusedCare?"Refused Care":"",p.refusedTransport?"Refused Transport":"",""].filter(Boolean).join(", ")||"Minor refusal");
