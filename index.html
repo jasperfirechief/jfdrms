@@ -1362,6 +1362,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     if(errors.length)return {ok:false,errors};
     return {ok:true,errors:[]};
   };
+  window.jfdNerisSelect=jfdNerisSelect;window.NERIS_INCIDENT_TYPES=NERIS_INCIDENT_TYPES;window.NERIS_LOCATION_TYPES=NERIS_LOCATION_TYPES;window.NERIS_LOCATION_USES=NERIS_LOCATION_USES;window.repeatedSection=repeatedSection;
   // Keep the normal report-type chooser. Patient-first workflow is handled inside the PCR form itself.
 })();
 
