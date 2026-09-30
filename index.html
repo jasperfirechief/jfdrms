@@ -418,7 +418,8 @@ async function adminSubmitReport(cad,idx){
   if(profile?.app_role!=="admin")return alert("Administrator access required.");
   const r=await db.from("incidents").select("reports").eq("cad",cad).maybeSingle();if(r.error||!r.data)return alert(r.error?.message||"Incident not found.");
   const reports=Array.isArray(r.data.reports)?r.data.reports:[],rep=reports[idx];if(!rep)return alert("Report not found.");
-  const validation=await validateReportForNeris(rep.data,true);if(!validation.ok)return alert("Validation failed:\n"+validation.errors.join("\n"));
+  const validation=await validateIncidentForNeris(rep.report_type==="fire_neris_v2"?"fire":"pcr",rep.data,Number((await db.from("incident_details").select("incident_id").eq("incident_id",Number((await db.from("incidents").select("id").eq("cad",cad).maybeSingle()).data?.id||0)).maybeSingle()).data?.incident_id||0),cad);
+  if(!validation.ok)return alert("NERIS review cannot proceed until these required fields are completed:\n\n"+validation.errors.join("\n"));
   if(!confirm("Validation passed. Submit this report to NERIS?"))return;
   const incident=await db.from("incidents").select("*").eq("cad",cad).maybeSingle();
   if(incident.error||!incident.data)return alert(incident.error?.message||"Incident not found.");
@@ -1196,6 +1197,53 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   const NERIS_INVESTIGATION_TYPES=[{"value":"INVESTIGATED_ON_SCENE_RESOURCE","label":"Investigated By On-Scene Operational Resources"},{"value":"INVESTIGATED_BY_ARSON_FIRE_INVESTIGATOR","label":"Investigated By Formal Arson / Fire Investigator"},{"value":"INVESTIGATED_BY_OUTSIDE_AGENCY","label":"Investigated By Outside Fire Agency"},{"value":"INVESTIGATED_BY_STATE_FIRE_MARSHAL","label":"Investigated By State Fire Marshal"},{"value":"INVESTIGATED_BY_INSURANCE","label":"Investigated By Insurance"},{"value":"INVESTIGATED_BY_NONFIRE_LAW_ENFORCEMENT","label":"Investigated By Law Enforcement (Nonfire)"},{"value":"INVESTIGATED_BY_OTHER","label":"Investigated By Other"}];
   const NERIS_DISPLACE_CAUSES=[{"value":"FIRE","label":"Fire"},{"value":"SMOKE","label":"Smoke"},{"value":"WATER","label":"Water"},{"value":"UTILITIES","label":"Utilities"},{"value":"HAZARDOUS_SITUATION","label":"Hazardous Situation"},{"value":"COLLAPSE","label":"Collapse"},{"value":"OTHER","label":"Other"}];
   const NERIS_ACTION_TACTICS=[{"value":"EMERGENCY_MEDICAL_CARE","label":"Emergency Medical Care"},{"value":"COMMAND_AND_CONTROL","label":"Command And Control"},{"value":"FORCIBLE_ENTRY","label":"Forcible Entry"},{"value":"INVESTIGATION","label":"Investigation"},{"value":"SUPPRESSION","label":"Suppression"},{"value":"CONTAINMENT","label":"Containment"},{"value":"VENTILATION","label":"Ventilation"},{"value":"SEARCH_STRUCTURE","label":"Search Structure"},{"value":"NON_STRUCTURE_SEARCH","label":"Non-Structure Search"},{"value":"SALVAGE_AND_OVERHAUL","label":"Salvage And Overhaul"},{"value":"PERSONNEL_CONTAMINATION_REDUCTION","label":"Personnel Contamination Reduction"},{"value":"HAZARDOUS_SITUATION_MITIGATION","label":"Hazardous Situation Mitigation"},{"value":"PROVIDE_EVACUATION_SUPPORT","label":"Provide Evacuation Support"},{"value":"PROVIDE_EQUIPMENT","label":"Provide Equipment"},{"value":"PROVIDE_SERVICES","label":"Provide Services"},{"value":"INFORMATION_ENFORCEMENT","label":"Information / Enforcement"}];
+  function jfdNerisBadge(label){return '<span class="ml-2 inline-flex items-center rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide">NERIS Required</span>';}
+  function jfdMarkNerisRequired(ids){
+    (ids||[]).forEach(id=>{
+      const el=$(id); const lab=el?.closest("label");
+      if(lab&&!lab.querySelector(".jfd-neris-badge")){
+        const b=document.createElement("span"); b.className="jfd-neris-badge ml-2 inline-flex items-center rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide"; b.textContent="NERIS Required"; lab.appendChild(b);
+        if(el.tagName==="INPUT"||el.tagName==="SELECT"||el.tagName==="TEXTAREA") el.required=true;
+      }
+    });
+  }
+  function jfdNerisRequirementPanel(){
+    return '<div id="jfdNerisRequirements" class="md:col-span-2 border-2 border-red-200 bg-red-50 rounded-xl p-4"><div class="flex items-center gap-2"><b class="text-red-800">NERIS Required Fields</b><span class="text-[10px] font-black uppercase bg-red-100 text-red-700 rounded-full px-2 py-0.5">Dynamic</span></div><p class="text-xs text-red-800 mt-1">Required fields change with the selected incident type(s). Fields marked below are required for NERIS submission; conditional fields are shown when their incident type applies.</p><div id="jfdNerisRequirementList" class="mt-3 grid md:grid-cols-2 gap-2"></div></div>';
+  }
+  function jfdUpdateNerisRequirements(){
+    const box=$("jfdNerisRequirementList"); if(!box)return;
+    const types=[ $("rPrimaryIncidentType")?.value, ...[...document.querySelectorAll("[id^='rIncidentType_']")].map(x=>x.value) ].filter(Boolean);
+    const upper=types.join(" ").toUpperCase();
+    const rows=[
+      ["rCad","Incident / CAD number"],
+      ["rLocation","Incident location"],
+      ["rCallArrival","Call Arrival time"],
+      ["rCallAnswered","Call Answered time"],
+      ["rCallCreate","Call Create time"]
+    ];
+    if(types.length) rows.push(["rPrimaryIncidentType","Primary incident type"]);
+    if(types.length){
+      const responders=document.querySelectorAll("[data-unit-row]").length;
+      box.innerHTML=rows.map(([id,label])=>'<div class="bg-white border border-red-100 rounded-lg px-3 py-2 text-sm"><b>'+esc(label)+'</b><span class="text-red-700 text-xs ml-2">NERIS Required</span></div>').join("");
+    }else{
+      box.innerHTML='<div class="text-sm text-red-800 md:col-span-2">Select a NERIS incident type to display its conditional requirements.</div>';
+    }
+    if(/\bFIRE\|/.test(upper)||types.some(x=>x==="FIRE")){
+      const fire=[["rFireLoc","Fire Location"],["rCondition","Arrival Condition"],["rDamageType","Damage Type"],["rWater","Water Supply"],["rInvestigation","Investigation Required?"]];
+      rows.push(...fire);
+      if(/STRUCTURE_FIRE/.test(upper)||/CONFINED_COOKING_APPLIANCE_FIRE/.test(upper)){
+        rows.push(["rSmokePresence","Smoke Alarm"],["rFireAlarm","Fire Alarm"],["rOtherAlarm","Other Alarm"],["rSuppression","Fire Suppression"]);
+      }
+      if(/CONFINED_COOKING_APPLIANCE_FIRE/.test(upper))rows.push(["rCookingSuppression","Cooking Fire Suppression"]);
+    }
+    if(/HAZSIT\|/.test(upper))rows.push(["rHazDisposition","Hazardous Situation Disposition"],["rHazEvacuated","People Evacuated"]);
+    if(/MEDICAL\|/.test(upper))rows.push(["jfdPatientRequired","At least one Patient Care Report / patient"],["jfdPatientChiefRequired","Patient chief complaint"],["jfdPatientEvaluationRequired","Patient care evaluation"],["jfdPatientDispositionRequired","Patient disposition"]);
+    const list=$("jfdNerisRequirementList");
+    list.innerHTML=rows.map(([id,label])=>'<div class="bg-white border border-red-100 rounded-lg px-3 py-2 text-sm"><b>'+esc(label)+'</b><span class="text-red-700 text-xs ml-2">NERIS Required</span></div>').join("");
+    const ids=rows.map(x=>x[0]).filter(x=>x.startsWith("r"));
+    jfdMarkNerisRequired(ids);
+    if(/HAZSIT\|/.test(upper))jfdMarkNerisRequired(["rHazDisposition","rHazEvacuated"]);
+  }
   function fireDetails(i,d){
     return card("Fire Details",'<div class="grid md:grid-cols-2 gap-3">'+
       select("rFireLoc","Fire Location",["Structure","Outside"],d?.fire_location||"")+field("rFloor","Floor of Origin",d?.floor_of_origin||"")+
@@ -1212,8 +1260,8 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   }
   window.jfdIncidentTypes=[];
   window.jfdAids={fd:[],nonfd:[]};
-  window.jfdAddIncidentType=function(){window.jfdIncidentTypes.push("");jfdRenderIncidentTypes();};
-  window.jfdRemoveIncidentType=function(i){window.jfdIncidentTypes.splice(i,1);jfdRenderIncidentTypes();};
+  window.jfdAddIncidentType=function(){window.jfdIncidentTypes.push("");jfdRenderIncidentTypes();jfdUpdateNerisRequirements();};
+  window.jfdRemoveIncidentType=function(i){window.jfdIncidentTypes.splice(i,1);jfdRenderIncidentTypes();jfdUpdateNerisRequirements();};
   function jfdRenderIncidentTypes(){
     const box=$("jfdIncidentTypes");if(!box)return;
     box.innerHTML=(window.jfdIncidentTypes||[]).map((v,i)=>'<div class="flex items-end gap-2 mb-2"><div class="flex-1">'+jfdNerisSelect("rIncidentType_"+i,"Incident Type "+(i+2),NERIS_INCIDENT_TYPES,v)+'</div><button type="button" onclick="jfdRemoveIncidentType('+i+')" class="border px-3 py-2 rounded-lg text-sm font-bold text-red-600">Remove</button></div>').join("");
@@ -1278,14 +1326,17 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       '</div>');
     window.jfdIncidentTypes=(d?.incident_types||[]).filter(Boolean);
     if(!window.jfdIncidentTypes.length&&d?.secondary_incident_type)window.jfdIncidentTypes=[d.secondary_incident_type];
-    h+=card("Actions Taken",'<div class="space-y-3">'+
+    h+=jfdNerisRequirementPanel()+
+      h+=card("Actions Taken",'<div class="space-y-3">'+
       '<div class="flex flex-wrap gap-5">'+
       '<label class="flex items-center gap-2 text-sm font-semibold"><input id="rActionTaken" type="checkbox" '+(d?.action_taken?"checked":"")+' onchange="jfdRenderActionControls()"> Action Taken</label>'+
       '<label class="flex items-center gap-2 text-sm font-semibold"><input id="rNoActionTaken" type="checkbox" '+(d?.no_action_taken?"checked":"")+' onchange="jfdRenderActionControls()"> No Action Taken</label>'+
       '</div><div id="jfdActionControls"></div></div>');
-    setTimeout(()=>{jfdRenderIncidentTypes();jfdRenderActionControls();},0);
+    setTimeout(()=>{jfdRenderIncidentTypes();jfdRenderActionControls();jfdUpdateNerisRequirements();},0);
     
     h+=fireDetails(i,d);
+    h+=card("Hazardous Situation Details",'<div class="grid md:grid-cols-2 gap-3"><label class="text-sm font-semibold">Hazardous Situation Disposition<span class="ml-2 text-[10px] font-black uppercase text-red-700">NERIS Required when HazSit</span><select id="rHazDisposition" class="w-full border rounded p-2 mt-1"><option value="">Select...</option><option value="COMPLETED_FIRE_SERVICE_ONLY">Completed Fire Service Only</option><option value="REFERRED_TO_OTHER_AGENCY">Referred To Other Agency</option><option value="OTHER">Other</option></select></label><label class="text-sm font-semibold">People Evacuated<span class="ml-2 text-[10px] font-black uppercase text-red-700">NERIS Required when HazSit</span><input id="rHazEvacuated" type="number" min="0" value="" class="w-full border rounded p-2 mt-1"></label><label class="text-sm font-semibold">Chemical Name(s)<input id="rChemicalName" class="w-full border rounded p-2 mt-1"></label><label class="text-sm font-semibold">Chemical DOT Class(es)<input id="rChemicalClass" class="w-full border rounded p-2 mt-1"></label><label class="text-sm font-semibold">Chemical Release Occurred<select id="rChemicalRelease" class="w-full border rounded p-2 mt-1"><option value="">Select...</option><option value="Yes">Yes</option><option value="No">No</option></select></label></div>');
+
     h+=repeatedSection("Exposures","exposures","Exposure",window.jfdRepeats.exposures,x=>x);
     h+=repeatedSection("Casualties / Rescues","casualties","Casualty / Rescue",window.jfdRepeats.casualties,x=>x);
     h+=repeatedSection("Hazards","hazards","Hazard",window.jfdRepeats.hazards,x=>x);
@@ -1322,11 +1373,12 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   function pcrFormNew(i,d,m,unitRows){
     const saved=d?.patients||d?.pcr?.patients||[];
     let h=pcrIncidentHeader(i,d,m);
+    h+=jfdNerisRequirementPanel();
     h+=card("PATIENTS",'<div id="jfdPatients"></div><div class="mt-3 flex flex-wrap gap-2">'+btn("+ Add Patient","jfdAddPatient({})","primary")</div>');
     h+=responseUi(unitRows,i);
     h+=card("Report Completion",field("rCompletedBy","Report Completed By",(d?.completed_by)||((profile?.first_name||"")+" "+(profile?.last_name||""))));
     h+=actionBar("pcr");
-    setTimeout(()=>{jfdRenderPatients(saved);jfdBindSignaturePads();},0);
+    setTimeout(()=>{jfdRenderPatients(saved);jfdBindSignaturePads();jfdUpdateNerisRequirements();},0);
     return h;
   }
   window.fireReportForm=fireFormNew;
@@ -1349,19 +1401,23 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     const hasFire=types.some(x=>/^FIRE\\|/.test(String(x))||x==="FIRE"),hasStructure=types.some(x=>/^FIRE\\|\\|STRUCTURE_FIRE/.test(String(x)));
     const hasHaz=types.some(x=>/^HAZSIT\\|/.test(String(x))),hasMed=types.some(x=>/^MEDICAL\\|/.test(String(x)));
     if(hasFire){
-      if(!data.rFireLoc)errors.push("Fire incidents require Fire Location.");
-      if(!data.rCondition)errors.push("Fire incidents require Arrival Condition.");
-      if(!data.rDamageType)errors.push("Fire incidents require Damage Type.");
+      if(!data.rFireLoc)errors.push("NERIS Required: Fire Location.");
+      if(!data.rCondition)errors.push("NERIS Required: Arrival Condition.");
+      if(!data.rDamageType)errors.push("NERIS Required: Damage Type.");
+      if(!data.rWater)errors.push("NERIS Required: Water Supply.");
+      if(!data.rInvestigation)errors.push("NERIS Required: Investigation Required?.");
+      if(!data.rCause)errors.push("NERIS Required: Cause.");
+      if(!data.rRoom)errors.push("NERIS Required: Room Type.");
     }
     if(hasStructure){
       ["rSmokePresence","rFireAlarm","rOtherAlarm","rSuppression"].forEach(id=>{if(!data[id])errors.push("Structure fire requires "+id.replace(/^r/,"")+" to be documented.");});
       if(types.some(x=>/CONFINED_COOKING_APPLIANCE_FIRE/.test(String(x)))&&!data.rCookingSuppression)errors.push("Confined cooking appliance fires require Cooking Fire Suppression to be documented.");
     }
     if(hasHaz){
-      if(!data.rHazDisposition)errors.push("Hazardous situations require Hazardous Situation Disposition.");
-      if(data.rHazEvacuated==="")errors.push("Hazardous situations require the number of people evacuated.");
+      if(!data.rHazDisposition)errors.push("NERIS Required: Hazardous Situation Disposition.");
+      if(data.rHazEvacuated===""||data.rHazEvacuated===undefined)errors.push("NERIS Required: People Evacuated.");
     }
-    if(hasMed&&!((data.patients||[]).length))errors.push("Medical incidents require at least one patient.");
+    if(hasMed&&!((data.patients||[]).length))errors.push("NERIS Required: At least one patient is required for a medical incident.");
     if(window.currentReportKind==="pcr"){data.patients=collectPatients();data.rNarrative=(data.patients||[]).map(p=>p.narrative).filter(Boolean).join("\n\n");}
     data.incident_types=[data.rPrimaryIncidentType,...[...document.querySelectorAll("[id^='rIncidentType_']")].map(x=>x.value).filter(Boolean)];
     data.action_taken=$("rActionTaken")?.checked===true;data.no_action_taken=$("rNoActionTaken")?.checked===true;
@@ -1414,7 +1470,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     if(errors.length)return {ok:false,errors};
     return {ok:true,errors:[]};
   };
-  window.jfdNerisSelect=jfdNerisSelect;window.NERIS_INCIDENT_TYPES=NERIS_INCIDENT_TYPES;window.NERIS_LOCATION_TYPES=NERIS_LOCATION_TYPES;window.NERIS_LOCATION_USES=NERIS_LOCATION_USES;window.repeatedSection=repeatedSection;
+  window.jfdNerisSelect=jfdNerisSelect;window.jfdUpdateNerisRequirements=jfdUpdateNerisRequirements;window.NERIS_INCIDENT_TYPES=NERIS_INCIDENT_TYPES;window.NERIS_LOCATION_TYPES=NERIS_LOCATION_TYPES;window.NERIS_LOCATION_USES=NERIS_LOCATION_USES;window.repeatedSection=repeatedSection;
   // Keep the normal report-type chooser. Patient-first workflow is handled inside the PCR form itself.
 })();
 
