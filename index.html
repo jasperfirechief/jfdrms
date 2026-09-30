@@ -478,6 +478,17 @@ async function validateIncidentForNeris(currentKind,currentData,incidentId,cad){
   if(!narrative)warnings.push("Outcome narrative is highly desired by NERIS and should be completed when information is available.");
   return {ok:errors.length===0,errors,warnings,incidentNumber,dispatchNumber};
 }
+async function validateNerisPayloadWithApi(data){
+  const payload=buildNerisPayload(data);
+  const r=await fetch("/api/neris",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"validate",payload})});
+  let body={};try{body=await r.json();}catch{}
+  if(r.ok&&body.ok!==false)return {ok:true,errors:[],details:body.details||null};
+  const raw=body?.details;
+  const errors=[];
+  const add=(v)=>{if(v===null||v===undefined||v==="")return;if(Array.isArray(v))v.forEach(add);else if(typeof v==="object"){if(v.message)add(v.message);else if(v.msg)add(v.msg);else if(v.detail)add(v.detail);else Object.values(v).forEach(add);}else errors.push(String(v));};
+  add(body?.error);add(raw);
+  return {ok:false,errors:[...new Set(errors)].filter(Boolean).slice(0,20)};
+}
 function validateReportForNeris(data,apiChecked=false){return {ok:!!data,errors:[],warnings:[]};}
 function addNerisTypeField(){
   const anchor=$("rCall");if(!anchor||$("rNerisType"))return;
@@ -846,7 +857,7 @@ function buildNerisPayload(data){
       outcome_narrative:data.rNarrative||""
     },
     dispatch:{
-      incident_number:String(incidentNumber),
+      incident_number:String(data.rDispatchIncidentNumber||incidentNumber),
       call_arrival:callArrival,
       call_answered:callAnswered,
       call_create:callCreate,
@@ -854,6 +865,41 @@ function buildNerisPayload(data){
       unit_responses:units
     }
   };
+  const structureIncident=incidentTypes.some(x=>/STRUCTURE_FIRE|STRUCTURAL_INVOLVEMENT|ROOM_AND_CONTENTS_FIRE|CONFINED_COOKING_APPLIANCE_FIRE|CHIMNEY_FIRE/.test(String(x)));
+  const fireIncident=incidentTypes.some(x=>/^FIRE\\|/.test(String(x))||/^FIRE$/.test(String(x)));
+  const mapWater={Hydrant:"HYDRANT_GREATER_500", "Tank Water":"TANK_WATER", Shuttle:"WATER_TENDER_SHUTTLE", "Nurse from Other Apparatus":"NURSE_OTHER_APPARATUS", "Draft from Static Source":"DRAFT_FROM_STATIC_SOURCE", "Supply From Fire Boat":"SUPPLY_FROM_FIRE_BOAT", "Foam / Water Additive":"FOAM_ADDITIVE"};
+  const mapCondition={"No Smoke/Fire Showing":"NO_SMOKE_FIRE_SHOWING","Smoke Showing":"SMOKE_SHOWING","Smoke and Fire Showing":"SMOKE_FIRE_SHOWING","Structure Involved":"STRUCTURE_INVOLVED","Fire Spread Beyond Structure":"FIRE_SPREAD_BEYOND_STRUCTURE","Fire Out Upon Arrival":"FIRE_OUT_UPON_ARRIVAL"};
+  const mapDamage={"No Damage":"NO_DAMAGE",Minor:"MINOR_DAMAGE",Moderate:"MODERATE_DAMAGE",Major:"MAJOR_DAMAGE"};
+  const mapRoom={Assembly:"ASSEMBLY",Bathroom:"BATHROOM",Bedroom:"BEDROOM",Kitchen:"KITCHEN","Living Space":"LIVING_SPACE","Hallway/Foyer":"HALLWAY_FOYER",Garage:"GARAGE","Balcony/Porch/Deck":"BALCONY_PORCH_DECK",Basement:"BASEMENT",Attic:"ATTIC",Office:"OFFICE","Utility Room":"UTILITY_ROOM",Other:"OTHER",Unknown:"UNKNOWN"};
+  const mapCause={"Operating Equipment":"OPERATING_EQUIPMENT",Electrical:"ELECTRICAL","Battery/Power Storage":"BATTERY_POWER_STORAGE","Heat From Another Object":"HEAT_FROM_ANOTHER_OBJECT","Explosives/Fireworks":"EXPLOSIVES_FIREWORKS","Smoking Materials/Illicit Drugs":"SMOKING_MATERIALS_ILLICIT_DRUGS","Open Flame":"OPEN_FLAME",Cooking:"COOKING",Chemical:"CHEMICAL","Act Of Nature":"ACT_OF_NATURE",Incendiary:"INCENDIARY","Other Heat Source":"OTHER_HEAT_SOURCE","Unable to be Determined":"UNABLE_TO_BE_DETERMINED"};
+  const mapInvest={Yes:"YES",No:"NO"};
+  if(fireIncident){
+    const fire={};
+    if(data.rWater)fire.fire_water_supply=mapWater[data.rWater]||data.rWater;
+    if(data.rInvestigation)fire.fire_investigation_need=mapInvest[data.rInvestigation]||data.rInvestigation;
+    if(data.rInvestigationType)fire.fire_investigation_type=Array.isArray(data.rInvestigationType)?data.rInvestigationType:[data.rInvestigationType];
+    if(structureIncident){
+      fire.structure_arrival_conditions=mapCondition[data.rCondition]||data.rCondition;
+      if(data.rDamageType)fire.structure_damage=mapDamage[data.rDamageType]||data.rDamageType;
+      if(data.rFloor!==undefined&&data.rFloor!=="")fire.structure_floor_of_origin=Number(data.rFloor);
+      if(data.rRoom)fire.structure_room_of_origin=mapRoom[data.rRoom]||data.rRoom;
+      if(data.rCause)fire.structure_fire_cause=mapCause[data.rCause]||data.rCause;
+    }else if(data.rCause){
+      fire.outside_fire_cause=mapCause[data.rCause]||data.rCause;
+      if(data.rAcres)fire.outside_fire_acres_burned=Number(data.rAcres);
+    }
+    payload.fire=fire;
+  }
+  if(structureIncident){
+    const presence=v=>v==="Present"?"PRESENT":v==="Not Present"?"NOT_PRESENT":v==="Not Applicable"?"NOT_APPLICABLE":v;
+    payload.smoke_alarm={presence:{type_rr_presence:presence(data.rSmokePresence)}};
+    payload.fire_alarm={presence:{type_rr_presence:presence(data.rFireAlarm)}};
+    payload.other_alarm={presence:{type_rr_presence:presence(data.rOtherAlarm)}};
+    payload.fire_suppression={presence:{type_rr_presence:presence(data.rSuppression)}};
+    if(/CONFINED_COOKING_APPLIANCE_FIRE/.test(incidentTypes.join(" "))&&data.rCookingSuppression){
+      payload.cooking_fire_suppression={presence:{type_rr_presence:presence(data.rCookingSuppression)}};
+    }
+  }
   const primaryUse=data.rPrimaryUse||"";
   const secondaryUse=data.rSecondaryUse||"";
   const parseUse=v=>{const p=String(v||"").split("||");return p.length===2?{use_type:p[0],use_subtype:p[1]}:null};
@@ -914,6 +960,8 @@ async function validateAndFinishReport(kind){
     const reports=Array.isArray(existing.data?.reports)?existing.data.reports:[];
     const validation=await validateIncidentForNeris(kind,data,incidentId,m.dataset.cad||"");
     if(!validation.ok)return alert("This incident is not ready for NERIS review:\n\n"+validation.errors.join("\n"));
+    const nerisCheck=await validateNerisPayloadWithApi(data);
+    if(!nerisCheck.ok)return alert("NERIS validation found items that must be corrected before review:\n\n"+nerisCheck.errors.join("\n"));
     const report={report_id:crypto.randomUUID(),report_type:kind==="fire"?"fire_neris_v2":"pcr_neris_v2",status:"ready_for_neris",data,updated_at:new Date().toISOString(),created_by:me?.id||null,validation};
     reports.unshift(report);
     const upd=await db.from("incidents").update({reports,updated_at:new Date().toISOString()}).eq("cad",m.dataset.cad||"");if(upd.error)throw new Error(upd.error.message);
@@ -960,13 +1008,13 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     if(kind==="fire")return card('<span class="text-red-600">JASPER FIRE DEPARTMENT</span><div class="text-xs text-slate-500 font-semibold mt-1">FIRE INCIDENT REPORT</div>',
       '<div class="grid md:grid-cols-3 gap-3">'+
       field("rDate","Incident Date",/^\\d{4}-\\d{2}-\\d{2}/.test(String(i.dispatch_time||""))?String(i.dispatch_time).slice(0,10):"","date")+
-      field("rCad","CAD / Incident Number",i.cad||"")+
+      field("rCad","CAD / Incident Number",i.cad||"", "text", true)+
       select("rCall","Call Type",CALL_TYPES,d?.call_type||i.type||"")+
-      field("rLocation","Location",i.location||"","text","md:col-span-3")+
+      field("rLocation","Location",i.location||"","text",true,"md:col-span-3")+
       field("rLatitude","Latitude",i.latitude??"","number")+
       field("rLongitude","Longitude",i.longitude??"","number")+
       select("rShift","Shift",["A","B","C"],m.shift||"")+
-      jfdNerisSelect("rPrimaryIncidentType","Primary Incident Type",NERIS_INCIDENT_TYPES,d?.primary_incident_type||d?.neris_incident_type||d?.incident_type||"","md:col-span-2")+
+      jfdNerisSelect("rPrimaryIncidentType","Primary Incident Type",NERIS_INCIDENT_TYPES,d?.primary_incident_type||d?.neris_incident_type||d?.incident_type||"","md:col-span-2",true)+
       '<div class="md:col-span-3"><div id="jfdIncidentTypes"></div><button type="button" onclick="jfdAddIncidentType()" class="mt-2 bg-white border px-3 py-2 rounded-lg font-bold text-sm">+ Add Incident Type</button></div>'+
       '</div>');
     return card('<span class="text-red-600">JASPER FIRE DEPARTMENT</span><div class="text-xs text-slate-500 font-semibold mt-1">PATIENT CARE REPORT</div>',
@@ -1221,6 +1269,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       if(!el.id||el.type==="checkbox"||el.matches("[data-runit]")||el.closest("[data-unit-row]"))return;
       data[el.id]=el.value;
     });
+    data.rDispatchIncidentNumber=data.rDispatchIncidentNumber||data.rCad||$("reportModal")?.dataset.cad||"";
     data.responding_apparatus=[...document.querySelectorAll("[data-unit-row]")].map(row=>({
       apparatus_id:Number(row.dataset.unitRow||0),unit_number:row.querySelector("b")?.textContent||"",
       times:Object.fromEntries([...row.querySelectorAll("input[type=datetime-local]")].map((x,n)=>[["enroute","on_scene","cancelled","clear"][n],x.value])),
