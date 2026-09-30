@@ -915,11 +915,11 @@ function buildNerisPayload(data){
     const careMap={"Evaluated and cared for":"PATIENT_EVALUATED_CARE_PROVIDED","Evaluated and refused care":"PATIENT_EVALUATED_REFUSED_CARE","Evaluated, no care required":"PATIENT_EVALUATED_NO_CARE_REQUIRED","Refused evaluation/care":"PATIENT_REFUSED_EVALUATION_CARE","Support services provided":"PATIENT_SUPPORT_SERVICES_PROVIDED","DOA":"PATIENT_DEAD_ON_ARRIVAL"};
     const statusMap={Improved:"IMPROVED",Unchanged:"UNCHANGED",Worsened:"WORSE"};
     const transportMap={"Transport by EMS Unit":"TRANSPORT_BY_EMS_UNIT","Transport by Other Agency":"OTHER_AGENCY_TRANSPORT","Patient Refused Transport":"PATIENT_REFUSED_TRANSPORT","Non-Patient Transport":"NONPATIENT_TRANSPORT","No Transport":"NO_TRANSPORT"};
-    payload.medical_detail=patients.map((p,i)=>({
-      patient_care_report:String(p.careReport||data.rCad||incidentNumber||("JFD-P"+(i+1))),
-      patient_evaluation_care:careMap[p.evaluation]||p.evaluation,
-      ...(p.status?{patient_improved_status:statusMap[p.status]||p.status}:{}),
-      ...(p.transportDisposition?{medical_disposition:transportMap[p.transportDisposition]||p.transportDisposition}:p.transport?{medical_disposition:transportMap[p.transport]||p.transport}:{})
+    payload.medical_details=patients.map((p,i)=>({
+      patient_care_report_id:String(p.careReport||data.rCad||incidentNumber||("JFD-P"+(i+1))),
+      patient_care_evaluation:careMap[p.evaluation]||p.evaluation,
+      ...(p.status?{patient_status:statusMap[p.status]||p.status}:{}),
+      ...(p.transportDisposition?{transport_disposition:transportMap[p.transportDisposition]||p.transportDisposition}:p.transport?{medical_disposition:transportMap[p.transport]||p.transport}:{})
     }));
   }
   const hazardIncident=incidentTypes.some(x=>/^HAZSIT\\|/.test(String(x)));
