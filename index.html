@@ -1309,7 +1309,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   function fireFormNew(i,d,m,unitRows){
     window.jfdRepeats={exposures:d?.exposures||[],casualties:d?.casualties||[],vehicles:d?.vehicles||[],hazards:d?.hazards||[]};
     let h=incidentHeader(i,d,m,"fire");
-    h+=responseUi(i);
+    h+=reportResponseSection([]);
     h+=card("Incident & Location Details",'<div class="grid md:grid-cols-2 gap-3">'+
       jfdNerisSelect("rLocationType","Location Type",NERIS_LOCATION_TYPES,d?.location_type||"")+
       jfdNerisSelect("rPrimaryUse","Primary Location Use",NERIS_LOCATION_USES,d?.primary_use||((d?.primary_use_type&&d?.primary_use_subtype)?(d.primary_use_type+"||"+d.primary_use_subtype):d?.primary_use_type)||"","md:col-span-2")+
@@ -1376,7 +1376,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     h+=jfdNerisRequirementPanel();
     const addPatientButton=btn("+ Add Patient","jfdAddPatient({})","primary");
     h+=card("PATIENTS",'<div id="jfdPatients"></div><div class="mt-3 flex flex-wrap gap-2">'+addPatientButton+'</div>');
-    h+=responseUi(unitRows,i);
+    h+=reportResponseSection([]);
     h+=card("Report Completion",field("rCompletedBy","Report Completed By",(d?.completed_by)||((profile?.first_name||"")+" "+(profile?.last_name||""))));
     h+=actionBar("pcr");
     setTimeout(()=>{jfdRenderPatients(saved);jfdBindSignaturePads();jfdUpdateNerisRequirements();},0);
@@ -1392,8 +1392,8 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       data[el.id]=el.value;
     });
     data.rDispatchIncidentNumber=data.rDispatchIncidentNumber||data.rCad||$("reportModal")?.dataset.cad||"";
-    data.responding_apparatus=[...document.querySelectorAll("[data-unit-row]")].map(row=>({
-      apparatus_id:Number(row.dataset.unitRow||0),unit_number:row.querySelector("b")?.textContent||"",
+    data.responding_apparatus=[...document.querySelectorAll(".report-response-unit")].map(row=>({
+      apparatus_id:Number(row.dataset.apparatusId||0),unit_number:row.querySelector(".font-bold")?.textContent?.trim()||"",
       times:Object.fromEntries([...row.querySelectorAll("input[type=datetime-local]")].map((x,n)=>[["enroute","on_scene","cancelled","clear"][n],x.value])),
       crew:JSON.parse(row.dataset.crew||"[]")
     }));
