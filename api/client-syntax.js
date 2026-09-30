@@ -1,15 +1,14 @@
+import fs from "node:fs";
 export default async function handler(req,res){
   if(req.method!=="GET")return res.status(405).json({ok:false,error:"GET only"});
   try{
-    const base="https://raw.githubusercontent.com/jasperfirechief/jfdrms/main/";
     const files=["index.html","js/type-aware.js","js/report-actions.js"];
     const results=[];
     for(const file of files){
-      const r=await fetch(base+file,{headers:{"User-Agent":"JasperFireDepartmentRMS-SyntaxCheck"}});
-      if(!r.ok)throw new Error(file+" fetch failed: "+r.status);
-      const src=await r.text();
+      const src=fs.readFileSync(process.cwd()+"/"+file,"utf8");
       if(file==="index.html"){
-        for(const [n,m] of [...src.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/gi)].entries()){
+        const re=/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/gi;
+        for(const [n,m] of [...src.matchAll(re)].entries()){
           const code=m[1].trim();if(!code)continue;
           try{new Function(code);results.push({file,script:n+1,ok:true});}
           catch(e){results.push({file,script:n+1,ok:false,error:String(e?.message||e)});}
