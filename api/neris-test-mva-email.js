@@ -11,10 +11,9 @@ export default async function handler(req,res){
       department_neris_id:String(process.env.NERIS_DEPARTMENT_ID||""),
       incident_number:incidentNumber,
       location,
-      location_type:"AUTOMOBILE"
+      
     },
     incident_types:[
-      {type:"HAZSIT||HAZARD_NONCHEM||MOTOR_VEHICLE_COLLISION"},
       {type:"MEDICAL||INJURY||MOTOR_VEHICLE_COLLISION"}
     ],
     dispatch:{
@@ -25,7 +24,7 @@ export default async function handler(req,res){
       location,
       unit_responses:[]
     },
-    medical_detail:[
+    medical:[
       {
         patient_care_report:incidentNumber+"-P1",
         patient_evaluation_care:"PATIENT_EVALUATED_CARE_PROVIDED",
