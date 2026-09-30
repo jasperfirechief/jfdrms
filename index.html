@@ -414,7 +414,7 @@ async function renderNerisReviewQueue(){
   (r.data||[]).forEach(i=>(Array.isArray(i.reports)?i.reports:[]).forEach((rep,idx)=>{if(rep.status==="ready_for_neris")rows.push({i,rep,idx})}));
   list.innerHTML=rows.map(x=>'<div class="border rounded-lg p-3 flex flex-wrap justify-between gap-3"><div><b>'+esc(x.rep.report_type||"Report")+'</b> · CAD '+esc(x.i.cad||"")+'<div class="text-sm text-slate-500">'+esc(x.i.location||"")+'</div></div><button class="bg-amber-600 text-white px-3 py-2 rounded font-bold" onclick="adminSubmitReport('+JSON.stringify(x.i.cad)+','+Number(x.idx)+')">Review / Submit</button></div>').join("")||'<p class="text-sm text-slate-500">No reports awaiting NERIS review.</p>';
 }
-async function adminSubmitReport(cad,idx){
+window.adminSubmitReport=async function(cad,idx){
   if(profile?.app_role!=="admin")return alert("Administrator access required.");
   const incident=await db.from("incidents").select("*").eq("cad",cad).maybeSingle();
   if(incident.error||!incident.data)return alert(incident.error?.message||"Incident not found.");
