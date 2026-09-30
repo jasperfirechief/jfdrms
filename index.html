@@ -1276,11 +1276,15 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   function jfdRenderAids(){
     const render=(kind,boxId)=>{
       const box=$(boxId);if(!box)return;
-      box.innerHTML=(window.jfdAids[kind]||[]).map((x,i)=>'<div class="border rounded-lg p-3 mb-2"><div class="flex justify-between items-center mb-2"><b>'+((kind==="fd")?"Fire Department Aid":"Non-Fire Department Aid")+' '+(i+1)+'</b><button type="button" onclick="jfdRemoveAid(\''+kind+'\','+i+')" class="text-red-600 font-bold">Remove</button></div><div class="grid md:grid-cols-3 gap-2">'+
-        select("","Direction",["Given","Received"],x.direction)+
-        jfdNerisSelect("","Aid Type",NERIS_AID_TYPES,x.type)+
-        field("","Agency",x.agency||"")+
-        '</div></div>').join("");
+      box.innerHTML=(window.jfdAids[kind]||[]).map((x,i)=>{
+        const title=kind==="fd"?"Fire Department Aid":"Non-Fire Department Aid";
+        const remove="jfdRemoveAid("+JSON.stringify(kind)+","+i+")";
+        return '<div class="border rounded-lg p-3 mb-2"><div class="flex justify-between items-center mb-2"><b>'+title+' '+(i+1)+'</b><button type="button" onclick='+JSON.stringify(remove)+' class="text-red-600 font-bold">Remove</button></div><div class="grid md:grid-cols-3 gap-2">'+
+          select("","Direction",["Given","Received"],x.direction)+
+          jfdNerisSelect("","Aid Type",NERIS_AID_TYPES,x.type)+
+          field("","Agency",x.agency||"")+
+          '</div></div>';
+      }).join("");
     };
     render("fd","jfdFdAid");render("nonfd","jfdNonFdAid");
   }
