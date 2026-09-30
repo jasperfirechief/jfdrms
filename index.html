@@ -924,6 +924,16 @@ function buildNerisPayload(data){
       ...(p.transportDisposition?{medical_disposition:transportMap[p.transportDisposition]||p.transportDisposition}:p.transport?{medical_disposition:transportMap[p.transport]||p.transport}:{})
     }));
   }
+  const hazardIncident=incidentTypes.some(x=>/^HAZSIT\\|/.test(String(x)));
+  if(hazardIncident){
+    const haz={};
+    if(data.rHazDisposition)haz.hazsit_disposition=data.rHazDisposition;
+    if(data.rHazEvacuated!==undefined&&data.rHazEvacuated!=="")haz.hazsit_evacuated=Number(data.rHazEvacuated);
+    if(data.rChemicalName)haz.chemical_name=String(data.rChemicalName).split(/[,;\\n]+/).map(x=>x.trim()).filter(Boolean);
+    if(data.rChemicalClass)haz.chemical_dot_class=String(data.rChemicalClass).split(/[,;\\n]+/).map(x=>x.trim()).filter(Boolean);
+    if(data.rChemicalRelease)haz.chemical_release_occurred=[data.rChemicalRelease==="Yes"];
+    payload.hazsit_detail=haz;
+  }
   const primaryUse=data.rPrimaryUse||"";
   const secondaryUse=data.rSecondaryUse||"";
   const parseUse=v=>{const p=String(v||"").split("||");return p.length===2?{use_type:p[0],use_subtype:p[1]}:null};
