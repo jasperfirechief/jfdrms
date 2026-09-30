@@ -34,3 +34,6 @@ NERIS is supported as the planned submission target. The current NERIS API uses 
 
 ## Deployment
 The frontend is a single static index.html and can be served by any static host connected to this GitHub repository.
+
+
+<!-- Vercel deployment trigger -->
