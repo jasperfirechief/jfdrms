@@ -434,10 +434,17 @@ window.adminSubmitReport=async function(cad,idx){
   if(!apiValidation.ok)return alert("NERIS API validation failed:\n\n"+apiValidation.errors.join("\n"));
   const result=await submitReportToNeris(merged,details.data?.incident_id||null);
   if(!result.ok)return alert(result.error);
-  reports[idx]={...rep,status:"submitted_to_neris",neris:result.neris,updated_at:new Date().toISOString()};
+  reports[idx]={...rep,status:"submitted_to_neris",neris:result.neris,updated_at:new Date().toISOString(),email_status:"pending"};
   const u=await db.from("incidents").update({reports,updated_at:new Date().toISOString()}).eq("cad",cad);
   if(u.error)return alert(u.error.message);
-  alert("Submitted to NERIS.");
+  let emailMessage="";
+  try{
+    const er=await fetch("/api/report-pdf",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"email",incident:incident.data,reports})});
+    let eb={};try{eb=await er.json()}catch{}
+    if(er.ok&&eb.ok){reports[idx]={...reports[idx],email_status:"sent",email_id:eb.email_id||null,email_sent_at:new Date().toISOString()};emailMessage=" The PDF was also emailed to the department report address.";}else{reports[idx]={...reports[idx],email_status:"failed",email_error:eb.error||"Email failed."};emailMessage=" NERIS submission succeeded, but the PDF email failed: "+(eb.error||"unknown email error");}
+    await db.from("incidents").update({reports,updated_at:new Date().toISOString()}).eq("cad",cad);
+  }catch(emailErr){reports[idx]={...reports[idx],email_status:"failed",email_error:emailErr?.message||String(emailErr)};await db.from("incidents").update({reports,updated_at:new Date().toISOString()}).eq("cad",cad);emailMessage=" NERIS submission succeeded, but the PDF email failed: "+(emailErr?.message||String(emailErr));}
+  alert("Submitted to NERIS."+emailMessage);
   await renderNerisReviewQueue();
   await loadIncidents();
   }catch(err){
