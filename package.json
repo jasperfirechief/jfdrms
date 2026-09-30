@@ -8,6 +8,6 @@
     "pdf-lib": "1.17.1"
   },
   "scripts": {
-    "build": "node -e \"console.log('JFD RMS static build: no compilation required')\""
+    "build": "mkdir -p public && cp index.html public/index.html && rm -rf public/js && cp -r js public/js"
   }
 }
