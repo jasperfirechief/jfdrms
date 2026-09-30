@@ -28,6 +28,14 @@ export default async function handler(req,res){
   const offset=Math.max(0,Number(url.searchParams.get("offset")||0));
   const limit=Math.min(20,Math.max(1,Number(url.searchParams.get("limit")||20)));
   const selected=allTypes.slice(offset,offset+limit);
+  const auth=Buffer.from(clientId+":"+secret).toString("base64");
+  const tr=await fetch(baseUrl+"/token",{method:"POST",headers:{Authorization:"Basic "+auth,"Content-Type":"application/x-www-form-urlencoded","User-Agent":"JasperFireDepartmentRMS/1.0"},body:"grant_type=client_credentials"});
+  const td=await tr.json().catch(()=>({}));
+  if(!tr.ok||!td.access_token)return res.status(502).json({ok:false,stage:"authentication",status:tr.status});
+
+  const headers={Authorization:"Bearer "+td.access_token,"Content-Type":"application/json","User-Agent":"JasperFireDepartmentRMS/1.0"};
+  const location={country:"US",state:"AL",number:100,street:"Test Street",incorporated_municipality:"Jasper",postal_code:"35501"};
+  const iso=n=>new Date(Date.now()-n*60000).toISOString();
   if(url.searchParams.get("mode")==="combos"){
     const results=[];
     for(const combo of combos){
@@ -44,14 +52,6 @@ export default async function handler(req,res){
     }
     return res.status(200).json({ok:true,mode:"combos",tested:results.length,valid:results.filter(x=>x.valid).length,invalid:results.filter(x=>!x.valid).length,results});
   }
-  const auth=Buffer.from(clientId+":"+secret).toString("base64");
-  const tr=await fetch(baseUrl+"/token",{method:"POST",headers:{Authorization:"Basic "+auth,"Content-Type":"application/x-www-form-urlencoded","User-Agent":"JasperFireDepartmentRMS/1.0"},body:"grant_type=client_credentials"});
-  const td=await tr.json().catch(()=>({}));
-  if(!tr.ok||!td.access_token)return res.status(502).json({ok:false,stage:"authentication",status:tr.status});
-
-  const headers={Authorization:"Bearer "+td.access_token,"Content-Type":"application/json","User-Agent":"JasperFireDepartmentRMS/1.0"};
-  const location={country:"US",state:"AL",number:100,street:"Test Street",incorporated_municipality:"Jasper",postal_code:"35501"};
-  const iso=n=>new Date(Date.now()-n*60000).toISOString();
   const results=[];
   for(const type of selected){
     const group=type.split("||")[0];
