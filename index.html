@@ -1393,7 +1393,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     });
     data.rDispatchIncidentNumber=data.rDispatchIncidentNumber||data.rCad||$("reportModal")?.dataset.cad||"";
     data.responding_apparatus=[...document.querySelectorAll(".report-response-unit")].map(row=>({
-      apparatus_id:Number(row.dataset.apparatusId||0),unit_number:row.querySelector(".font-bold")?.textContent?.trim()||"",
+      apparatus_id:Number(row.dataset.apparatusId||0),unit_number:row.querySelector("b")?.textContent?.trim()||"",
       times:Object.fromEntries([...row.querySelectorAll("input[type=datetime-local]")].map((x,n)=>[["enroute","on_scene","cancelled","clear"][n],x.value])),
       crew:JSON.parse(row.dataset.crew||"[]")
     }));
