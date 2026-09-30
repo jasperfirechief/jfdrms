@@ -758,7 +758,45 @@ async function startIncidentReport(kind){
   $("rDate")?.addEventListener("change",()=>refreshReportApparatusCrews($("rDate").value));
 }
 function openSavedReportFromButton(btn){ return openSavedReport(btn.dataset.cad||"",btn.dataset.reportId||""); }
-async function openSavedReport(cad,reportId){
+
+function humanReportKey(k){
+  return String(k||"")
+    .replace(/^r(?=[A-Z])/, "")
+    .replace(/[_-]+/g," ")
+    .replace(/([a-z0-9])([A-Z])/g,"$1 $2")
+    .replace(/\\b\\w/g,c=>c.toUpperCase())
+    .trim() || "Field";
+}
+function reportViewerValue(v){
+  if(v===undefined||v===null||v==="")return '<span class="text-slate-400">Not entered</span>';
+  if(typeof v==="boolean")return v?'Yes':'No';
+  if(typeof v==="string"&&v.startsWith("data:image/")){
+    return '<img src="'+v+'" alt="Saved signature" class="max-w-sm max-h-40 border rounded bg-white object-contain">';
+  }
+  if(Array.isArray(v)){
+    if(!v.length)return '<span class="text-slate-400">None recorded</span>';
+    if(v.every(x=>x===null||typeof x!=="object")){
+      return '<div class="flex flex-wrap gap-2">'+v.map(x=>'<span class="px-2 py-1 rounded bg-slate-100 border text-sm">'+esc(String(x??""))+'</span>').join("")+'</div>';
+    }
+    return '<div class="space-y-2">'+v.map((x,i)=>'<div class="border rounded-lg p-3 bg-white"><div class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Item '+(i+1)+'</div>'+reportViewerObject(x)+'</div>').join("")+'</div>';
+  }
+  if(typeof v==="object")return reportViewerObject(v);
+  return esc(String(v));
+}
+function reportViewerObject(obj){
+  if(!obj||typeof obj!=="object")return reportViewerValue(obj);
+  return '<div class="grid md:grid-cols-2 gap-3">'+Object.entries(obj).filter(([k,v])=>v!==undefined&&v!==null&&v!==""&&k!=="report_id").map(([k,v])=>'<div class="border rounded-lg p-3 bg-white"><div class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-1">'+esc(humanReportKey(k))+'</div><div class="text-sm whitespace-pre-wrap break-words">'+reportViewerValue(v)+'</div></div>').join("")+'</div>';
+}
+function ensureSavedReportViewer(){
+  let m=$("savedReportViewer");if(m)return m;
+  m=document.createElement("div");m.id="savedReportViewer";
+  m.className="hiddenx fixed inset-0 z-[80] bg-slate-950/75 backdrop-blur-sm p-3 sm:p-5 overflow-y-auto";
+  m.innerHTML='<div class="max-w-6xl mx-auto my-2 sm:my-6 bg-white rounded-2xl shadow-2xl overflow-hidden"><div class="bg-slate-950 text-white px-5 py-4 sm:px-6 flex justify-between items-start gap-4"><div><div class="text-xs font-bold uppercase tracking-wider text-slate-300">Saved Report</div><h2 id="savedReportViewerTitle" class="text-xl sm:text-2xl font-black mt-1"></h2><p id="savedReportViewerSub" class="text-sm text-slate-300 mt-1"></p></div><button type="button" onclick="closeSavedReportViewer()" class="border border-slate-600 hover:bg-slate-800 px-3 py-2 rounded-lg font-bold">Close</button></div><div class="p-4 sm:p-6"><div id="savedReportViewerActions" class="flex flex-wrap gap-2 mb-5"></div><div id="savedReportViewerBody" class="space-y-5"></div></div></div>';
+  document.body.appendChild(m);return m;
+}
+function closeSavedReportViewer(){const m=$("savedReportViewer");if(m)m.classList.add("hiddenx");}
+async function editSavedReport(cad,reportId){
+  closeSavedReportViewer();
   const r=await db.from("incidents").select("*,incident_details(*)").eq("cad",cad).maybeSingle();
   if(r.error||!r.data)return alert(r.error?.message||"Incident not found.");
   const i=r.data,d=(r.data.incident_details||{})[0]||r.data.incident_details||{};
@@ -767,20 +805,50 @@ async function openSavedReport(cad,reportId){
   if(!rep)return alert("Saved report not found.");
   const kind=String(rep.report_type||"").startsWith("pcr_")?"pcr":"fire";
   const modal=ensureReportModal();
-  modal.dataset.incidentId=String(d.incident_id||"");
-  modal.dataset.cad=String(i.cad||cad);
-  modal.dataset.standalone="";
+  modal.dataset.incidentId=String(d.incident_id||"");modal.dataset.cad=String(i.cad||cad);modal.dataset.standalone="";
   modal.classList.remove("hiddenx");
   await openIncidentReportForm(kind,i,d,ur.data||[]);
   applyPreviousReportValues(rep.data||{});
   if(Array.isArray(rep.data?.responding_apparatus)&&rep.data.responding_apparatus.length){
     const rows=document.querySelectorAll(".report-response-unit");
     rep.data.responding_apparatus.forEach((saved,idx)=>{
-      const row=rows[idx]; if(!row)return;
+      const row=rows[idx];if(!row)return;
       if(saved.times)Object.entries(saved.times).forEach(([k,v])=>{const el=row.querySelector('[data-report-unit-time="'+k+'"]');if(el)el.value=v||"";});
     });
   }
   modal.dataset.reportId=rep.report_id||"";
+}
+async function openSavedReport(cad,reportId){
+  const r=await db.from("incidents").select("*,incident_details(*)").eq("cad",cad).maybeSingle();
+  if(r.error||!r.data)return alert(r.error?.message||"Incident not found.");
+  const i=r.data,reports=Array.isArray(i.reports)?i.reports:[],rep=reports.find(x=>x?.report_id===reportId);
+  if(!rep)return alert("Saved report not found.");
+  const kind=String(rep.report_type||"").startsWith("pcr_")?"pcr":"fire";
+  const title=kind==="pcr"?"Patient Care Report":"Fire Incident Report";
+  const statusLabel={draft:"Draft",complete:"Completed",ready_for_neris:"Awaiting NERIS Review",submitted_to_neris:"Submitted to NERIS"}[rep.status]||humanReportKey(rep.status||"Saved");
+  const m=ensureSavedReportViewer();
+  $("savedReportViewerTitle").textContent=title+" · CAD "+(i.cad||"");
+  $("savedReportViewerSub").textContent=(i.location||"Location not provided")+" · "+statusLabel;
+  const actions=$("savedReportViewerActions");
+  const canEdit=rep.status!=="submitted_to_neris";
+  actions.innerHTML='<button type="button" onclick="downloadIncidentPdf('+JSON.stringify(cad)+','+JSON.stringify(reportId)+')" class="bg-blue-700 text-white px-3 py-2 rounded-lg font-bold">Download PDF</button><button type="button" onclick="emailIncidentPdf('+JSON.stringify(cad)+','+JSON.stringify(reportId)+')" class="bg-emerald-700 text-white px-3 py-2 rounded-lg font-bold">Email PDF</button>'+(canEdit?'<button type="button" onclick="editSavedReport('+JSON.stringify(cad)+','+JSON.stringify(reportId)+')" class="bg-slate-950 text-white px-3 py-2 rounded-lg font-bold">'+(rep.status==="draft"?"Edit Draft":"Edit Report")+'</button>':"")+'<button type="button" onclick="closeSavedReportViewer()" class="border px-3 py-2 rounded-lg font-bold">Close</button>';
+  const d=rep.data||{};
+  const primaryFields=["rCad","rDate","rCall","rCallType","rPrimaryIncidentType","rSecondaryIncidentType","rLocation","rLocationType","rShift","rNarrative","rCompletedBy","completedBy","report_completed_by"];
+  const used=new Set();
+  const sections=[];
+  const makeSection=(title,keys)=>{
+    const entries=keys.filter(k=>Object.prototype.hasOwnProperty.call(d,k)&&d[k]!==undefined&&d[k]!==null&&d[k]!=="");
+    if(!entries.length)return;
+    entries.forEach(k=>used.add(k));
+    sections.push('<section class="border rounded-xl p-4 bg-slate-50"><h3 class="font-black text-lg mb-3">'+esc(title)+'</h3>'+reportViewerObject(Object.fromEntries(entries.map(k=>[k,d[k]])))+'</section>');
+  };
+  makeSection("Incident Information",primaryFields);
+  makeSection("Response / Apparatus",["responding_apparatus","additional_personnel"]);
+  makeSection("Patient Information",["patients"]);
+  const remaining=Object.entries(d).filter(([k,v])=>!used.has(k)&&v!==undefined&&v!==null&&v!=="");
+  if(remaining)sections.push('<section class="border rounded-xl p-4 bg-slate-50"><h3 class="font-black text-lg mb-3">Saved Report Details</h3>'+reportViewerObject(Object.fromEntries(remaining))+'</section>');
+  $("savedReportViewerBody").innerHTML=sections.join("")||'<div class="border rounded-xl p-5 text-slate-500">No saved report fields were found.</div>';
+  m.classList.remove("hiddenx");
 }
 async function renderReports(){
   const list=$("reportsList");if(!list)return;
@@ -797,7 +865,7 @@ async function renderReports(){
   ];
   list.innerHTML=groups.map(g=>{
     const items=rows.filter(x=>x.rep.status===g.key);
-    return '<div class="card p-5"><h2 class="font-black text-lg">'+g.title+'</h2><div class="mt-3 space-y-2">'+(items.length?items.map(x=>'<div class="border rounded-lg p-3 flex flex-wrap justify-between gap-3 items-center"><div><div class="font-bold">'+esc(x.rep.report_type==="pcr_neris_v2"?"Patient Care Report":"Fire Report")+' · CAD '+esc(x.i.cad||"")+'</div><div class="text-sm text-slate-500">'+esc(x.i.type||"Incident")+' · '+esc(x.i.location||"Location not provided")+'</div><div class="text-xs text-slate-400 mt-1">'+esc(x.rep.updated_at?incidentDate(x.rep.updated_at):incidentDate(x.i.dispatch_time))+' '+esc(x.rep.updated_at?incidentTime(x.rep.updated_at):incidentTime(x.i.dispatch_time))+'</div></div><div class="flex gap-2"><button data-cad="'+esc(x.i.cad||"")+'" data-report-id="'+esc(x.rep.report_id||"")+'" onclick="openSavedReportFromButton(this)" class="bg-slate-950 text-white px-3 py-2 rounded-lg text-sm font-bold">Open Report</button>'+(x.rep.status==="submitted_to_neris"?'<button type="button" data-cad="'+esc(x.i.cad||"")+'" onclick="generateIncidentPdf(this.dataset.cad)" class="bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-bold">View PDF</button><button type="button" data-cad="'+esc(x.i.cad||"")+'" onclick="emailIncidentPdf(this.dataset.cad)" class="bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-bold">Email PDF</button>':"")+(profile?.app_role==="admin"?'<button data-cad="'+esc(x.i.cad||"")+'" data-report-id="'+esc(x.rep.report_id||"")+'" onclick="adminDeleteReportFromButton(this)" class="bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-bold">Delete</button>':"")+'</div></div>').join(""):'<div class="text-sm text-slate-500">'+g.empty+'</div>')+'</div></div>';
+    return '<div class="card p-5"><h2 class="font-black text-lg">'+g.title+'</h2><div class="mt-3 space-y-2">'+(items.length?items.map(x=>'<div class="border rounded-lg p-3 flex flex-wrap justify-between gap-3 items-center"><div><div class="font-bold">'+esc(x.rep.report_type==="pcr_neris_v2"?"Patient Care Report":"Fire Report")+' · CAD '+esc(x.i.cad||"")+'</div><div class="text-sm text-slate-500">'+esc(x.i.type||"Incident")+' · '+esc(x.i.location||"Location not provided")+'</div><div class="text-xs text-slate-400 mt-1">'+esc(x.rep.updated_at?incidentDate(x.rep.updated_at):incidentDate(x.i.dispatch_time))+' '+esc(x.rep.updated_at?incidentTime(x.rep.updated_at):incidentTime(x.i.dispatch_time))+'</div></div><div class="flex gap-2"><button data-cad="'+esc(x.i.cad||"")+'" data-report-id="'+esc(x.rep.report_id||"")+'" onclick="openSavedReportFromButton(this)" class="bg-slate-950 text-white px-3 py-2 rounded-lg text-sm font-bold">Open Report</button>'+(x.rep.status==="submitted_to_neris"?'<button type="button" data-cad="'+esc(x.i.cad||"")+'" data-report-id="'+esc(x.rep.report_id||"")+'" onclick="downloadIncidentPdf(this.dataset.cad,this.dataset.reportId)" class="bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-bold">Download PDF</button><button type="button" data-cad="'+esc(x.i.cad||"")+'" data-report-id="'+esc(x.rep.report_id||"")+'" onclick="emailIncidentPdf(this.dataset.cad,this.dataset.reportId)" class="bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-bold">Email PDF</button>':"")+(profile?.app_role==="admin"?'<button data-cad="'+esc(x.i.cad||"")+'" data-report-id="'+esc(x.rep.report_id||"")+'" onclick="adminDeleteReportFromButton(this)" class="bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-bold">Delete</button>':"")+'</div></div>').join(""):'<div class="text-sm text-slate-500">'+g.empty+'</div>')+'</div></div>';
   }).join("");
 }
 async function adminDeleteReportFromButton(btn){
