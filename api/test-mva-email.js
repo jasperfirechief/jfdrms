@@ -1,6 +1,6 @@
+import { makePdf } from "./report-pdf.js";
 export default async function handler(req,res){
   if(req.method!=="GET")return res.status(405).json({ok:false,error:"Method not allowed"});
-  const base="https://jfdrms.vercel.app";
   const incident={cad:"2026-22608",type:"MOTOR VEHICLE ACCIDENT",location:"3600 BRAKEFIELD DAIRY RD, JASPER, AL",dispatch_time:"2026-09-29T18:14:07Z"};
   const reports=[
     {report_type:"fire_neris_v2",status:"ready_for_neris",data:{
@@ -19,7 +19,10 @@ export default async function handler(req,res){
     }}
   ];
   try{
-    const r=await fetch(base+"/api/report-pdf",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({incident,reports,action:"email",to:["firechief@jaspercity.com"]})});
-    const t=await r.text();res.status(r.status).send(t);
+    const pdf=await makePdf(incident,reports);
+    const key=String(process.env.BREVO_API_KEY||""),from=String(process.env.BREVO_FROM_EMAIL||"");
+    if(!key||!from)return res.status(503).json({ok:false,error:"Brevo email is not configured in Vercel."});
+    const er=await fetch("https://api.brevo.com/v3/smtp/email",{method:"POST",headers:{"api-key":key,"Content-Type":"application/json","accept":"application/json"},body:JSON.stringify({sender:{email:from,name:"Jasper Fire Department"},to:[{email:"firechief@jaspercity.com"}],subject:"JFD RMS TEST - MVA 2026-22608",textContent:"TEST ONLY: Combined MVA incident report with two fictional patients.",attachment:[{content:Buffer.from(pdf).toString("base64"),name:"2026-22608 - JFD RMS MVA TEST.pdf"}]})});
+    const t=await er.text();res.status(er.status).send(t);
   }catch(e){res.status(500).json({ok:false,error:e.message})}
 }
