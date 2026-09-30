@@ -6,8 +6,5 @@
   "dependencies": {
     "ai": "latest",
     "pdf-lib": "1.17.1"
-  },
-  "scripts": {
-    "build": "mkdir -p public && cp index.html public/index.html && rm -rf public/js && cp -r js public/js"
   }
 }
