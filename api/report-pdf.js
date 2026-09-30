@@ -127,9 +127,6 @@ export async function makePdf(incident={},reports=[]){
    kv("Disposition Narrative",p.dispositionNarrative);
    kv("Vehicle / Insurance",p.vehicleInfo||p.vehicleInsurance||p.insurance);
    kv("Equipment Used / Replaced",p.equipmentUsed||p.equipmentReplaced||p.equipment);
-   heading("NARRATIVE");
-   wrap(p.narrative||p.comments||"No narrative entered.",9,13);
-   kv("Person Completing Report",p.completedBy||p.reportCompletedBy||p.provider||"JFD RMS user / electronic record");
    if(p.refusedCare||p.refusedTransport||p.minorRefusal){
      heading("REFUSAL / SIGNATURES");
      kv("Refusal Type",[p.refusedCare?"Refused Care":"",p.refusedTransport?"Refused Transport":"",""].filter(Boolean).join(", ")||"Minor refusal");
@@ -141,10 +138,12 @@ export async function makePdf(incident={},reports=[]){
      kv("Witness",p.witnessName);
      kv("Witness Signature",p.witnessSignatureText||p.witnessSignature);
      kv("Minor Patients",Array.isArray(p.minorPatients)?p.minorPatients.map(x=>x.name+" (DOB "+x.dob+")").join(", "):"");
-     // Signature images are embedded when supplied.
      const sigs=[["Patient / Guardian Signature",p.signature],["Witness Signature",p.witnessSignature]];
      for(const [label,dataUrl] of sigs){if(!String(dataUrl||"").startsWith("data:image/png"))continue;try{const bytes=Buffer.from(String(dataUrl).split(",")[1],"base64");const img=await pdf.embedPng(bytes);need(105);page.drawText(label,{x:m,y,font:F.bold,size:8});y-=12;page.drawImage(img,{x:m,y:y-70,width:250,height:70});page.drawRectangle({x:m,y:y-70,width:250,height:70,borderWidth:.5,borderColor:rgb(.6,.6,.6)});y-=82}catch{}}
    }
+   heading("NARRATIVE");
+   wrap(p.narrative||p.comments||"No narrative entered.",9,13);
+   kv("Person Completing Report",p.completedBy||p.reportCompletedBy||p.provider||"JFD RMS user / electronic record");
    page.drawText("JFD RMS • Patient Care Report • Patient "+(i+1),{x:m,y:38,font:F.reg,size:7,color:rgb(.4,.4,.4)});
  }
  if(!patients.length){top("PATIENT CARE REPORT","No patient records were attached to this incident.");kv("Patient Records","None recorded");}
