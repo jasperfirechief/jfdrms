@@ -147,8 +147,9 @@ async function makeReportPdf(incident, report) {
 async function makeStaffingPdf(date, rows) {
   const sections=[{title:"SHIFT STAFFING • "+date,rows:[]}];
   for(const r of rows||[]) sections[0].rows.push(
-    ["Station",r.station],["Apparatus",r.apparatus],["Personnel",r.user_id],["Driver",r.is_driver?"Yes":"No"],["Officer",r.is_officer?"Yes":"No"]
+    ["Shift",r.shift],["Staffing Record",r.staffing_id],["Managed By",r.managed_by_user_id],["Created",fmtDateTime(r.created_at)]
   );
+  if(!rows?.length) sections[0].rows.push(["Result","No daily staffing record was recorded for this shift."]);
   return makeTablePdf("DAILY STAFFING REPORT",sections);
 }
 
@@ -156,9 +157,9 @@ async function makeChecksPdf(date, rows) {
   const sections=[{title:"APPARATUS CHECKS • "+date,rows:[]}];
   for(const r of rows||[]){
     sections[0].rows.push(
-      ["Apparatus",r.apparatus_name],["Station",r.station],["Inspector",r.inspector_name],
-      ["Status",r.overall_status],["Mileage",r.mileage],["Engine Hours",r.engine_hours],
-      ["Defects",r.defect_notes],["Checklist",r.checklist_data?JSON.stringify(r.checklist_data):""]
+      ["Apparatus",r.apparatus_name||r.apparatus_id],["Performed By",r.inspector_name||r.performed_by],
+      ["Check Date",r.check_date],["Check Time",r.check_time],["Status",r.status],
+      ["Problems",r.problem_count],["Notes",r.notes],["Checklist",r.checklist?JSON.stringify(r.checklist):""]
     );
   }
   if(!rows?.length) sections[0].rows.push(["Result","No apparatus checks were recorded for this shift."]);
