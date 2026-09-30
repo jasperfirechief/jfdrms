@@ -32,6 +32,25 @@ function withDepartmentId(payload) {
 
 export default async function handler(req, res) {
   if (req.method === "GET") {
+    if (new URL(req.url, "http://localhost").searchParams.get("action") === "test-auth") {
+      try {
+        const auth = await getToken();
+        return res.status(200).json({
+          ok: true,
+          authenticated: true,
+          base_url: BASE_URL,
+          token_type: auth.token_type,
+          expires_in: auth.expires_in
+        });
+      } catch (err) {
+        return res.status(502).json({
+          ok: false,
+          authenticated: false,
+          base_url: BASE_URL,
+          error: err?.message || "NERIS authentication failed"
+        });
+      }
+    }
     return res.status(200).json({
       ok: true,
       service: "jfdrms-neris",
