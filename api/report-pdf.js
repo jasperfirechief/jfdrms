@@ -44,7 +44,7 @@ export async function makePdf(incident,reports){
        const p=patients[pi]||{};
        if(pi>0){page=pdf.addPage([W,H]);y=header(page,font,"PATIENT CARE REPORT · PATIENT "+(pi+1),incident,m)}else{y-=5;page.drawText("PATIENT "+(pi+1),{x:m,y,font:bold,size:14});y-=20}
        ({page,y}=section(page,font,"PATIENT INFORMATION",y,m));
-       y=line(page,font,"Name",p.name,y,m);y=line(page,font,"DOB",fmtDate(p.dob),y,m);y=line(page,font,"Sex",p.gender,y,m);y=line(page,font,"Address",p.address,y,m);y=line(page,font,"Chief Complaint",p.chief,y,m);y=line(page,font,"Injury",p.injury,y,m);
+       y=line(page,font,"Name",p.name,y,m);y=line(page,font,"DOB",fmtDate(p.dob),y,m);y=line(page,font,"Sex",p.gender,y,m);y=line(page,font,"Age",p.age,y,m);y=line(page,font,"Address",p.address,y,m);y=line(page,font,"Phone",p.phone||p.contactPhone,y,m);y=line(page,font,"Chief Complaint",p.chief,y,m);y=line(page,font,"Injury / Medical Complaint",p.injury,y,m);y=line(page,font,"Medical History",p.medicalHistory||p.history,y,m);y=line(page,font,"Medications",Array.isArray(p.medications)?p.medications.join(", "):p.medications,y,m);y=line(page,font,"Allergies",Array.isArray(p.allergies)?p.allergies.join(", "):p.allergies,y,m);
        ({page,y}=section(page,font,"CARE",y,m));
        y=line(page,font,"Care Provided",p.careProvided==="yes"?"Yes":"No",y,m);
        if(Array.isArray(p.careMethods)&&p.careMethods.length)y=wrap(page,font,"BLS Methods: "+p.careMethods.join(", "),m,y,W-2*m,8,11);
@@ -83,6 +83,8 @@ export async function makePdf(incident,reports){
        }
      }
    }else{
+     ({page,y}=section(page,font,"PERSON / PROPERTY / INSURANCE",y,m));
+     for(const [label,val] of [["Person Involved",data.rPerson||data.person_involved],["Owner",data.rOwnerName],["Owner Contact",data.rOwnerPhone],["Owner Address",data.rOwnerAddress],["Owner Insurance",data.rOwnerInsurance],["Occupant",data.rOccName||data.rOccupantName],["Occupant Contact",data.rOccPhone||data.rOccupantPhone],["Occupant Address",data.rOccupantAddress],["Occupant Insurance",data.rOccInsurance],["Insurance Company",data.rInsuranceCompany],["Insurance Phone",data.rInsurancePhone],["Insurance Policy",data.rInsurancePolicy],["Vehicle",data.rVehicle1],["Year",data.rYear1],["Make",data.rMake1],["Model",data.rModel1],["License / VIN",data.rVin1]])y=line(page,font,label,val,y,m);
      ({page,y}=section(page,font,"INCIDENT DETAILS",y,m));
      for(const [label,key] of [["Primary Incident Type","rPrimaryIncidentType"],["Call Type","rCall"],["Shift","rShift"],["Location Type","rLocationType"],["Primary Use","rPrimaryUse"],["Location In Use","rLocationInUse"],["Used As Intended","rUsedAsIntended"],["People Present","rPeoplePresent"],["Narrative","rNarrative"]])y=wrap(page,font,label+": "+text(data[key]),m,y,W-2*m,8,11,true);
      const units=Array.isArray(data.responding_apparatus)?data.responding_apparatus:[];
