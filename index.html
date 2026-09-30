@@ -420,12 +420,18 @@ async function adminSubmitReport(cad,idx){
   const reports=Array.isArray(r.data.reports)?r.data.reports:[],rep=reports[idx];if(!rep)return alert("Report not found.");
   const validation=await validateReportForNeris(rep.data,true);if(!validation.ok)return alert("Validation failed:\n"+validation.errors.join("\n"));
   if(!confirm("Validation passed. Submit this report to NERIS?"))return;
-  const result=await submitReportToNeris(rep.data,null);
+  const incident=await db.from("incidents").select("*").eq("cad",cad).maybeSingle();
+  const details=await db.from("incident_details").select("*").eq("incident_id",incidentIdForCad(cad)).maybeSingle();
+  const merged={...rep.data,...(incident.data?.incident_details||{}),rCad:cad};
+  const apiValidation=await validateNerisPayloadWithApi(merged);
+  if(!apiValidation.ok)return alert("NERIS API validation failed:\n\n"+apiValidation.errors.join("\n"));
+  const result=await submitReportToNeris(merged,details.data?.incident_id||null);
   if(!result.ok)return alert(result.error);
   reports[idx]={...rep,status:"submitted_to_neris",neris:result.neris,updated_at:new Date().toISOString()};
   const u=await db.from("incidents").update({reports,updated_at:new Date().toISOString()}).eq("cad",cad);
   if(u.error)return alert(u.error.message);alert("Submitted to NERIS.");await renderNerisReviewQueue();await loadIncidents();
 }
+async function incidentIdForCad(cad){const r=await db.from("incident_details").select("incident_id").eq("cad",cad).maybeSingle();return r.data?.incident_id||null;}
 async function validateIncidentForNeris(currentKind,currentData,incidentId,cad){
   const errors=[],warnings=[];
   if(!incidentId)return {ok:false,errors:["This report must be attached to an incident before NERIS review."],warnings};
