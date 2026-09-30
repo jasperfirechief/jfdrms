@@ -464,27 +464,9 @@ async function validateIncidentForNeris(currentKind,currentData,incidentId,cad){
   const responders=all.flatMap(x=>Array.isArray(x.responding_apparatus)?x.responding_apparatus:[]).filter(x=>x.unit_number);
   if(!responders.length)errors.push("At least one responding department unit is required.");
   if(!finalFire&&!finalMedical)errors.push("Select an applicable incident type. NERIS requires at least one incident type.");
-  if(finalMedical){
-    const patients=all.flatMap(x=>Array.isArray(x.patients)?x.patients:[]);
-    if(!patients.length)errors.push("A medical incident requires a Patient Care Report with at least one patient.");
-    patients.forEach((p,i)=>{
-      if(!p.name)errors.push("Patient "+(i+1)+": patient name is required.");
-      if(!p.chief)errors.push("Patient "+(i+1)+": chief complaint is required.");
-      if(!p.evaluation)errors.push("Patient "+(i+1)+": patient care evaluation is required.");
-      if(p.refusedCare||p.refusedTransport||p.minorRefusal){if(!p.refusalSigner)errors.push("Patient "+(i+1)+": Patient / Guardian Name is required for refusal.");
-        if(!p.signature)errors.push("Patient "+(i+1)+": refusal signature is required.");
-      }
-    });
-  }
-  if(finalFire){
-    const f=[...all].reverse().find(x=>x.rFireLoc||x.rWater||x.rInvestigation||x.rCondition||x.rDamageType||x.rRoom||x.rCause)||{};
-    ["rFireLoc","rCondition","rDamageType","rRoom","rCause","rWater","rInvestigation"].forEach(k=>{if(!f[k])errors.push("Fire Incident Report: "+({rFireLoc:"Fire Location",rCondition:"Condition",rDamageType:"Damage Type",rRoom:"Room Type",rCause:"Cause",rWater:"Water Supply",rInvestigation:"Investigation Required?"})[k]+" is required.");});
-    const structure=/STRUCTURE_FIRE|FIRE - STRUCTURE|STRUCTURE/.test(typeText);
-    if(structure){
-      ["rSmokePresence","rFireAlarm","rOtherAlarm","rSuppression"].forEach(k=>{if(!f[k])errors.push("Fire Incident Report: "+({rSmokePresence:"Smoke Alarm",rFireAlarm:"Fire Alarm",rOtherAlarm:"Other Alarm",rSuppression:"Fire Suppression"})[k]+" is required for a structure fire.");});
-      if(/CONFINED_COOKING_APPLIANCE_FIRE/.test(typeText)&&!f.rCookingSuppression)errors.push("Fire Incident Report: Cooking Fire Suppression is required for a confined cooking appliance fire.");
-    }
-  }
+  // Do not turn highly-desired or conditionally optional module fields into local blockers.
+  // The API validation below is the final NERIS gate. Strict risk-reduction requirements
+  // for structure fires are enforced by the dynamic field requirements and API payload.
   const narrative=all.map(x=>x.rNarrative).find(v=>String(v||"").trim());
   if(!narrative)warnings.push("Outcome narrative is highly desired by NERIS and should be completed when information is available.");
   return {ok:errors.length===0,errors,warnings,incidentNumber,dispatchNumber};
@@ -901,22 +883,28 @@ function buildNerisPayload(data){
   const mapCause={"Operating Equipment":"OPERATING_EQUIPMENT",Electrical:"ELECTRICAL","Battery/Power Storage":"BATTERY_POWER_STORAGE","Heat From Another Object":"HEAT_FROM_ANOTHER_OBJECT","Explosives/Fireworks":"EXPLOSIVES_FIREWORKS","Smoking Materials/Illicit Drugs":"SMOKING_MATERIALS_ILLICIT_DRUGS","Open Flame":"OPEN_FLAME",Cooking:"COOKING",Chemical:"CHEMICAL","Act Of Nature":"ACT_OF_NATURE",Incendiary:"INCENDIARY","Other Heat Source":"OTHER_HEAT_SOURCE","Unable to be Determined":"UNABLE_TO_BE_DETERMINED"};
   const mapInvest={Yes:"YES",No:"NO"};
   if(fireIncident){
-    const fire={};
-    if(data.rWater)fire.water_supply=mapWater[data.rWater]||data.rWater;
-    if(data.rInvestigation)fire.investigation_needed=mapInvest[data.rInvestigation]||data.rInvestigation;
-    fire.investigation_types=Array.isArray(data.rInvestigationType)?data.rInvestigationType:(data.rInvestigationType?[data.rInvestigationType]:[]);
+    // NERIS treats fire_detail as a conditional module. Preserve all fire fields in
+    // the RMS, but only send the module to NERIS when it is complete enough to satisfy
+    // the module's conditional schema. This prevents optional/partial fire data from
+    // becoming an accidental NERIS validation failure.
     const outside=data.rFireLoc==="Outside";
-    const location_detail=outside?{OUTSIDE:{}}:{STRUCTURE:{}};
-    const ld=outside?location_detail.OUTSIDE:location_detail.STRUCTURE;
-    if(data.rCondition&&!outside)ld.arrival_condition=mapCondition[data.rCondition]||data.rCondition;
-    if(data.rDamageType&&!outside)ld.damage_type=mapDamage[data.rDamageType]||data.rDamageType;
-    if(data.rFloor!==undefined&&data.rFloor!==""&&!outside)ld.floor_of_origin=Number(data.rFloor);
-    if(data.rRoom&&!outside)ld.room_of_origin_type=mapRoom[data.rRoom]||data.rRoom;
-    if(data.rCause)ld.cause=mapCause[data.rCause]||data.rCause;
-    if(!outside&&data.rProgressionEvident!==undefined&&data.rProgressionEvident!=="")ld.progression_evident=data.rProgressionEvident==="Yes";
-    fire.location_detail=location_detail;
-    if(!structureIncident&&data.rAcres)fire.acres_burned=Number(data.rAcres);
-    payload.fire_detail=fire;
+    const fireComplete=!!data.rFireLoc && !!data.rWater && !!data.rInvestigation &&
+      (outside || (!!data.rCondition && !!data.rDamageType && !!data.rRoom && !!data.rCause));
+    if(fireComplete){
+      const fire={water_supply:mapWater[data.rWater]||data.rWater,investigation_needed:mapInvest[data.rInvestigation]||data.rInvestigation};
+      fire.investigation_types=Array.isArray(data.rInvestigationType)?data.rInvestigationType:(data.rInvestigationType?[data.rInvestigationType]:[]);
+      const location_detail=outside?{OUTSIDE:{}}:{STRUCTURE:{}};
+      const ld=outside?location_detail.OUTSIDE:location_detail.STRUCTURE;
+      if(data.rCondition&&!outside)ld.arrival_condition=mapCondition[data.rCondition]||data.rCondition;
+      if(data.rDamageType&&!outside)ld.damage_type=mapDamage[data.rDamageType]||data.rDamageType;
+      if(data.rFloor!==undefined&&data.rFloor!==""&&!outside)ld.floor_of_origin=Number(data.rFloor);
+      if(data.rRoom&&!outside)ld.room_of_origin_type=mapRoom[data.rRoom]||data.rRoom;
+      if(data.rCause)ld.cause=mapCause[data.rCause]||data.rCause;
+      if(!outside&&data.rProgressionEvident!==undefined&&data.rProgressionEvident!=="")ld.progression_evident=data.rProgressionEvident==="Yes";
+      fire.location_detail=location_detail;
+      if(!structureIncident&&data.rAcres)fire.acres_burned=Number(data.rAcres);
+      payload.fire_detail=fire;
+    }
   }
   if(structureIncident){
     const presence=v=>v==="Present"?"PRESENT":v==="Not Present"?"NOT_PRESENT":v==="Not Applicable"?"NOT_APPLICABLE":v;
@@ -942,13 +930,14 @@ function buildNerisPayload(data){
   }
   const hazardIncident=incidentTypes.some(x=>/^HAZSIT\\|/.test(String(x)));
   if(hazardIncident){
-    const haz={};
-    if(data.rHazDisposition)haz.hazsit_disposition=data.rHazDisposition;
-    if(data.rHazEvacuated!==undefined&&data.rHazEvacuated!=="")haz.hazsit_evacuated=Number(data.rHazEvacuated);
-    if(data.rChemicalName)haz.chemical_name=String(data.rChemicalName).split(/[,;\\n]+/).map(x=>x.trim()).filter(Boolean);
-    if(data.rChemicalClass)haz.chemical_dot_class=String(data.rChemicalClass).split(/[,;\\n]+/).map(x=>x.trim()).filter(Boolean);
-    if(data.rChemicalRelease)haz.chemical_release_occurred=[data.rChemicalRelease==="Yes"];
-    payload.hazsit_detail=haz;
+    const hazComplete=!!data.rHazDisposition && data.rHazEvacuated!=="";
+    if(hazComplete){
+      const haz={hazsit_disposition:data.rHazDisposition,hazsit_evacuated:Number(data.rHazEvacuated)};
+      if(data.rChemicalName)haz.chemical_name=String(data.rChemicalName).split(/[,;\\n]+/).map(x=>x.trim()).filter(Boolean);
+      if(data.rChemicalClass)haz.chemical_dot_class=String(data.rChemicalClass).split(/[,;\\n]+/).map(x=>x.trim()).filter(Boolean);
+      if(data.rChemicalRelease)haz.chemical_release_occurred=[data.rChemicalRelease==="Yes"];
+      payload.hazsit_detail=haz;
+    }
   }
   const primaryUse=data.rPrimaryUse||"";
   const secondaryUse=data.rSecondaryUse||"";
@@ -1223,37 +1212,34 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   }
   function jfdUpdateNerisRequirements(){
     const box=$("jfdNerisRequirementList"); if(!box)return;
-    const types=[ $("rPrimaryIncidentType")?.value, ...[...document.querySelectorAll("[id^='rIncidentType_']")].map(x=>x.value) ].filter(Boolean);
+    const types=[$("rPrimaryIncidentType")?.value,...[...document.querySelectorAll("[id^='rIncidentType_']")].map(x=>x.value)].filter(Boolean);
     const upper=types.join(" ").toUpperCase();
     const rows=[
       ["rCad","Incident / CAD number"],
+      ["rDispatchIncidentNumber","Dispatch incident number"],
       ["rLocation","Incident location"],
       ["rCallArrival","Call Arrival time"],
       ["rCallAnswered","Call Answered time"],
-      ["rCallCreate","Call Create time"]
+      ["rCallCreate","Call Create time"],
+      ["rPrimaryIncidentType","Primary incident type"]
     ];
-    if(types.length) rows.push(["rPrimaryIncidentType","Primary incident type"]);
-    if(types.length){
-      const responders=document.querySelectorAll("[data-unit-row]").length;
-      box.innerHTML=rows.map(([id,label])=>'<div class="bg-white border border-red-100 rounded-lg px-3 py-2 text-sm"><b>'+esc(label)+'</b><span class="text-red-700 text-xs ml-2">NERIS Required</span></div>').join("");
-    }else{
-      box.innerHTML='<div class="text-sm text-red-800 md:col-span-2">Select a NERIS incident type to display its conditional requirements.</div>';
+    const structure=types.some(x=>/^FIRE\|\|STRUCTURE_FIRE/.test(String(x)));
+    const confinedCooking=types.some(x=>/CONFINED_COOKING_APPLIANCE_FIRE/.test(String(x)));
+    if(structure){
+      rows.push(
+        ["rSmokePresence","Smoke alarm"],
+        ["rFireAlarm","Fire alarm"],
+        ["rOtherAlarm","Other alarm"],
+        ["rSuppression","Fire suppression"]
+      );
+      if(confinedCooking)rows.push(["rCookingSuppression","Cooking fire suppression"]);
     }
-    if(/\bFIRE\|/.test(upper)||types.some(x=>x==="FIRE")){
-      const fire=[["rFireLoc","Fire Location"],["rCondition","Arrival Condition"],["rDamageType","Damage Type"],["rWater","Water Supply"],["rInvestigation","Investigation Required?"]];
-      rows.push(...fire);
-      if(/STRUCTURE_FIRE/.test(upper)||/CONFINED_COOKING_APPLIANCE_FIRE/.test(upper)){
-        rows.push(["rSmokePresence","Smoke Alarm"],["rFireAlarm","Fire Alarm"],["rOtherAlarm","Other Alarm"],["rSuppression","Fire Suppression"]);
-      }
-      if(/CONFINED_COOKING_APPLIANCE_FIRE/.test(upper))rows.push(["rCookingSuppression","Cooking Fire Suppression"]);
+    if(!types.length){
+      box.innerHTML='<div class="text-sm text-red-800 md:col-span-2">Select a NERIS incident type to display the fields NERIS requires for this incident.</div>';
+      return;
     }
-    if(/HAZSIT\|/.test(upper))rows.push(["rHazDisposition","Hazardous Situation Disposition"],["rHazEvacuated","People Evacuated"]);
-    if(/MEDICAL\|/.test(upper))rows.push(["jfdPatientRequired","At least one Patient Care Report / patient"],["jfdPatientChiefRequired","Patient chief complaint"],["jfdPatientEvaluationRequired","Patient care evaluation"],["jfdPatientDispositionRequired","Patient disposition"]);
-    const list=$("jfdNerisRequirementList");
-    list.innerHTML=rows.map(([id,label])=>'<div class="bg-white border border-red-100 rounded-lg px-3 py-2 text-sm"><b>'+esc(label)+'</b><span class="text-red-700 text-xs ml-2">NERIS Required</span></div>').join("");
-    const ids=rows.map(x=>x[0]).filter(x=>x.startsWith("r"));
-    jfdMarkNerisRequired(ids);
-    if(/HAZSIT\|/.test(upper))jfdMarkNerisRequired(["rHazDisposition","rHazEvacuated"]);
+    box.innerHTML=rows.map(([id,label])=>'<div class="bg-white border border-red-100 rounded-lg px-3 py-2 text-sm"><b>'+esc(label)+'</b><span class="text-red-700 text-xs ml-2">NERIS Required</span></div>').join("");
+    jfdMarkNerisRequired(rows.map(x=>x[0]));
   }
   function fireDetails(i,d){
     return card("Fire Details",'<div class="grid md:grid-cols-2 gap-3">'+
@@ -1408,34 +1394,16 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       crew:JSON.parse(row.dataset.crew||"[]")
     }));
     data.additional_personnel=[...document.querySelectorAll("[data-report-person]:checked")].map(x=>Number(x.dataset.reportPerson));
-    const types=Array.isArray(data.incident_types)?data.incident_types.filter(Boolean):[data.rPrimaryIncidentType].filter(Boolean);
-    const hasFire=types.some(x=>/^FIRE\\|/.test(String(x))||x==="FIRE"),hasStructure=types.some(x=>/^FIRE\\|\\|STRUCTURE_FIRE/.test(String(x)));
-    const hasHaz=types.some(x=>/^HAZSIT\\|/.test(String(x))),hasMed=types.some(x=>/^MEDICAL\\|/.test(String(x)));
-    if(hasFire){
-      if(!data.rFireLoc)errors.push("NERIS Required: Fire Location.");
-      if(!data.rCondition)errors.push("NERIS Required: Arrival Condition.");
-      if(!data.rDamageType)errors.push("NERIS Required: Damage Type.");
-      if(!data.rWater)errors.push("NERIS Required: Water Supply.");
-      if(!data.rInvestigation)errors.push("NERIS Required: Investigation Required?.");
-      if(!data.rCause)errors.push("NERIS Required: Cause.");
-      if(!data.rRoom)errors.push("NERIS Required: Room Type.");
-    }
-    if(hasStructure){
-      ["rSmokePresence","rFireAlarm","rOtherAlarm","rSuppression"].forEach(id=>{if(!data[id])errors.push("Structure fire requires "+id.replace(/^r/,"")+" to be documented.");});
-      if(types.some(x=>/CONFINED_COOKING_APPLIANCE_FIRE/.test(String(x)))&&!data.rCookingSuppression)errors.push("Confined cooking appliance fires require Cooking Fire Suppression to be documented.");
-    }
-    if(hasHaz){
-      if(!data.rHazDisposition)errors.push("NERIS Required: Hazardous Situation Disposition.");
-      if(data.rHazEvacuated===""||data.rHazEvacuated===undefined)errors.push("NERIS Required: People Evacuated.");
-    }
-    if(hasMed&&!((data.patients||[]).length))errors.push("NERIS Required: At least one patient is required for a medical incident.");
+    // Do not enforce conditional NERIS module fields while collecting the report.
+    // The RMS preserves optional/departmental information, while the NERIS review/API
+    // gate enforces only the minimum fields applicable to the incident.
     if(window.currentReportKind==="pcr"){data.patients=collectPatients();data.rNarrative=(data.patients||[]).map(p=>p.narrative).filter(Boolean).join("\n\n");}
     data.incident_types=[data.rPrimaryIncidentType,...[...document.querySelectorAll("[id^='rIncidentType_']")].map(x=>x.value).filter(Boolean)];
     data.action_taken=$("rActionTaken")?.checked===true;data.no_action_taken=$("rNoActionTaken")?.checked===true;
     data.actions_taken=[...document.querySelectorAll("input[name='rActionsTaken']:checked")].map(x=>x.value);
     data.exposures=window.jfdRepeats?.exposures||[];data.casualties=window.jfdRepeats?.casualties||[];data.vehicles=window.jfdRepeats?.vehicles||[];data.hazards=window.jfdRepeats?.hazards||[];
     data.aid_records=[...(window.jfdAids?.fd||[])];data.nonfd_aid_records=[...(window.jfdAids?.nonfd||[])];
-    data.jasper_validation_version="2026-09-29";
+    data.jasper_validation_version="2026-09-30-neris-minimum";
     return data;
   };
   window.applyPreviousReportValues=function(data){
