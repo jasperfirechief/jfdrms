@@ -1298,6 +1298,23 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       crew:JSON.parse(row.dataset.crew||"[]")
     }));
     data.additional_personnel=[...document.querySelectorAll("[data-report-person]:checked")].map(x=>Number(x.dataset.reportPerson));
+    const types=Array.isArray(data.incident_types)?data.incident_types.filter(Boolean):[data.rPrimaryIncidentType].filter(Boolean);
+    const hasFire=types.some(x=>/^FIRE\\|/.test(String(x))||x==="FIRE"),hasStructure=types.some(x=>/^FIRE\\|\\|STRUCTURE_FIRE/.test(String(x)));
+    const hasHaz=types.some(x=>/^HAZSIT\\|/.test(String(x))),hasMed=types.some(x=>/^MEDICAL\\|/.test(String(x)));
+    if(hasFire){
+      if(!data.rFireLoc)errors.push("Fire incidents require Fire Location.");
+      if(!data.rCondition)errors.push("Fire incidents require Arrival Condition.");
+      if(!data.rDamageType)errors.push("Fire incidents require Damage Type.");
+    }
+    if(hasStructure){
+      ["rSmokePresence","rFireAlarm","rOtherAlarm","rSuppression"].forEach(id=>{if(!data[id])errors.push("Structure fire requires "+id.replace(/^r/,"")+" to be documented.");});
+      if(types.some(x=>/CONFINED_COOKING_APPLIANCE_FIRE/.test(String(x)))&&!data.rCookingSuppression)errors.push("Confined cooking appliance fires require Cooking Fire Suppression to be documented.");
+    }
+    if(hasHaz){
+      if(!data.rHazDisposition)errors.push("Hazardous situations require Hazardous Situation Disposition.");
+      if(data.rHazEvacuated==="")errors.push("Hazardous situations require the number of people evacuated.");
+    }
+    if(hasMed&&!((data.patients||[]).length))errors.push("Medical incidents require at least one patient.");
     if(window.currentReportKind==="pcr"){data.patients=collectPatients();data.rNarrative=(data.patients||[]).map(p=>p.narrative).filter(Boolean).join("\n\n");}
     data.incident_types=[data.rPrimaryIncidentType,...[...document.querySelectorAll("[id^='rIncidentType_']")].map(x=>x.value).filter(Boolean)];
     data.action_taken=$("rActionTaken")?.checked===true;data.no_action_taken=$("rNoActionTaken")?.checked===true;
