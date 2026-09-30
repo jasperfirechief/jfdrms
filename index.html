@@ -891,18 +891,6 @@ function buildNerisPayload(data){
     payload.fire_detail=fire;
   }
   if(structureIncident){
-      fire.structure_arrival_conditions=mapCondition[data.rCondition]||data.rCondition;
-      if(data.rDamageType)fire.structure_damage=mapDamage[data.rDamageType]||data.rDamageType;
-      if(data.rFloor!==undefined&&data.rFloor!=="")fire.structure_floor_of_origin=Number(data.rFloor);
-      if(data.rRoom)fire.structure_room_of_origin=mapRoom[data.rRoom]||data.rRoom;
-      if(data.rCause)fire.structure_fire_cause=mapCause[data.rCause]||data.rCause;
-    }else if(data.rCause){
-      fire.outside_fire_cause=mapCause[data.rCause]||data.rCause;
-      if(data.rAcres)fire.outside_fire_acres_burned=Number(data.rAcres);
-    }
-    payload.fire=fire;
-  }
-  if(structureIncident){
     const presence=v=>v==="Present"?"PRESENT":v==="Not Present"?"NOT_PRESENT":v==="Not Applicable"?"NOT_APPLICABLE":v;
     payload.smoke_alarm={presence:{type_rr_presence:presence(data.rSmokePresence)}};
     payload.fire_alarm={presence:{type_rr_presence:presence(data.rFireAlarm)}};
@@ -939,24 +927,23 @@ function buildNerisPayload(data){
   const parseUse=v=>{const p=String(v||"").split("||");return p.length===2?{use_type:p[0],use_subtype:p[1]}:null};
   const usePrimary=parseUse(primaryUse),useSecondary=parseUse(secondaryUse);
   const locationUse={};
-  if(usePrimary){locationUse.use_type=usePrimary.use_type;locationUse.use_subtype=usePrimary.use_subtype;}
-  if(useSecondary){locationUse.use_secondary=true;locationUse.use_type_secondary=useSecondary.use_type;locationUse.use_subtype_secondary=useSecondary.use_subtype;}
-  if(data.rLocationInUse)locationUse.use_status=data.rLocationInUse==="Yes";
-  if(data.rUsedAsIntended)locationUse.use_intended=data.rUsedAsIntended==="Yes";
-  if(data.rVacancy)locationUse.use_vacancy=data.rVacancy;
+  if(usePrimary)locationUse.use_type=primaryUse;
+  if(useSecondary)locationUse.secondary_use=secondaryUse;
+  if(data.rLocationInUse)locationUse.in_use={in_use:data.rLocationInUse==="Yes"};
+  if(data.rVacancy)locationUse.vacancy_cause=data.rVacancy;
   if(Object.keys(locationUse).length)payload.base.location_use=locationUse;
-  if(data.rPeoplePresent)payload.base.people_present=data.rPeoplePresent==="Yes";
-  if(data.rActions)payload.actions_tactics={action_noaction:{type:"ACTION",actions:[]}};
+  if(data.rActionsTaken||Array.isArray(data.actions_taken)&&data.actions_taken.length){
+    const actions=Array.isArray(data.actions_taken)?data.actions_taken.filter(Boolean):[];
+    payload.actions_tactics={action_noaction:{type:actions.length?"ACTION":"NO_ACTION",...(actions.length?{actions}:{})}};
+  }
   const aidDirection=data.rAidDirection||"";
   const aidType=data.rAidType||"";
   const departments=String(data.rAidDepartments||"").split(/[\n,;]+/).map(x=>x.trim()).filter(Boolean);
-  const nonfd=Array.isArray(data.rNonFdAid)?data.rNonFdAid:[];
-  if(aidDirection||aidType||departments.length||nonfd.length){
-    payload.base.aid_direction=aidDirection||undefined;
-    payload.base.aid_type=aidType||undefined;
-    payload.base.aid_department_name=departments;
-    payload.base.aid_nonfd=nonfd;
+  if(departments.length){
+    payload.aids=departments.map(department_neris_id=>({department_neris_id,aid_type:aidType||"SUPPORT_AID",aid_direction:aidDirection||"RECEIVED"}));
   }
+  const nonfd=Array.isArray(data.rNonFdAid)?data.rNonFdAid:[];
+  if(nonfd.length)payload.nonfd_aids=nonfd;
   return payload;
 }
 async function submitReportToNeris(data,incidentId){
