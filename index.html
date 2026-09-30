@@ -436,7 +436,7 @@ async function validateIncidentForNeris(currentKind,currentData,incidentId,cad){
   const all=reports.map(x=>x?.data||{}).concat(currentData||{});
   const kinds=reports.map(x=>String(x?.report_type||"")).concat(currentKind==="fire"?"fire_neris_v2":"pcr_neris_v2");
   const hasFire=kinds.some(x=>x.startsWith("fire_")),hasMedical=kinds.some(x=>x.startsWith("pcr_"));
-  const typeText=all.map(x=>[x.rIncidentType,x.rIncidentTypes].filter(Boolean).join(" ")).join(" ").toUpperCase();
+  const typeText=all.map(x=>[x.rPrimaryIncidentType,x.rSecondaryIncidentType,x.rIncidentType,x.rIncidentTypes,x.incident_types].filter(Boolean).flatMap(x=>Array.isArray(x)?x:[x]).join(" ")).join(" ").toUpperCase();
   const fireType=/FIRE|STRUCTURE_FIRE|WILDLAND|VEHICLE_FIRE/.test(typeText),medicalType=/MEDICAL|EMS/.test(typeText);
   const finalFire=hasFire||fireType,finalMedical=hasMedical||medicalType;
   const incidentNumber=i.incident_number||i.cad||all.map(x=>x.rCad).find(Boolean)||"";
@@ -899,6 +899,18 @@ function buildNerisPayload(data){
     if(/CONFINED_COOKING_APPLIANCE_FIRE/.test(incidentTypes.join(" "))&&data.rCookingSuppression){
       payload.cooking_fire_suppression={presence:{type_rr_presence:presence(data.rCookingSuppression)}};
     }
+  }
+  const patients=Array.isArray(data.patients)?data.patients:[];
+  if(patients.length){
+    const careMap={"Evaluated and cared for":"PATIENT_EVALUATED_CARE_PROVIDED","Evaluated and refused care":"PATIENT_EVALUATED_REFUSED_CARE","Evaluated, no care required":"PATIENT_EVALUATED_NO_CARE_REQUIRED","Refused evaluation/care":"PATIENT_REFUSED_EVALUATION_CARE","Support services provided":"PATIENT_SUPPORT_SERVICES_PROVIDED","DOA":"PATIENT_DEAD_ON_ARRIVAL"};
+    const statusMap={Improved:"IMPROVED",Unchanged:"UNCHANGED,Worsened:"WORSE"};
+    const transportMap={"Transport by EMS Unit":"TRANSPORT_BY_EMS_UNIT","Transport by Other Agency":"OTHER_AGENCY_TRANSPORT","Patient Refused Transport":"PATIENT_REFUSED_TRANSPORT","Non-Patient Transport":"NONPATIENT_TRANSPORT","No Transport":"NO_TRANSPORT"};
+    payload.medical=patients.map((p,i)=>({
+      patient_care_report:String(p.careReport||data.rCad||incidentNumber||("JFD-P"+(i+1))),
+      patient_evaluation_care:careMap[p.evaluation]||p.evaluation,
+      ...(p.status?{patient_improved_status:statusMap[p.status]||p.status}:{}),
+      ...(p.transportDisposition?{medical_disposition:transportMap[p.transportDisposition]||p.transportDisposition}:p.transport?{medical_disposition:transportMap[p.transport]||p.transport}:{})
+    }));
   }
   const primaryUse=data.rPrimaryUse||"";
   const secondaryUse=data.rSecondaryUse||"";
