@@ -41,10 +41,11 @@ export default async function handler(req,res){
     };
     if(isFire){
       payload.fire_detail=isStructure?{
-        location_detail:{STRUCTURE:{arrival_condition:"SMOKE_FIRE_SHOWING",progression_evident:true,damage_type:"MODERATE_DAMAGE",floor_of_origin:1,room_of_origin_type:"KITCHEN",cause:"OPERATING_EQUIPMENT"}},
+        location_detail:{type:"STRUCTURE",arrival_condition:"SMOKE_FIRE_SHOWING",progression_evident:true,damage_type:"MODERATE_DAMAGE",floor_of_origin:1,room_of_origin_type:"KITCHEN",cause:"OPERATING_EQUIPMENT"},
         water_supply:"TANK_WATER",investigation_needed:"NO",investigation_types:[]
       }:{
-        location_detail:{type:"OUTSIDE",arrival_condition:"SMOKE_FIRE_SHOWING",damage_type:"NO_DAMAGE",cause:"ACT_OF_NATURE"}
+        location_detail:{type:"OUTSIDE",cause:"NATURAL"},
+        water_supply:"TANK_WATER",investigation_needed:"NO",investigation_types:[]
       };
     }
     if(isStructure){
