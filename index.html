@@ -330,7 +330,7 @@ function renderInspectionChecklist(){
   ];
   box.innerHTML=sections.map(([title,items])=>{
     const rows=items.map((item,index)=>{
-      const label=item[0],ref=item[1],key="inspection-"+String(title||"").split("").map(function(ch){return /[a-z0-9]/i.test(ch)?ch:"-"}).join("")+"-"+index;
+      const label=item[0],ref=item[1],key="inspection-"+String(title||"").split("").map(function(ch){var n=ch.toLowerCase();return (n>="a"&&n<="z")||(n>="0"&&n<="9")?ch:"-"}).join("")+"-"+index;
       return '<div class="border-b last:border-0 py-3"><div class="font-semibold text-sm">'+esc(label)+'</div><div class="text-xs text-slate-500 mt-1">'+esc(ref)+'</div><div class="grid md:grid-cols-[auto_180px_1fr] gap-2 items-center mt-2"><label class="text-sm font-medium flex items-center gap-2"><input type="checkbox" class="mt-1" data-inspection-present="'+esc(key)+'"> Checked</label><select data-inspection-check="'+esc(key)+'" class="border rounded p-2 text-sm"><option value="">Select</option><option value="OK">OK</option><option value="Violation">Violation</option><option value="N/A">N/A</option></select><input data-inspection-note="'+esc(key)+'" class="border rounded p-2 text-sm" placeholder="Notes / violation details"></div></div>';
     }).join("");
     return '<div class="card p-4"><h2 class="font-black mb-3">'+esc(title)+'</h2><div class="space-y-2">'+rows+'</div></div>';
@@ -806,7 +806,7 @@ function nerisIso(v,fallback){
 }
 function buildNerisLocation(value,lat,lng){
   const raw=String(value||"").trim();
-  const parts=String(raw||"").trim().split(/\\s+/); const m=parts.length>=2&&/^[0-9]+$/.test(parts[0])?[parts[0],parts.slice(1).join(" ")]:null;
+  const parts=String(raw||"").trim().split(" ").filter(Boolean); const first=parts[0]||""; const numeric=first.length>0&&first.split("").every(function(ch){return ch>="0"&&ch<="9"}); const m=parts.length>=2&&numeric?[first,parts.slice(1).join(" ")]:null;
   const loc={country:"US",state:"AL"};
   if(m){loc.number=Number(m[1]);loc.street=m[2];}else if(raw)loc.street=raw;
   if(lat!==""&&lng!==""&&!Number.isNaN(Number(lat))&&!Number.isNaN(Number(lng))){
