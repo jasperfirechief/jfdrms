@@ -834,7 +834,8 @@ function buildNerisPayload(data){
   const times=[arrival,answered,create].sort();
   const callArrival=times[0],callAnswered=times[1],callCreate=times[2];
   const primaryType=data.rPrimaryIncidentType||data.rNerisType||data.rIncidentType||"FIRE||STRUCTURE_FIRE||STRUCTURAL_INVOLVEMENT_FIRE";
-  const incidentTypes=[primaryType].concat(data.rSecondaryIncidentType?[data.rSecondaryIncidentType]:[]).filter(Boolean);
+  const selectedTypes=Array.isArray(data.incident_types)?data.incident_types.filter(Boolean):[];
+  const incidentTypes=[primaryType,...selectedTypes.filter(x=>x!==primaryType),...(data.rSecondaryIncidentType?[data.rSecondaryIncidentType]:[])].filter(Boolean).filter((x,i,a)=>a.indexOf(x)===i);
   const location=buildNerisLocation(data.rLocation,data.rLatitude,data.rLongitude);
   const units=(data.responding_apparatus||[]).filter(u=>u.unit_number).map(u=>{
     const t=u.times||{};
