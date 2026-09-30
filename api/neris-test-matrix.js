@@ -34,14 +34,14 @@ export default async function handler(req,res){
   if(!tr.ok||!td.access_token)return res.status(502).json({ok:false,stage:"authentication",status:tr.status});
 
   const headers={Authorization:"Bearer "+td.access_token,"Content-Type":"application/json","User-Agent":"JasperFireDepartmentRMS/1.0"};
-  const location={country:"US",state:"AL",number:100,street:"Test Street",incorporated_municipality:"Jasper",postal_code:"35501"};
+  const testLocation={country:"US",state:"AL",number:100,street:"Test Street",incorporated_municipality:"Jasper",postal_code:"35501"};
   const iso=n=>new Date(Date.now()-n*60000).toISOString();
   if(url.searchParams.get("mode")==="combos"){
     const results=[];
     for(const combo of combos){
       const incidentNumber="TEST-COMBO-"+Date.now()+"-"+results.length;
       const groups=combo.map(x=>x.split("||")[0]);
-      const payload={base:{department_neris_id:dept,incident_number:incidentNumber,location,outcome_narrative:"JFD NERIS combination validation"},incident_types:combo.map(type=>({type})),dispatch:{incident_number:incidentNumber,call_arrival:iso(3),call_answered:iso(2),call_create:iso(1),location,unit_responses:[{reported_unit_id:"JFD-TEST",dispatch:iso(1),enroute_to_scene:iso(1),on_scene:iso(2),unit_clear:iso(0),unable_to_dispatch:false}]}};
+      const payload={base:{department_neris_id:dept,incident_number:incidentNumber,testLocation,outcome_narrative:"JFD NERIS combination validation"},incident_types:combo.map(type=>({type})),dispatch:{incident_number:incidentNumber,call_arrival:iso(3),call_answered:iso(2),call_create:iso(1),testLocation,unit_responses:[{reported_unit_id:"JFD-TEST",dispatch:iso(1),enroute_to_scene:iso(1),on_scene:iso(2),unit_clear:iso(0),unable_to_dispatch:false}]}};
       if(groups.includes("FIRE")) payload.fire_detail={location_detail:{type:"STRUCTURE",arrival_condition:"SMOKE_FIRE_SHOWING",progression_evident:true,damage_type:"MODERATE_DAMAGE",floor_of_origin:1,room_of_origin_type:"KITCHEN",cause:"OPERATING_EQUIPMENT"},water_supply:"TANK_WATER",investigation_needed:"NO",investigation_types:[]};
       if(groups.includes("FIRE")){const np={type_rr_presence:"NOT_PRESENT"};payload.smoke_alarm={presence:np};payload.fire_alarm={presence:{type_rr_presence:"NOT_PRESENT"}};payload.other_alarm={presence:{type_rr_presence:"NOT_PRESENT"}};payload.fire_suppression={presence:{type_rr_presence:"NOT_PRESENT"}};if(combo.some(x=>x.includes("CONFINED_COOKING_APPLIANCE_FIRE")))payload.cooking_fire_suppression={presence:{type_rr_presence:"NOT_PRESENT"}};}
       if(groups.includes("HAZSIT")) payload.hazsit_detail={disposition:"COMPLETED_FIRE_SERVICE_ONLY",evacuated:0};
@@ -62,14 +62,14 @@ export default async function handler(req,res){
     const isMedical=group==="MEDICAL";
     const incidentNumber="TEST-EXHAUSTIVE-"+offset+"-"+results.length+"-"+Date.now();
     const payload={
-      base:{department_neris_id:dept,incident_number:incidentNumber,location,outcome_narrative:"JFD NERIS test validation"},
+      base:{department_neris_id:dept,incident_number:incidentNumber,testLocation,outcome_narrative:"JFD NERIS test validation"},
       incident_types:[{type}],
       dispatch:{
         incident_number:incidentNumber,
         call_arrival:iso(3),
         call_answered:iso(2),
         call_create:iso(1),
-        location,
+        testLocation,
         unit_responses:[{reported_unit_id:"JFD-TEST",dispatch:iso(1),enroute_to_scene:iso(1),on_scene:iso(2),unit_clear:iso(0),unable_to_dispatch:false}]
       }
     };
