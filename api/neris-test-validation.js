@@ -26,6 +26,10 @@ export default async function handler(req, res) {
       location: { country: "US", state: "AL", number: 100, street: "Test Street", incorporated_municipality: "Jasper", postal_code: "35501" }
     },
     incident_types: [{ type: "FIRE||STRUCTURE_FIRE||ROOM_AND_CONTENTS_FIRE" }],
+    smoke_alarm_presence: "NOT_PRESENT",
+    fire_alarm_presence: "NOT_PRESENT",
+    other_alarm_presence: "NOT_PRESENT",
+    fire_suppression_presence: "NOT_PRESENT",
     dispatch: {
       incident_number: "TEST-20260930-001",
       call_arrival: "2026-09-30T02:00:00Z",
