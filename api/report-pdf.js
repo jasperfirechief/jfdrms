@@ -67,10 +67,19 @@ export async function makePdf(incident,reports){
          ({page,y}=section(page,font,"REFUSAL DOCUMENTATION",y,m));
          y=wrap(page,font,"Patient/Guardian was advised of the risks of refusing medical evaluation, treatment, and/or transport. The patient/guardian indicated understanding and declined the documented care or transport.",m,y,W-2*m,8,11);
          y=line(page,font,"Refusal Type",[(p.refusedCare?"Refused evaluation/care":""),(p.refusedTransport?"Refused transport":""),(p.minorRefusal?"Parent/Guardian refusal":"")].filter(Boolean).join("; "),y,m);
-         y=line(page,font,"Patient / Guardian",p.refusalSigner,y,m);y=line(page,font,"Refusal Date/Time",fmtTime(p.refusalTime),y,m);
+         y=line(page,font,"Patient / Guardian",p.refusalSigner,y,m);
+         y=line(page,font,"Refusal Date/Time",fmtTime(p.refusalTime),y,m);
          if(Array.isArray(p.minorPatients)&&p.minorPatients.length){y=wrap(page,font,"Minor Patients: "+p.minorPatients.map(x=>x.name+" ("+fmtDate(x.dob)+")").join("; "),m,y,W-2*m,8,11)}
-         if(p.signature){y-=3;page.drawText("Patient / Guardian Signature",{x:m,y,font:bold,size:8});y-=8;try{const img=await pdf.embedPng(Buffer.from(String(p.signature).split(",")[1],"base64"));page.drawImage(img,{x:m,y:y-65,width:240,height:60});page.drawRectangle({x:m,y:y-65,width:240,height:60,borderWidth:.5,borderColor:rgb(.6,.6,.6)});y-=78}catch{}}
+         y=line(page,font,"Guardian Relationship",p.guardianRelationship||p.relationship,y,m);
+         y=line(page,font,"Risks Explained / Acknowledged",p.refusalRisks||"Yes",y,m);
+         y-=4;
+         page.drawText("PATIENT / GUARDIAN SIGNATURE",{x:m,y,font:bold,size:8});y-=8;
+         if(p.signature){try{const img=await pdf.embedPng(Buffer.from(String(p.signature).split(",")[1],"base64"));page.drawImage(img,{x:m,y:y-65,width:240,height:60});page.drawRectangle({x:m,y:y-65,width:240,height:60,borderWidth:.5,borderColor:rgb(.6,.6,.6)});y-=78}catch{y-=16}}
+         else {page.drawLine({start:{x:m,y},end:{x:m+240,y}});y-=16}
+         y=line(page,font,"Signed By",p.refusalSigner,y,m);
          y=line(page,font,"Provider Signature","JFD RMS user / electronic record",y,m);
+         y=line(page,font,"Witness",p.witnessName||"Not recorded",y,m);
+         y=line(page,font,"Witness Signature",p.witnessSignature?"Electronic signature recorded":"Not recorded",y,m);
        }
      }
    }else{
