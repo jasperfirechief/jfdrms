@@ -13,9 +13,9 @@ export default async function handler(req,res){
     ["mva","HAZSIT||HAZARD_NONCHEM||MOTOR_VEHICLE_COLLISION"],
     ["hazmat_gas","HAZSIT||HAZARDOUS_MATERIALS||GAS_LEAK_ODOR"],
     ["hazmat_fuel","HAZSIT||HAZARDOUS_MATERIALS||FUEL_SPILL_ODOR"],
-    ["rescue_person","RESCUE||NONFF||PERSON_RESCUE"],
-    ["rescue_vehicle","RESCUE||NONFF||VEHICLE_RESCUE"],
-    ["firefighter_rescue","RESCUE||FF||FIREFIGHTER_RESCUE"],
+    ["rescue_person","RESCUE||OUTSIDE||LOW_ANGLE_RESCUE"],
+    ["rescue_vehicle","RESCUE||TRANSPORTATION||MOTOR_VEHICLE_EXTRICATION_ENTRAPPED"],
+    ["firefighter_rescue","RESCUE||STRUCTURE||EXTRICATION_ENTRAPPED"],
     ["public_service","PUBSERV||CITIZEN_ASSIST||CITIZEN_ASSIST_SERVICE_CALL"],
     ["cancelled","NOEMERG||CANCELLED"]
   ];
@@ -29,9 +29,9 @@ export default async function handler(req,res){
   const out=[];
   for(const [name,type] of selected){
     const n="TEST-MATRIX-"+name.toUpperCase()+"-"+Date.now();
-    const t1=new Date(),t2=new Date(t1.getTime()+60000),t3=new Date(t1.getTime()+120000);
+    const t3=new Date(Date.now()-60000),t2=new Date(t3.getTime()-60000),t1=new Date(t2.getTime()-60000);
     const location={country:"US",state:"AL",number:100,street:"Test Street",incorporated_municipality:"Jasper",postal_code:"35501"};
-    const payload={base:{department_neris_id:dept,incident_number:n,incident_types:[{type}],location},incident_types:[{type}],dispatch:{incident_number:n,call_arrival:t1.toISOString(),call_answered:t2.toISOString(),call_create:t3.toISOString(),location,unit_responses:[]}};
+    const payload={base:{department_neris_id:dept,incident_number:n,location},incident_types:[{type}],dispatch:{incident_number:n,call_arrival:t1.toISOString(),call_answered:t2.toISOString(),call_create:t3.toISOString(),location,unit_responses:[]}};
     if(name==="structure_fire"){payload.smoke_alarm={presence:{type_rr_presence:"NOT_PRESENT"}};payload.fire_alarm={presence:{type_rr_presence:"NOT_PRESENT"}};payload.other_alarm={presence:{type_rr_presence:"NOT_PRESENT"}};payload.fire_suppression={presence:{type_rr_presence:"NOT_PRESENT"}};}
     const vr=await fetch(baseUrl+"/incident/"+encodeURIComponent(dept)+"/validate",{method:"POST",headers,body:JSON.stringify(payload)});
     const raw=await vr.text();let details;try{details=JSON.parse(raw)}catch{details={raw}};
