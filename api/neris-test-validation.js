@@ -3,7 +3,6 @@ export default async function handler(req, res) {
   const clientId = String(process.env.NERIS_CLIENT_ID || "");
   const clientSecret = String(process.env.NERIS_CLIENT_SECRET || "");
   const departmentId = String(process.env.NERIS_DEPARTMENT_ID || "");
-
   if (req.method !== "GET") return res.status(405).json({ ok: false, error: "GET only" });
   if (!clientId || !clientSecret || !departmentId) return res.status(500).json({ ok: false, error: "NERIS test configuration missing" });
 
@@ -15,11 +14,18 @@ export default async function handler(req, res) {
   });
   const tokenText = await tokenResponse.text();
   let tokenData; try { tokenData = JSON.parse(tokenText); } catch { tokenData = {}; }
-  if (!tokenResponse.ok || !tokenData.access_token) {
-    return res.status(502).json({ ok: false, stage: "authentication", status: tokenResponse.status });
-  }
+  if (!tokenResponse.ok || !tokenData.access_token) return res.status(502).json({ ok: false, stage: "authentication", status: tokenResponse.status });
 
-  const payload = { base: { department_neris_id: departmentId } };
+  const payload = {
+    base: {
+      department_neris_id: departmentId,
+      incident_number: "TEST-20260930-001",
+      location: { address: { street: "100 Sample Street", city: "Jasper", state: "AL", postal_code: "35501" } }
+    },
+    incident_types: [{ type: "FIRE" }],
+    dispatch: { event_opened: "2026-09-30T02:00:00Z" }
+  };
+
   const validationResponse = await fetch(baseUrl + "/incident/" + encodeURIComponent(departmentId) + "/validate", {
     method: "POST",
     headers: { Authorization: "Bearer " + tokenData.access_token, "Content-Type": "application/json", "User-Agent": "JasperFireDepartmentRMS/1.0" },
@@ -28,11 +34,5 @@ export default async function handler(req, res) {
   const validationText = await validationResponse.text();
   let details; try { details = JSON.parse(validationText); } catch { details = { raw: validationText }; }
 
-  return res.status(200).json({
-    ok: validationResponse.ok,
-    submitted: false,
-    stage: "validation",
-    status: validationResponse.status,
-    details
-  });
+  return res.status(200).json({ ok: validationResponse.ok, submitted: false, stage: "validation", status: validationResponse.status, details });
 }
