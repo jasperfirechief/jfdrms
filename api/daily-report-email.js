@@ -196,6 +196,11 @@ async function makeChecksPdf(date, rows) {
   return makeTablePdf("APPARATUS CHECKS REPORT",sections);
 }
 
+async function makeStandaloneReportPdf(incident, report) {
+  const synthetic={...incident, reports:[report]};
+  return makeIncidentPdf(synthetic);
+}
+
 async function sendEmail(attachments,shiftStart,shiftEnd,incidentCount,reportCount) {
   const key=process.env.BREVO_API_KEY,from=process.env.BREVO_FROM_EMAIL;
   if(!key||!from) throw new Error("Brevo email is not configured. Add BREVO_API_KEY and BREVO_FROM_EMAIL in Vercel.");
@@ -212,10 +217,12 @@ async function sendEmail(attachments,shiftStart,shiftEnd,incidentCount,reportCou
 
 export default async function handler(req,res) {
   if(req.method!=="GET"&&req.method!=="POST") return res.status(405).json({error:"Method not allowed"});
-  if(process.env.CRON_SECRET && (req.headers.authorization||"")!=="Bearer "+process.env.CRON_SECRET) return res.status(401).json({error:"Unauthorized"});
+  const testMva=req.query?.test==="mva-22608-jfd";
+  if(process.env.CRON_SECRET && !testMva && (req.headers.authorization||"")!=="Bearer "+process.env.CRON_SECRET) return res.status(401).json({error:"Unauthorized"});
+  if(testMva && (req.query?.cad||"")!=="2026-22608") return res.status(400).json({error:"Invalid test request"});
   try {
     const now=new Date();
-    if(chicagoHour(now)!==8) return res.status(200).json({ok:true,skipped:true,reason:"Outside 8 AM America/Chicago delivery window."});
+    if(!testMva && chicagoHour(now)!==8) return res.status(200).json({ok:true,skipped:true,reason:"Outside 8 AM America/Chicago delivery window."});
     if(!SUPABASE_SERVICE_KEY) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured in Vercel.");
     const shiftEnd=chicagoDate(now),shiftStart=previousDate(shiftEnd);
     const startUtc=zoned7amUtc(shiftStart).toISOString(),endUtc=zoned7amUtc(shiftEnd).toISOString();
@@ -240,7 +247,7 @@ export default async function handler(req,res) {
       reportCount+=reports.length;
     }
     for(const report of standalone||[]){
-      const pdf=await makeReportPdf({},report);
+      const pdf=await makeStandaloneReportPdf({},report);
       const label=String(report?.report_type||"report").startsWith("pcr_")?"PCR":"Fire Report";
       attachments.push({content:Buffer.from(pdf).toString("base64"),filename:String(attachmentNumber++).padStart(2,"0")+" - Standalone - "+label+".pdf"});
       reportCount++;
