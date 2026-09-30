@@ -57,7 +57,7 @@ export default async function handler(req,res){
       if(isCooking)payload.cooking_fire_suppression={presence:{type_rr_presence:"NOT_PRESENT"}};
     }
     if(isHaz){
-      payload.hazsit_detail={hazsit_disposition:"NO_HAZARD",hazsit_evacuated:0};
+      payload.hazsit_detail={disposition:"COMPLETED_FIRE_SERVICE_ONLY",evacuated:0};
     }
     if(isMedical){
       payload.medical_details=[{
