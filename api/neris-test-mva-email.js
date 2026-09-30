@@ -33,9 +33,9 @@ export default async function handler(req,res){
       },
       {
         patient_care_report:incidentNumber+"-P2",
-        patient_evaluation_care:"PATIENT_EVALUATED_CARE_PROVIDED",
-        patient_improved_status:"IMPROVED",
-        medical_disposition:"OTHER_AGENCY_TRANSPORT"
+        patient_care_evaluation:"PATIENT_EVALUATED_CARE_PROVIDED",
+        patient_status:"IMPROVED",
+        transport_disposition:"OTHER_AGENCY_TRANSPORT"
       }
     ]
   };
@@ -96,4 +96,4 @@ export default async function handler(req,res){
     return res.status(500).json({ok:false,incident_number:incidentNumber,error:e?.message||String(e)});
   }
 }
-// one-time runner trigger 6
+// one-time runner trigger 7
