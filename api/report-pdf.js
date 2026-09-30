@@ -8,7 +8,7 @@ function header(page,font,title,incident,m){let y=792-m;page.drawText("JASPER FI
 function section(page,font,title,y,m){page.drawText(title,{x:m,y,font:font.bold,size:11,color:rgb(.12,.18,.25)});y-=15;return {page,y}}
 function line(page,font,label,value,y,m){page.drawText(label,{x:m,y,font:font.bold,size:8});page.drawText(text(value)||"—",{x:m+115,y,font:font.reg,size:8});return y-12}
 function addSig(pdf,page,font,dataUrl,x,y,w,h){if(!dataUrl||!String(dataUrl).startsWith("data:image/png"))return false;try{const b=Buffer.from(String(dataUrl).split(",")[1],"base64");return pdf.embedPng(b).then(img=>{page.drawImage(img,{x,y,width:w,height:h});page.drawRectangle({x,y,width:w,height:h,borderWidth:.5,borderColor:rgb(.6,.6,.6)});return true})}catch{return false}}
-async function makePdf(incident,reports){
+export async function makePdf(incident,reports){
  const pdf=await PDFDocument.create(),reg=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold),font={reg,bold},W=612,H=792,m=42;
  let page=pdf.addPage([W,H]),y=H-m;
  page.drawText("JASPER FIRE DEPARTMENT",{x:m,y,font:bold,size:20,color:rgb(.65,.02,.02)});y-=27;
