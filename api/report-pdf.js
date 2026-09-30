@@ -9,91 +9,219 @@ function section(page,font,title,y,m){page.drawText(title,{x:m,y,font:font.bold,
 function line(page,font,label,value,y,m){page.drawText(label,{x:m,y,font:font.bold,size:8});page.drawText(text(value)||"—",{x:m+115,y,font:font.reg,size:8});return y-12}
 function addSig(pdf,page,font,dataUrl,x,y,w,h){if(!dataUrl||!String(dataUrl).startsWith("data:image/png"))return false;try{const b=Buffer.from(String(dataUrl).split(",")[1],"base64");return pdf.embedPng(b).then(img=>{page.drawImage(img,{x,y,width:w,height:h});page.drawRectangle({x,y,width:w,height:h,borderWidth:.5,borderColor:rgb(.6,.6,.6)});return true})}catch{return false}}
 export async function makePdf(incident,reports){
- const pdf=await PDFDocument.create(),reg=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold),font={reg,bold},W=612,H=792,m=42;
+ const pdf=await PDFDocument.create();
+ const reg=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
+ const font={reg,bold},W=612,H=792,m=42,usable=W-2*m;
  let page=pdf.addPage([W,H]),y=H-m;
+
+ const val=v=>text(v)||"—";
+ const newPage=()=>{page=pdf.addPage([W,H]);y=H-m;return page};
+ const need=space=>{if(y<58+space)newPage();return y};
+ const drawLine=(label,value)=>{need(18);page.drawText(String(label),{x:m,y,font:bold,size:8,color:rgb(.12,.18,.25)});y=wrap(page,font,val(value),m+120,y,usable-120,8,11);return y};
+ const drawWrap=(label,value)=>{need(28);y=wrap(page,font,String(label)+": "+val(value),m,y,usable,8,11,true);return y};
+ const heading=title=>{need(38);page.drawText(title,{x:m,y,font:bold,size:11,color:rgb(.12,.18,.25)});y-=17;return y};
+ const reportType=r=>String(r?.report_type||"");
+ const fireReports=(reports||[]).filter(r=>reportType(r).startsWith("fire_"));
+ const pcrReports=(reports||[]).filter(r=>reportType(r).startsWith("pcr_"));
+ const primary=fireReports[0]?.data||reports?.[0]?.data||{};
+ const allPatients=pcrReports.flatMap(r=>Array.isArray(r?.data?.patients)?r.data.patients:[]);
+
+ // PAGE 1: public-facing basics only. This is suitable for an owner/occupant
+ // to take to an assistance organization without exposing technical/medical data.
  page.drawText("JASPER FIRE DEPARTMENT",{x:m,y,font:bold,size:20,color:rgb(.65,.02,.02)});y-=27;
- page.drawText("PUBLIC INCIDENT SUMMARY",{x:m,y,font:bold,size:14});y-=20;
- y=wrap(page,font,"CAD / Incident: "+text(incident?.cad||incident?.incident_number||"Manual"),m,y,W-2*m,10,13,true);
- y=wrap(page,font,"Type: "+text(reports?.[0]?.data?.rPrimaryIncidentType||incident?.type||"Incident"),m,y,W-2*m,10,13);
- y=wrap(page,font,"Location: "+text(incident?.location||"Location not provided"),m,y,W-2*m,10,13);
- y-=10;
- const pCount=reports.flatMap(r=>Array.isArray(r?.data?.patients)?r.data.patients:[]).length;
- const transported=reports.flatMap(r=>Array.isArray(r?.data?.patients)?r.data.patients:[]).filter(p=>String(p.transportDisposition||"").startsWith("Transport")).length;
- const refused=reports.flatMap(r=>Array.isArray(r?.data?.patients)?r.data.patients:[]).filter(p=>p.refusedTransport||p.minorRefusal||p.transportDisposition==="Patient Refused Transport").length;
- for(const [label,val] of [["Patients",pCount||"None"],["Transported",transported],["Refused Transport",refused],["Report Date",fmtDate(incident?.dispatch_time)]])y=line(page,font,label,val,y,m);
- y-=8;page.drawText("PUBLIC SUMMARY",{x:m,y,font:bold,size:11});y-=16;
- const narrative=reports.map(r=>r?.data?.rNarrative).filter(Boolean).join("\n\n")||reports.flatMap(r=>r?.data?.patients||[]).map(p=>p.narrative).filter(Boolean).join("\n\n")||"Jasper Fire Department responded and documented the incident.";
- y=wrap(page,font,narrative,m,y,W-2*m,9,12);
- y-=10;page.drawText("Patient names, medical details, signatures, and other restricted departmental information are contained on subsequent pages.",{x:m,y,font:reg,size:7,color:rgb(.4,.4,.4)});
- for(const rep of reports){
-   const data=rep?.data||{};
-   page=pdf.addPage([W,H]);y=header(page,font,title(rep?.report_type),incident,m);
-   if(String(rep?.report_type||"").startsWith("pcr_")){
-     const patients=Array.isArray(data.patients)?data.patients:[];
-     const units=Array.isArray(data.responding_apparatus)?data.responding_apparatus:[];
-     ({page,y}=section(page,font,"INCIDENT / RESPONSE",y,m));
-     y=line(page,font,"Primary Incident Type",data.rPrimaryIncidentType,y,m);
-     y=line(page,font,"Shift",data.rShift,y,m);
-     y=line(page,font,"Call Arrival",fmtTime(data.rCallArrival),y,m);
-     y=line(page,font,"Call Answered",fmtTime(data.rCallAnswered),y,m);
-     y=line(page,font,"Call Create",fmtTime(data.rCallCreate),y,m);
-     y-=4;
-     ({page,y}=section(page,font,"RESPONDING APPARATUS",y,m));
-     for(const u of units){y=wrap(page,font,(u.unit_number||"Unit")+" · "+(u.crew||[]).join(", "),m,y,W-2*m,8,11,true);}
-     for(let pi=0;pi<patients.length;pi++){
-       const p=patients[pi]||{};
-       if(pi>0){page=pdf.addPage([W,H]);y=header(page,font,"PATIENT CARE REPORT · PATIENT "+(pi+1),incident,m)}else{y-=5;page.drawText("PATIENT "+(pi+1),{x:m,y,font:bold,size:14});y-=20}
-       ({page,y}=section(page,font,"PATIENT INFORMATION",y,m));
-       y=line(page,font,"Name",p.name,y,m);y=line(page,font,"DOB",fmtDate(p.dob),y,m);y=line(page,font,"Sex",p.gender,y,m);y=line(page,font,"Age",p.age,y,m);y=line(page,font,"Address",p.address,y,m);y=line(page,font,"Phone",p.phone||p.contactPhone,y,m);y=line(page,font,"Chief Complaint",p.chief,y,m);y=line(page,font,"Injury / Medical Complaint",p.injury,y,m);y=line(page,font,"Medical History",p.medicalHistory||p.history,y,m);y=line(page,font,"Medications",Array.isArray(p.medications)?p.medications.join(", "):p.medications,y,m);y=line(page,font,"Allergies",Array.isArray(p.allergies)?p.allergies.join(", "):p.allergies,y,m);
-       ({page,y}=section(page,font,"CARE",y,m));
-       y=line(page,font,"Care Provided",p.careProvided==="yes"?"Yes":"No",y,m);
-       if(Array.isArray(p.careMethods)&&p.careMethods.length)y=wrap(page,font,"BLS Methods: "+p.careMethods.join(", "),m,y,W-2*m,8,11);
-       if(p.narrative)y=wrap(page,font,"Care Notes: "+p.narrative,m,y,W-2*m,8,11);
-       if(Array.isArray(p.vitals)&&p.vitals.length){
-         ({page,y}=section(page,font,"VITALS",y,m));
-         for(const v of p.vitals)y=wrap(page,font,["Time "+v.time,"O₂ Sat "+v.o2,"Pulse "+v.pulse,"Resp "+v.resp,"BP "+v.bp,"Pupils "+v.pupils].filter(x=>x.split(" ").slice(1).join(" ")).join(" · "),m,y,W-2*m,8,11);
-       }
-       ({page,y}=section(page,font,"DISPOSITION / TRANSPORT",y,m));
-       y=line(page,font,"Disposition",p.transportDisposition,y,m);
-       y=line(page,font,"Vehicle / Unit",p.transportVehicle,y,m);
-       y=line(page,font,"Transporting Agency",p.transportAgency,y,m);
-       y=line(page,font,"Destination",p.destination,y,m);
-       y=line(page,font,"Vehicle",([p.vehicleYear,p.vehicleMake,p.vehicleModel].filter(Boolean).join(" ")),y,m);
-       y=line(page,font,"License / VIN",p.vehicleVin,y,m);
-       y=line(page,font,"Insurance",p.insurance,y,m);
-       y=line(page,font,"Policy",p.policy,y,m);
-       if(p.dispositionNote)y=wrap(page,font,"Disposition Notes: "+p.dispositionNote,m,y,W-2*m,8,11);
-       if(p.refusedCare||p.refusedTransport||p.minorRefusal){
-         ({page,y}=section(page,font,"REFUSAL DOCUMENTATION",y,m));
-         y=wrap(page,font,"Patient/Guardian was advised of the risks of refusing medical evaluation, treatment, and/or transport. The patient/guardian indicated understanding and declined the documented care or transport.",m,y,W-2*m,8,11);
-         y=line(page,font,"Refusal Type",[(p.refusedCare?"Refused evaluation/care":""),(p.refusedTransport?"Refused transport":""),(p.minorRefusal?"Parent/Guardian refusal":"")].filter(Boolean).join("; "),y,m);
-         y=line(page,font,"Patient / Guardian",p.refusalSigner,y,m);
-         y=line(page,font,"Refusal Date/Time",fmtTime(p.refusalTime),y,m);
-         if(Array.isArray(p.minorPatients)&&p.minorPatients.length){y=wrap(page,font,"Minor Patients: "+p.minorPatients.map(x=>x.name+" ("+fmtDate(x.dob)+")").join("; "),m,y,W-2*m,8,11)}
-         y=line(page,font,"Guardian Relationship",p.guardianRelationship||p.relationship,y,m);
-         y=line(page,font,"Risks Explained / Acknowledged",p.refusalRisks||"Yes",y,m);
-         y-=4;
-         page.drawText("PATIENT / GUARDIAN SIGNATURE",{x:m,y,font:bold,size:8});y-=8;
-         if(p.signature){try{const img=await pdf.embedPng(Buffer.from(String(p.signature).split(",")[1],"base64"));page.drawImage(img,{x:m,y:y-65,width:240,height:60});page.drawRectangle({x:m,y:y-65,width:240,height:60,borderWidth:.5,borderColor:rgb(.6,.6,.6)});y-=78}catch{y-=16}}
-         else {page.drawLine({start:{x:m,y},end:{x:m+240,y}});y-=16}
-         y=line(page,font,"Signed By",p.refusalSigner,y,m);
-         y=line(page,font,"Provider Signature","JFD RMS user / electronic record",y,m);
-         y=line(page,font,"Witness",p.witnessName||"Not recorded",y,m);
-         y=line(page,font,"Witness Signature",p.witnessSignature?"Electronic signature recorded":"Not recorded",y,m);
-       }
+ page.drawText("INCIDENT / PROPERTY INFORMATION",{x:m,y,font:bold,size:14});y-=20;
+ y=wrap(page,font,"This page provides the basic incident and property information commonly needed for property-loss assistance or insurance documentation. Technical response and investigation information appears on later pages.",m,y,usable,8,11);
+ y-=8;
+ heading("INCIDENT BASICS");
+ drawLine("CAD / Incident Number",incident?.cad||primary.rCad);
+ drawLine("Incident Date",fmtDate(primary.rDate||incident?.dispatch_time));
+ drawLine("Call Type",primary.rCallType||primary.rCall||incident?.type);
+ drawLine("Primary Incident Type",primary.rPrimaryIncidentType||incident?.type);
+ drawLine("Incident Location",primary.rLocation||incident?.location);
+ drawLine("Location Type",primary.rLocationType);
+ y-=3;
+ heading("PERSON / PROPERTY");
+ drawLine("Person Involved",primary.rPerson||primary.person_involved);
+ drawLine("Owner Name",primary.rOwnerName||primary.owner_name);
+ drawLine("Owner Address",primary.rOwnerAddress||primary.owner_address);
+ drawLine("Owner Phone",primary.rOwnerPhone||primary.owner_phone);
+ drawLine("Occupant Name",primary.rOccupantName||primary.rOccName||primary.occupant_name);
+ drawLine("Occupant Address",primary.rOccupantAddress||primary.occupant_address);
+ drawLine("Occupant Phone",primary.rOccupantPhone||primary.rOccPhone||primary.occupant_phone);
+ drawLine("Property Use / Occupancy",primary.rPrimaryUse||primary.rOccupancy);
+ y-=3;
+ heading("INSURANCE");
+ drawLine("Insurance Company",primary.rInsuranceCompany||primary.insurance_company||primary.rOwnerInsurance||primary.rOccInsurance);
+ drawLine("Insurance Phone",primary.rInsurancePhone||primary.insurance_phone);
+ drawLine("Policy Number",primary.rInsurancePolicy||primary.insurance_policy);
+ y-=3;
+ heading("LOSS / DAMAGE");
+ drawLine("Damage Type",primary.rDamageType||primary.damage_type);
+ drawLine("Estimated Damage",primary.rDamageEstimate||primary.damage_estimate);
+ drawLine("Vehicle",primary.rVehicle1);
+ drawLine("Year / Make / Model",[primary.rYear1,primary.rMake1,primary.rModel1].filter(Boolean).join(" "));
+ drawLine("License / VIN",primary.rVin1);
+ y-=4;
+ if(primary.rNarrative){heading("BASIC INCIDENT DESCRIPTION");y=wrap(page,font,val(primary.rNarrative),m,y,usable,9,13)}
+ page.drawText("Jasper Fire Department RMS • Public Incident Summary",{x:m,y:38,font:reg,size:7,color:rgb(.4,.4,.4)});
+
+ // TECHNICAL DEPARTMENT RECORD
+ newPage();
+ page.drawText("JASPER FIRE DEPARTMENT",{x:m,y,font:bold,size:17,color:rgb(.65,.02,.02)});y-=22;
+ page.drawText("TECHNICAL INCIDENT REPORT",{x:m,y,font:bold,size:13});y-=17;
+ y=wrap(page,font,"CAD / Incident: "+val(incident?.cad||primary.rCad||incident?.incident_number),m,y,usable,9,12,true);
+ y=wrap(page,font,"Location: "+val(incident?.location||primary.rLocation),m,y,usable,9,12);
+ y-=8;
+
+ const addTechnicalReport=(rep,index)=>{
+   const d=rep?.data||{};
+   if(index>0){newPage();page.drawText("JASPER FIRE DEPARTMENT",{x:m,y,font:bold,size:17,color:rgb(.65,.02,.02)});y-=22;page.drawText("FIRE REPORT DETAIL",{x:m,y,font:bold,size:13});y-=17}
+   heading("INCIDENT & LOCATION");
+   drawLine("CAD / Incident",d.rCad||incident?.cad);
+   drawLine("Incident Date",d.rDate||incident?.dispatch_time);
+   drawLine("Shift",d.rShift);
+   drawLine("Call Type",d.rCallType||d.rCall);
+   drawLine("Primary Incident Type",d.rPrimaryIncidentType);
+   drawLine("Secondary Incident Type",d.rSecondaryIncidentType);
+   drawLine("Location",d.rLocation||incident?.location);
+   drawLine("Latitude",d.rLatitude||incident?.latitude);
+   drawLine("Longitude",d.rLongitude||incident?.longitude);
+   drawLine("Location Type",d.rLocationType);
+   drawLine("Primary Use",d.rPrimaryUse||d.rOccupancy);
+   drawLine("Secondary Use",d.rSecondaryUse);
+   drawLine("Location In Use",d.rLocationInUse);
+   drawLine("Used As Intended",d.rUsedAsIntended);
+   drawLine("Vacancy",d.rVacancy);
+   drawLine("People Present",d.rPeoplePresent);
+   y-=3;
+   heading("OWNER / OCCUPANT / INSURANCE");
+   drawLine("Person Involved",d.rPerson||d.person_involved);
+   drawLine("Owner Name",d.rOwnerName||d.owner_name);
+   drawLine("Owner Address",d.rOwnerAddress||d.owner_address);
+   drawLine("Owner Phone",d.rOwnerPhone||d.owner_phone);
+   drawLine("Owner Insurance",d.rOwnerInsurance||d.owner_insurance);
+   drawLine("Occupant Name",d.rOccupantName||d.rOccName||d.occupant_name);
+   drawLine("Occupant Address",d.rOccupantAddress||d.occupant_address);
+   drawLine("Occupant Phone",d.rOccupantPhone||d.rOccPhone||d.occupant_phone);
+   drawLine("Occupant Insurance",d.rOccInsurance||d.occupant_insurance);
+   drawLine("Insurance Company",d.rInsuranceCompany||d.insurance_company);
+   drawLine("Insurance Phone",d.rInsurancePhone||d.insurance_phone);
+   drawLine("Policy Number",d.rInsurancePolicy||d.insurance_policy);
+   y-=3;
+   heading("FIRE / INCIDENT CONDITIONS");
+   drawLine("Fire Location",d.rFireLoc);
+   drawLine("Arrival Condition",d.rCondition);
+   drawLine("Water Supply",d.rWater);
+   drawLine("Damage Type",d.rDamageType);
+   drawLine("Damage Estimate",d.rDamageEstimate);
+   drawLine("Floor of Origin",d.rFloor);
+   drawLine("Room / Area",d.rRoom);
+   drawLine("Cause",d.rCause);
+   drawLine("Wildfire Acres",d.rAcres);
+   drawLine("Smoke Alarm",d.rSmokePresence);
+   drawLine("Smoke Alarm Working",d.rSmokeWorking);
+   drawLine("Fire Alarm",d.rFireAlarm);
+   drawLine("Other Alarm",d.rOtherAlarm);
+   drawLine("Suppression System",d.rSuppression);
+   drawLine("Cooking Suppression",d.rCookingSuppression);
+   y-=3;
+   heading("ACTIONS TAKEN");
+   drawLine("Action Taken",d.rActionTaken||d.action_taken);
+   drawLine("No Action Taken",d.rNoActionTaken||d.no_action_taken);
+   const acts=Array.isArray(d.actions_taken)?d.actions_taken:(Array.isArray(d.rActionsTaken)?d.rActionsTaken:[]);
+   drawLine("Actions / Tactics",acts.join(", "));
+   drawLine("No-Action Reason",d.rNoActionReason);
+   y-=3;
+   heading("RESPONDING APPARATUS / CHRONOLOGY");
+   const units=Array.isArray(d.responding_apparatus)?d.responding_apparatus:[];
+   if(!units.length)drawLine("Responding Apparatus","None recorded");
+   for(const u of units){
+     const times=u.times||{};
+     drawWrap("Unit",[(u.unit_number||u.unit||""),times.enroute?"En Route "+fmtTime(times.enroute):"",times.on_scene?"On Scene "+fmtTime(times.on_scene):"",times.cancelled?"Cancelled "+fmtTime(times.cancelled):"",times.clear?"Clear "+fmtTime(times.clear):""].filter(Boolean).join(" • "));
+     if(Array.isArray(u.crew)&&u.crew.length)drawLine("Crew",u.crew.join(", "));
+   }
+   drawLine("Additional Personnel",Array.isArray(d.additional_personnel)?d.additional_personnel.join(", "):d.additional_personnel);
+   y-=3;
+   heading("MUTUAL AID / OTHER AGENCIES");
+   const aids=[...(Array.isArray(d.aid_records)?d.aid_records:[]),...(Array.isArray(d.nonfd_aid_records)?d.nonfd_aid_records:[])];
+   if(!aids.length)drawLine("Aid","None recorded");
+   for(const a of aids)drawWrap("Aid",JSON.stringify(a));
+   y-=3;
+   heading("EXPOSURES / CASUALTIES / HAZARDS");
+   const ex=Array.isArray(d.exposures)?d.exposures:[];const ca=Array.isArray(d.casualties)?d.casualties:[];const hz=Array.isArray(d.hazards)?d.hazards:[];
+   if(ex.length)for(const x of ex)drawWrap("Exposure",JSON.stringify(x));
+   else drawLine("Exposures","None recorded");
+   if(ca.length)for(const x of ca)drawWrap("Casualty / Rescue",JSON.stringify(x));
+   else drawLine("Casualties / Rescues","None recorded");
+   if(hz.length)for(const x of hz)drawWrap("Hazard",JSON.stringify(x));
+   else drawLine("Hazards","None recorded");
+   y-=3;
+   heading("VEHICLE / PROPERTY");
+   const vehicles=Array.isArray(d.vehicles)?d.vehicles:[]; 
+   if(vehicles.length)for(const v of vehicles)drawWrap("Vehicle",JSON.stringify(v));
+   else{
+     drawLine("Vehicle #1",d.rVehicle1);
+     drawLine("Year",d.rYear1);
+     drawLine("Make",d.rMake1);
+     drawLine("Model",d.rModel1);
+     drawLine("License / VIN",d.rVin1);
+   }
+   y-=3;
+   heading("HAZMAT / SPECIAL HAZARDS");
+   drawLine("Evacuation Count",d.rEvac||d.rHazEvacuated);
+   drawLine("HAZMAT Disposition",d.rHazmat||d.rHazDisposition);
+   drawLine("Chemicals / Present / Released",d.rChemicals);
+   drawLine("Electrical Hazard",d.rElectrical);
+   drawLine("Other Hazard",d.rOtherHazard);
+   y-=3;
+   heading("NARRATIVE / COMPLETION");
+   y=wrap(page,font,val(d.rNarrative),m,y,usable,9,13);
+   drawLine("Report Completed By",d.rCompletedBy);
+ };
+ for(let i=0;i<fireReports.length;i++)addTechnicalReport(fireReports[i],i);
+ if(!fireReports.length){heading("FIRE REPORT");y=wrap(page,font,"No Fire Incident Report data was attached to this incident.",m,y,usable,9,13)}
+
+ // Last section is deliberately the NERIS investigation detail.
+ newPage();
+ page.drawText("JASPER FIRE DEPARTMENT",{x:m,y,font:bold,size:17,color:rgb(.65,.02,.02)});y-=22;
+ page.drawText("NERIS INVESTIGATION DETAILS",{x:m,y,font:bold,size:13});y-=17;
+ y=wrap(page,font,"This section is the technical investigation information associated with the incident and NERIS submission. It is intentionally kept at the end of the report.",m,y,usable,8,11);
+ y-=7;
+ for(const rep of fireReports){
+   const d=rep?.data||{};
+   heading("INVESTIGATION");
+   drawLine("Investigation Required",d.rInvestigation||d.investigation);
+   drawLine("Investigation Type",d.rInvestigationType||d.investigation_type);
+   drawLine("Cause",d.rCause||d.cause);
+   drawLine("Origin Floor",d.rFloor||d.floor_of_origin);
+   drawLine("Origin Room / Area",d.rRoom||d.room_type);
+   drawLine("Arrival Condition",d.rCondition||d.condition);
+   drawLine("Damage Type",d.rDamageType||d.damage_type);
+   drawLine("Damage Estimate",d.rDamageEstimate||d.damage_estimate);
+   drawLine("Fire Location",d.rFireLoc||d.fire_location);
+   drawLine("Water Supply",d.rWater||d.water_supply);
+   drawLine("Smoke Alarm Presence",d.rSmokePresence||d.smoke_alarm_presence);
+   drawLine("Smoke Alarm Working",d.rSmokeWorking||d.smoke_alarm_working);
+   drawLine("Fire Alarm",d.rFireAlarm||d.fire_alarm);
+   drawLine("Other Alarm",d.rOtherAlarm||d.other_alarm);
+   drawLine("Suppression System",d.rSuppression||d.suppression_system);
+   drawLine("Cooking Fire Suppression",d.rCookingSuppression||d.cooking_suppression);
+   const neris=d.neris_investigation||d.nerisInvestigation||d.investigation_details||d.neris?.investigation;
+   if(neris&&typeof neris==="object"){
+     heading("NERIS INVESTIGATION RECORD");
+     for(const [k,v] of Object.entries(neris)){
+       if(v===undefined||v===null||v==="")continue;
+       const label=String(k).replace(/[_-]+/g," ").replace(/\b\w/g,c=>c.toUpperCase());
+       drawWrap(label,typeof v==="object"?JSON.stringify(v):v);
      }
-   }else{
-     ({page,y}=section(page,font,"PERSON / PROPERTY / INSURANCE",y,m));
-     for(const [label,val] of [["Person Involved",data.rPerson||data.person_involved],["Owner",data.rOwnerName],["Owner Contact",data.rOwnerPhone],["Owner Address",data.rOwnerAddress],["Owner Insurance",data.rOwnerInsurance],["Occupant",data.rOccName||data.rOccupantName],["Occupant Contact",data.rOccPhone||data.rOccupantPhone],["Occupant Address",data.rOccupantAddress],["Occupant Insurance",data.rOccInsurance],["Insurance Company",data.rInsuranceCompany],["Insurance Phone",data.rInsurancePhone],["Insurance Policy",data.rInsurancePolicy],["Vehicle",data.rVehicle1],["Year",data.rYear1],["Make",data.rMake1],["Model",data.rModel1],["License / VIN",data.rVin1]])y=line(page,font,label,val,y,m);
-     ({page,y}=section(page,font,"INCIDENT DETAILS",y,m));
-     for(const [label,key] of [["Primary Incident Type","rPrimaryIncidentType"],["Call Type","rCall"],["Shift","rShift"],["Location Type","rLocationType"],["Primary Use","rPrimaryUse"],["Location In Use","rLocationInUse"],["Used As Intended","rUsedAsIntended"],["People Present","rPeoplePresent"],["Narrative","rNarrative"]])y=wrap(page,font,label+": "+text(data[key]),m,y,W-2*m,8,11,true);
-     const units=Array.isArray(data.responding_apparatus)?data.responding_apparatus:[];
-     if(units.length){({page,y}=section(page,font,"RESPONDING APPARATUS",y,m));for(const u of units)y=wrap(page,font,(u.unit_number||"Unit")+" · En Route "+text(u.times?.enroute)+" · On Scene "+text(u.times?.on_scene)+" · Clear "+text(u.times?.clear),m,y,W-2*m,8,11);}
    }
  }
+ if(!fireReports.length)drawLine("NERIS Investigation","No Fire Report investigation data attached.");
+ page.drawText("JFD RMS • NERIS Investigation Details",{x:m,y:38,font:reg,size:7,color:rgb(.4,.4,.4)});
+
  return pdf.save();
 }
-function title(t){return String(t||"").startsWith("pcr_")?"PATIENT CARE REPORT":String(t||"").startsWith("fire_")?"FIRE INCIDENT REPORT":"INCIDENT REPORT"}
+
 export default async function handler(req,res){
  if(req.method!=="POST")return res.status(405).json({ok:false,error:"Method not allowed"});
  try{
