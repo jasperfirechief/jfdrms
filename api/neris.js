@@ -19,7 +19,7 @@ async function getToken() {
   let data; try { data = JSON.parse(text); } catch { data = { raw: text }; }
   if (!r.ok) throw new Error("NERIS authentication failed (" + r.status + ").");
   if (!data.access_token) throw new Error("NERIS authentication did not return an access token.");
-  return data.access_token;
+  return { token: data.access_token, token_type: data.token_type || "Bearer", expires_in: data.expires_in || null };
 }
 
 function withDepartmentId(payload) {
@@ -46,12 +46,25 @@ export default async function handler(req, res) {
 
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+
+    if (body?.action === "test-auth") {
+      const auth = await getToken();
+      return res.status(200).json({
+        ok: true,
+        authenticated: true,
+        base_url: BASE_URL,
+        token_type: auth.token_type,
+        expires_in: auth.expires_in
+      });
+    }
+
     if (!body || !["validate","submit"].includes(body.action) || !body.payload) {
       return res.status(400).json({ ok:false, error:"A NERIS validation or submission payload is required." });
     }
 
     const payload = withDepartmentId(body.payload);
-    const token = await getToken();
+    const auth = await getToken();
+    const token = auth.token;
 
     const validation = await fetch(BASE_URL + "/incident/" + encodeURIComponent(payload.base.department_neris_id) + "/validate", {
       method: "POST",
