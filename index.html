@@ -1078,6 +1078,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     return dispatch+response;
   }
   window.jfdRemoveReportUnit=function(id){document.querySelector('[data-unit-row="'+Number(id)+'"]')?.remove();const cb=document.querySelector('[data-runit="'+Number(id)+'"]');if(cb)cb.checked=false;};
+  window.clearManualResponseSelection=function(){document.querySelectorAll("[data-runit]").forEach(x=>x.checked=false);document.querySelectorAll("[data-unit-row]").forEach(x=>x.remove());const box=$("jfdUnitRows");if(box)box.innerHTML='<p class="text-sm text-slate-500">Select responding apparatus above.</p>';};
   window.jfdSyncUnits=function(){
     const box=$("jfdUnitRows");if(!box)return;
     const selected=[...document.querySelectorAll("[data-runit]:checked")].map(x=>Number(x.dataset.runit));
