@@ -1066,7 +1066,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       jfdNerisSelect("rPrimaryIncidentType","Primary Incident Type",NERIS_INCIDENT_TYPES,d?.primary_incident_type||d?.neris_incident_type||d?.incident_type||"","md:col-span-2",true)+
       jfdNerisSelect("rSecondaryIncidentType","Secondary Incident Type (optional)",NERIS_INCIDENT_TYPES,d?.secondary_incident_type||"","md:col-span-2")+
       '</div>');
-  };function responseUi(unitRows,iForResponse){
+  };function responseUi(iForResponse){
     const checks=apparatus.filter(a=>a.active!==false).sort((a,b)=>String(a.unit_number).localeCompare(String(b.unit_number))).map(a=>'<label class="flex items-center gap-2 border rounded-lg p-2 bg-white"><input type="checkbox" data-runit="'+Number(a.apparatus_id)+'" onchange="jfdSyncUnits()"> <b>'+esc(a.unit_number)+'</b><span class="text-xs text-slate-500">'+esc(a.apparatus_type||"")+'</span></label>').join("");
     const dispatch=card("Dispatch",'<p class="text-xs text-slate-500 mb-3">Dispatch/CAD information is kept separate from firefighter response information. CAD values are pre-populated when available and remain editable.</p><div class="grid md:grid-cols-2 lg:grid-cols-4 gap-3">'+
       field("rDispatchIncidentNumber","Dispatch Incident Number",iForResponse?.dispatch_incident_number||iForResponse?.cad||"","text","",true)+field("rCallArrival","Call Arrival",localDateTime(iForResponse?.call_arrival||iForResponse?.dispatch_time),"datetime-local","",true)+
@@ -1308,7 +1308,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   function fireFormNew(i,d,m,unitRows){
     window.jfdRepeats={exposures:d?.exposures||[],casualties:d?.casualties||[],vehicles:d?.vehicles||[],hazards:d?.hazards||[]};
     let h=incidentHeader(i,d,m,"fire");
-    h+=responseUi(unitRows,i);
+    h+=responseUi(i);
     h+=card("Incident & Location Details",'<div class="grid md:grid-cols-2 gap-3">'+
       jfdNerisSelect("rLocationType","Location Type",NERIS_LOCATION_TYPES,d?.location_type||"")+
       jfdNerisSelect("rPrimaryUse","Primary Location Use",NERIS_LOCATION_USES,d?.primary_use||((d?.primary_use_type&&d?.primary_use_subtype)?(d.primary_use_type+"||"+d.primary_use_subtype):d?.primary_use_type)||"","md:col-span-2")+
