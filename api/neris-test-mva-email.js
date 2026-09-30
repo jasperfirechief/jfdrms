@@ -91,9 +91,9 @@ export default async function handler(req,res){
       reports:[{report_type:"pcr_neris_v2",status:"submitted_to_neris",data:reportData}]
     };
     const email=await call("/api/report-pdf",reportBody);
-    return res.status(200).json({ok:email.ok,incident_number:incidentNumber,neris:neris.data,email});
+    console.log("MVA NERIS TEST SUCCESS",JSON.stringify({incident_number:incidentNumber,neris:neris.data,email}));return res.status(200).json({ok:email.ok,incident_number:incidentNumber,neris:neris.data,email});
   }catch(e){
     return res.status(500).json({ok:false,incident_number:incidentNumber,error:e?.message||String(e)});
   }
 }
-// one-time runner trigger 8
+// one-time runner trigger 9
