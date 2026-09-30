@@ -47,7 +47,7 @@ export default async function handler(req,res){
   };
   try{
     const neris=await call("/api/neris",{action:"submit",payload});
-    if(!neris.ok||neris.data?.ok===false)return res.status(502).json({ok:false,stage:"neris_submission",incident_number:incidentNumber,neris});
+    if(!neris.ok||neris.data?.ok===false){console.log("MVA NERIS TEST FAILURE",JSON.stringify(neris));return res.status(200).json({ok:false,stage:"neris_submission",incident_number:incidentNumber,neris});}
     const reportData={
       rCad:incidentNumber,
       rDispatchIncidentNumber:incidentNumber,
@@ -97,4 +97,4 @@ export default async function handler(req,res){
     return res.status(500).json({ok:false,incident_number:incidentNumber,error:e?.message||String(e)});
   }
 }
-// one-time runner trigger
+// one-time runner trigger 2
