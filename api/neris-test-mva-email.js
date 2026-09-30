@@ -24,12 +24,12 @@ export default async function handler(req,res){
       location,
       unit_responses:[]
     },
-    medical:[
+    medical_details:[
       {
         patient_care_report:incidentNumber+"-P1",
-        patient_evaluation_care:"PATIENT_EVALUATED_CARE_PROVIDED",
-        patient_improved_status:"UNCHANGED",
-        medical_disposition:"PATIENT_REFUSED_TRANSPORT"
+        patient_care_evaluation:"PATIENT_EVALUATED_CARE_PROVIDED",
+        patient_status:"UNCHANGED",
+        transport_disposition:"PATIENT_REFUSED_TRANSPORT"
       },
       {
         patient_care_report:incidentNumber+"-P2",
@@ -51,7 +51,7 @@ export default async function handler(req,res){
       rCad:incidentNumber,
       rDispatchIncidentNumber:incidentNumber,
       rLocation:"200 Test Avenue, Jasper, AL 35501",
-      rPrimaryIncidentType:"HAZSIT||HAZARD_NONCHEM||MOTOR_VEHICLE_COLLISION",
+      rPrimaryIncidentType:"MEDICAL||INJURY||MOTOR_VEHICLE_COLLISION",
       rSecondaryIncidentType:"MEDICAL||INJURY||MOTOR_VEHICLE_COLLISION",
       rCallArrival:t1.toISOString(),
       rCallAnswered:t2.toISOString(),
@@ -96,4 +96,4 @@ export default async function handler(req,res){
     return res.status(500).json({ok:false,incident_number:incidentNumber,error:e?.message||String(e)});
   }
 }
-// one-time runner trigger 4
+// one-time runner trigger 5
