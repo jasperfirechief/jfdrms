@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     base: {
       department_neris_id: departmentId,
       incident_number: "TEST-20260930-001",
-      location: { latitude: 33.8312, longitude: -87.2771 }
+      location: {}
     },
     incident_types: [{ type: "FIRE||STRUCTURE_FIRE||ROOM_AND_CONTENTS_FIRE" }],
     dispatch: {
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
       call_answered: t,
       call_create: t,
       call_arrival: "2026-09-30T02:07:00Z",
-      location: { latitude: 33.8312, longitude: -87.2771 },
+      location: {},
       unit_responses: []
     }
   };
