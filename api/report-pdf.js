@@ -45,18 +45,6 @@ export default async function handler(req,res){
     if(!er.ok)return res.status(502).json({ok:false,error:"Report email failed.",details:ed});
     return res.status(200).json({ok:true,email_id:ed?.messageId||null});
   }
-  if(body.action==="email"){
-    const key=String(process.env.RESEND_API_KEY||"");
-    const from=String(process.env.REPORT_EMAIL_FROM||"");
-    const to=Array.isArray(body.to)?body.to.filter(Boolean):body.to?[body.to]:[];
-    if(!key||!from)return res.status(503).json({ok:false,error:"Report email is not configured in Vercel."});
-    if(!to.length)return res.status(400).json({ok:false,error:"No email recipient was supplied."});
-    const b64=Buffer.from(pdf).toString("base64");
-    const er=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json"},body:JSON.stringify({from,to,subject:"Jasper Fire Department Incident Report - "+text(incident?.cad||incident?.incident_number||""),html:"<p>Attached is the Jasper Fire Department incident report.</p>",attachments:[{filename:(text(incident?.cad||"Incident")+" - JFD Report.pdf"),content:b64}]})});
-    const et=await er.text();let ed;try{ed=JSON.parse(et)}catch{ed={raw:et}};
-    if(!er.ok)return res.status(502).json({ok:false,error:"Report email failed.",details:ed});
-    return res.status(200).json({ok:true,email_id:ed?.id||null});
-  }
   res.setHeader("Content-Type","application/pdf");res.setHeader("Content-Disposition",'inline; filename="JFD Incident Report.pdf"');
   return res.status(200).send(Buffer.from(pdf));
  }catch(e){console.error("JFD report PDF error",e);return res.status(500).json({ok:false,error:e?.message||"Report generation failed"})}
