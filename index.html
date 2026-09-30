@@ -1146,12 +1146,6 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     h+=responseUi(unitRows,i);
     h+=card("Incident & Location Details",'<div class="grid md:grid-cols-2 gap-3">'+
       jfdNerisSelect("rLocationType","Location Type",NERIS_LOCATION_TYPES,d?.location_type||"")+
-      h+=card("Owner / Occupant Information",'<div class="grid md:grid-cols-2 gap-4">'+
-      '<div class="border rounded-xl p-3"><h4 class="font-black mb-2">Owner</h4>'+field("rOwnerName","Owner Name",d?.owner_name||"")+field("rOwnerAddress","Owner Address",d?.owner_address||"")+field("rOwnerPhone","Owner Phone",d?.owner_phone||"","tel")+'</div>'+
-      '<div class="border rounded-xl p-3"><h4 class="font-black mb-2">Occupant</h4>'+field("rOccupantName","Occupant Name",d?.occupant_name||"")+field("rOccupantAddress","Occupant Address",d?.occupant_address||"")+field("rOccupantPhone","Occupant Phone",d?.occupant_phone||"","tel")+'</div>'+
-      '<div class="border rounded-xl p-3 md:col-span-2"><h4 class="font-black mb-2">Property Insurance</h4><div class="grid md:grid-cols-3 gap-2">'+field("rInsuranceCompany","Insurance Company",d?.insurance_company||"")+field("rInsurancePhone","Insurance Phone",d?.insurance_phone||"","tel")+field("rInsurancePolicy","Policy Number",d?.insurance_policy||"")+'</div></div>'+
-      '</div>');
-      
       jfdNerisSelect("rPrimaryUse","Primary Location Use",NERIS_LOCATION_USES,d?.primary_use||d?.primary_use_type&&d?.primary_use_subtype?(d.primary_use_type+"||"+d.primary_use_subtype):d?.primary_use_type||"","md:col-span-2")+
       select("rLocationInUse","Location In Use",["Yes","No"],d?.location_in_use||d?.use_status||"")+
       select("rUsedAsIntended","Used as Intended",["Yes","No"],d?.used_as_intended||d?.use_intended||"")+
@@ -1159,6 +1153,12 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       select("rPeoplePresent","People Present",["Yes","No"],d?.people_present||"")+
       jfdNerisSelect("rSecondaryUse","Secondary Location Use (optional)",NERIS_LOCATION_USES,d?.secondary_use||"","md:col-span-2")+
       '</div>');
+    h+=card("Owner / Occupant Information",'<div class="grid md:grid-cols-2 gap-4">'+
+      '<div class="border rounded-xl p-3"><h4 class="font-black mb-2">Owner</h4>'+field("rOwnerName","Owner Name",d?.owner_name||"")+field("rOwnerAddress","Owner Address",d?.owner_address||"")+field("rOwnerPhone","Owner Phone",d?.owner_phone||"","tel")+'</div>'+
+      '<div class="border rounded-xl p-3"><h4 class="font-black mb-2">Occupant</h4>'+field("rOccupantName","Occupant Name",d?.occupant_name||"")+field("rOccupantAddress","Occupant Address",d?.occupant_address||"")+field("rOccupantPhone","Occupant Phone",d?.occupant_phone||"","tel")+'</div>'+
+      '<div class="border rounded-xl p-3 md:col-span-2"><h4 class="font-black mb-2">Property Insurance</h4><div class="grid md:grid-cols-3 gap-2">'+field("rInsuranceCompany","Insurance Company",d?.insurance_company||"")+field("rInsurancePhone","Insurance Phone",d?.insurance_phone||"","tel")+field("rInsurancePolicy","Policy Number",d?.insurance_policy||"")+'</div></div>'+
+      '</div>');
+      
     window.jfdIncidentTypes=(d?.incident_types||[]).filter(Boolean);
     if(!window.jfdIncidentTypes.length&&d?.secondary_incident_type)window.jfdIncidentTypes=[d.secondary_incident_type];
     h+=card("Actions Taken",'<div class="space-y-3">'+
