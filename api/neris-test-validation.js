@@ -16,18 +16,13 @@ export default async function handler(req, res) {
   let tokenData; try { tokenData = JSON.parse(tokenText); } catch { tokenData = {}; }
   if (!tokenResponse.ok || !tokenData.access_token) return res.status(502).json({ ok: false, stage: "authentication", status: tokenResponse.status });
 
-  const t = "2026-09-30T02:00:00Z";
   const payload = {
-    base: {
-      department_neris_id: departmentId,
-      incident_number: "TEST-20260930-001",
-      location: {}
-    },
+    base: { department_neris_id: departmentId, incident_number: "TEST-20260930-001", location: {} },
     incident_types: [{ type: "FIRE||STRUCTURE_FIRE||ROOM_AND_CONTENTS_FIRE" }],
     dispatch: {
       incident_number: "TEST-20260930-001",
-      call_answered: t,
-      call_create: t,
+      call_create: "2026-09-30T02:00:00Z",
+      call_answered: "2026-09-30T02:01:00Z",
       call_arrival: "2026-09-30T02:07:00Z",
       location: {},
       unit_responses: []
