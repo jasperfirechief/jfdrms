@@ -1323,8 +1323,8 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       '</div>');
     window.jfdIncidentTypes=(d?.incident_types||[]).filter(Boolean);
     if(!window.jfdIncidentTypes.length&&d?.secondary_incident_type)window.jfdIncidentTypes=[d.secondary_incident_type];
-    h+=jfdNerisRequirementPanel()+
-      h+=card("Actions Taken",'<div class="space-y-3">'+
+    h+=jfdNerisRequirementPanel();
+    h+=card("Actions Taken",'<div class="space-y-3">'+
       '<div class="flex flex-wrap gap-5">'+
       '<label class="flex items-center gap-2 text-sm font-semibold"><input id="rActionTaken" type="checkbox" '+(d?.action_taken?"checked":"")+' onchange="jfdRenderActionControls()"> Action Taken</label>'+
       '<label class="flex items-center gap-2 text-sm font-semibold"><input id="rNoActionTaken" type="checkbox" '+(d?.no_action_taken?"checked":"")+' onchange="jfdRenderActionControls()"> No Action Taken</label>'+
