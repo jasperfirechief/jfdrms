@@ -846,7 +846,7 @@ function ensureSavedReportViewer(){
   document.body.appendChild(m);return m;
 }
 function closeSavedReportViewer(){const m=$("savedReportViewer");if(m)m.classList.add("hiddenx");}
-async async function editSavedReport(cad,reportId){
+async function editSavedReport(cad,reportId){
   try{
     const r=await db.from("incidents").select("*,incident_details(*)").eq("cad",cad).maybeSingle();
     if(r.error||!r.data)return alert(r.error?.message||"Incident not found.");
