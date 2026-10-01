@@ -481,14 +481,17 @@ function renderAcceptancePanels(){
   box.querySelectorAll('[data-accept-result]').forEach(cb=>cb.addEventListener("change",()=>{if(cb.checked)box.querySelectorAll('[data-accept-result="'+CSS.escape(cb.dataset.acceptResult)+'"]').forEach(x=>{if(x!==cb)x.checked=false})}));
 }
 function ifcSectionUrl(ref){
-  const m=String(ref||"").match(/(?:§§?|Section\s+|Sec\.\s*|Chapter\s+)?([0-9]{3,4})(?:\.([0-9.]+))?/i);if(!m)return "";
-  const sec=m[1]+(m[2]?"."+m[2]:""),ch=Number(sec.split(".")[0]);
+  const raw=String(ref||"").trim();
+  const m=raw.match(/(?:IFC\s*2024\s*)?(?:§§?|Section\s+|Sec\.\s*|Chapter\s+)?(\d{3,4}(?:\.\d+)+|\d{3,4})\b/i);
+  if(!m)return "";
+  const sec=m[1],ch=Number(sec.split(".")[0]);
   const paths={3:"chapter-3-general-requirements",4:"chapter-4-emergency-planning-and-preparedness",5:"chapter-5-fire-service-features",6:"chapter-6-building-services-and-systems",7:"chapter-7-fire-and-smoke-protection-features",8:"chapter-8-interior-finish-decorative-materials-and-furnishings",9:"chapter-9-fire-protection-and-life-safety-systems",10:"chapter-10-means-of-egress",11:"chapter-11-construction-requirements-for-existing-buildings",12:"chapter-12-energy-systems",50:"chapter-50-hazardous-materials-general-provisions",51:"chapter-51-aerosols",52:"chapter-52-combustible-dust-producing-operations",53:"chapter-53-compressed-gases",54:"chapter-54-corrosive-materials",55:"chapter-55-cryogenic-fluids",57:"chapter-57-flammable-combustible-liquids"};
-  const path=paths[ch];if(!path)return "";return "https://codes.iccsafe.org/content/IFC2024P1/"+path+"#IFC2024P1_Pt03_Ch"+String(ch).padStart(2,"0")+"_Sec"+sec;
+  const path=paths[ch];if(!path)return "";
+  return "https://codes.iccsafe.org/content/IFC2024P1/"+path+"#IFC2024P1_Pt03_Ch"+String(ch).padStart(2,"0")+"_Sec"+sec;
 }
 function renderIfcReference(ref){
-  const raw=String(ref||"").trim(),u=ifcSectionUrl(raw);if(u)return '<a href="'+u+'" target="_blank" rel="noopener noreferrer" class="text-blue-700 underline hover:text-blue-900">'+esc(raw)+'</a>';
-  return esc(raw);
+  const raw=String(ref||"").trim(),u=ifcSectionUrl(raw);
+  return u?'<a href="'+u+'" target="_blank" rel="noopener noreferrer" class="text-blue-700 underline hover:text-blue-900">'+esc(raw)+'</a>':esc(raw);
 }
 async function renderInspectionChecklist(){
   const box=$("inspectionChecklist");if(!box)return;
