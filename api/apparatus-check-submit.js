@@ -25,7 +25,7 @@ export default async function handler(req,res){
   }
   if(!ok)throw new Error("Only the assigned on-duty driver, assigned on-duty officer, or an administrator may complete this apparatus check.");
   const items=await api("apparatus_check_items?select=item_id,category,item_text,sort_order&active=eq.true&order=sort_order,item_id",auth);
-  const problems=items.filter(x=>b.checklist[String(x.item_id)]==="Problem").map(x=>({item_id:x.item_id,item_text:x.item_text,notes:b.checklist[x.item_id+"_notes"]||""}));
+  const problems=items.filter(x=>{const v=b.checklist?.[String(x.item_id)];return v==="attention"||v==="resolved"||v==="Needs Attention"||v==="Issue Found and Resolved"}).map(x=>({item_id:x.item_id,item_text:x.item_text,notes:b.checklist?.[x.item_id+"_notes"]||b.checklist?.[String(x.item_id)+"_notes"]||""}));
   const now=new Date(),date=now.toISOString().slice(0,10),time=now.toTimeString().slice(0,5);
   const row={apparatus_id:aid,performed_by:u.id,check_date:date,check_time:time,status:problems.length?"failed":"complete",checklist:b.checklist,notes:String(b.notes||""),problem_count:problems.length,email_status:problems.length?"pending":"not_required"};
   const saved=await api("apparatus_checks",auth,{method:"POST",body:JSON.stringify(row)}),check=saved[0];
