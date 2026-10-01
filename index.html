@@ -1470,7 +1470,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   function fireFormNew(i,d,m,unitRows){
     window.jfdRepeats={exposures:d?.exposures||[],casualties:d?.casualties||[],vehicles:d?.vehicles||[],hazards:d?.hazards||[]};
     let h=incidentHeader(i,d,m,"fire");
-    h+=reportResponseSection([]);
+    h+=reportResponseSection({dispatch_incident_number:d?.rDispatchIncidentNumber||d?.dispatch_incident_number||i.cad||"",call_arrival:d?.rCallArrival||d?.call_arrival||i.dispatch_time,call_answered:d?.rCallAnswered||d?.call_answered||i.dispatch_time,call_create:d?.rCallCreate||d?.call_create||i.dispatch_time,dispatch_time:d?.rDispatch||d?.dispatch_time||i.dispatch_time});
     h+=card("Incident & Location Details",'<div class="grid md:grid-cols-2 gap-3">'+
       jfdNerisSelect("rLocationType","Location Type",NERIS_LOCATION_TYPES,d?.location_type||"")+
       jfdNerisSelect("rPrimaryUse","Primary Location Use",NERIS_LOCATION_USES,d?.primary_use||((d?.primary_use_type&&d?.primary_use_subtype)?(d.primary_use_type+"||"+d.primary_use_subtype):d?.primary_use_type)||"","md:col-span-2")+
@@ -1538,7 +1538,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     h+=jfdNerisRequirementPanel();
     const addPatientButton=btn("+ Add Patient","jfdAddPatient({})","primary");
     h+=card("PATIENTS",'<div id="jfdPatients"></div><div class="mt-3 flex flex-wrap gap-2">'+addPatientButton+'</div>');
-    h+=reportResponseSection([]);
+    h+=reportResponseSection({dispatch_incident_number:d?.rDispatchIncidentNumber||d?.dispatch_incident_number||i.cad||"",call_arrival:d?.rCallArrival||d?.call_arrival||i.dispatch_time,call_answered:d?.rCallAnswered||d?.call_answered||i.dispatch_time,call_create:d?.rCallCreate||d?.call_create||i.dispatch_time,dispatch_time:d?.rDispatch||d?.dispatch_time||i.dispatch_time});
     h+=card("Report Completion",field("rCompletedBy","Report Completed By",(d?.completed_by)||((profile?.first_name||"")+" "+(profile?.last_name||""))));
     h+=actionBar("pcr");
     setTimeout(()=>{jfdRenderPatients(saved);jfdBindSignaturePads();jfdUpdateNerisRequirements();},0);
