@@ -1,5 +1,15 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
+
+const SUPABASE_URL="https://audgtwcctdoiptuekqvn.supabase.co";
+const SUPABASE_KEY="sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz";
+async function requireAdmin(req){
+ const auth=req.headers.authorization||"";if(!auth.startsWith("Bearer "))throw new Error("Authentication required.");
+ const ur=await fetch(SUPABASE_URL+"/auth/v1/user",{headers:{apikey:SUPABASE_KEY,Authorization:auth}});if(!ur.ok)throw new Error("Invalid or expired session.");
+ const u=await ur.json();const pr=await fetch(SUPABASE_URL+"/rest/v1/users?select=app_role,active&user_id=eq."+encodeURIComponent(u.id),{headers:{apikey:SUPABASE_KEY,Authorization:auth}});if(!pr.ok)throw new Error("Unable to verify RMS permissions.");
+ const rows=await pr.json();if(rows?.[0]?.active!==true||rows?.[0]?.app_role!=="admin")throw new Error("Administrator access required for PDF reports.");return u;
+}
+
 const t=v=>String(v??"").replace(/\s+/g," ").trim();
 const val=v=>t(v)||"—";
 const JFD_TIME_ZONE="America/Chicago";
