@@ -1044,11 +1044,15 @@ async function fetchAllIncidentsForReports(){
   while(true){const r=await db.from("incidents").select("cad,type,location,dispatch_time,updated_at,reports").order("updated_at",{ascending:false}).range(from,from+pageSize-1);if(r.error)throw new Error(r.error.message);const page=r.data||[];rows.push(...page);if(page.length<pageSize)break;from+=pageSize;}
   return rows;
 }
+async function fetchAllIncidentsForReports(){
+  const rows=[];const pageSize=1000;let from=0;
+  while(true){const r=await db.from("incidents").select("cad,type,location,dispatch_time,updated_at,reports").order("updated_at",{ascending:false}).range(from,from+pageSize-1);if(r.error)throw new Error(r.error.message);const page=r.data||[];rows.push(...page);if(page.length<pageSize)break;from+=pageSize;}
+  return rows;
+}
 async function renderReports(){
   const list=$("reportsList");if(!list)return;
   list.innerHTML='<div class="card p-5 text-sm text-slate-500">Loading reports...</div>';
-  const r=await db.from("incidents").select("cad,type,location,dispatch_time,reports").order("updated_at",{ascending:false}).limit(500);
-  if(r.error){list.innerHTML='<div class="card p-5 text-sm text-red-600">'+esc(r.error.message)+'</div>';return;}
+  let incidentRows=[];try{incidentRows=await fetchAllIncidentsForReports()}catch(e){list.innerHTML='<div class="card p-5 text-red-600">'+esc(e?.message||String(e))+'</div>';return;}
   const rows=[];
   (incidentRows||[]).forEach(i=>(Array.isArray(i.reports)?i.reports:[]).forEach((rep,idx)=>rows.push({i,rep,idx})));
   window._jfdReportRows=rows;
