@@ -2,8 +2,9 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 const t=v=>String(v??"").replace(/\s+/g," ").trim();
 const val=v=>t(v)||"—";
-const date=v=>{if(!v)return "";const d=new Date(v);return Number.isNaN(d.getTime())?String(v):d.toLocaleDateString("en-US")};
-const time=v=>{if(!v)return "";const d=new Date(v);return Number.isNaN(d.getTime())?String(v):d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})};
+const JFD_TIME_ZONE="America/Chicago";
+const date=v=>{if(!v)return "";const d=new Date(v);return Number.isNaN(d.getTime())?String(v):d.toLocaleDateString("en-US",{timeZone:JFD_TIME_ZONE})};
+const time=v=>{if(!v)return "";const d=new Date(v);return Number.isNaN(d.getTime())?String(v):d.toLocaleTimeString("en-US",{timeZone:JFD_TIME_ZONE,hour:"numeric",minute:"2-digit"})};
 
 export async function makePdf(incident={},reports=[]){
  const pdf=await PDFDocument.create();
