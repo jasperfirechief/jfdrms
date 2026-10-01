@@ -477,7 +477,8 @@ function populateInspectionInspector(){
 function renderAcceptancePanels(){
   const box=$("acceptanceTestPanels");if(!box)return;
   const chosen=[...document.querySelectorAll('input[name="acceptanceType"]:checked')].map(x=>x.value);
-  box.innerHTML=chosen.map((x,i)=>'<div class="border rounded-lg p-3 bg-white"><div class="font-bold">'+esc(x)+'</div><div class="grid md:grid-cols-2 gap-2 mt-2"><select data-accept-result="'+esc(x)+'" class="border rounded p-2"><option value="">Result</option><option>Passed</option><option>Failed</option><option>Not Applicable</option></select><textarea data-accept-notes="'+esc(x)+'" class="border rounded p-2" rows="2" placeholder="Notes"></textarea></div></div>').join("");
+  box.innerHTML=chosen.map(x=>'<div class="border rounded-lg p-3 bg-white"><div class="font-bold">'+esc(x)+'</div><div class="flex flex-wrap gap-4 mt-2"><label class="flex items-center gap-2"><input type="checkbox" data-accept-result="'+esc(x)+'" value="Pass"> Pass</label><label class="flex items-center gap-2"><input type="checkbox" data-accept-result="'+esc(x)+'" value="Fail"> Fail</label><label class="flex items-center gap-2"><input type="checkbox" data-accept-result="'+esc(x)+'" value="N/A"> N/A</label></div><textarea data-accept-notes="'+esc(x)+'" class="w-full border rounded p-2 mt-2" rows="2" placeholder="Notes"></textarea></div>').join("");
+  box.querySelectorAll('[data-accept-result]').forEach(cb=>cb.addEventListener("change",()=>{if(cb.checked)box.querySelectorAll('[data-accept-result="'+CSS.escape(cb.dataset.acceptResult)+'"]').forEach(x=>{if(x!==cb)x.checked=false})}));
 }
 function ifcSectionUrl(ref){
   const m=String(ref||"").match(/(?:§§?|Chapter )?([0-9]{3,4})(?:\.([0-9.]+))?/i);if(!m)return "";
@@ -488,14 +489,15 @@ function ifcSectionUrl(ref){
 function renderIfcReference(ref){
   return String(ref||"").split(/(§§?[0-9]{3,4}(?:\.[0-9.]+)?|Chapter [0-9]{1,2}(?:-[0-9]{1,2})?)/g).map(part=>{const u=ifcSectionUrl(part);return u?'<a href="'+u+'" target="_blank" rel="noopener noreferrer" class="text-blue-700 underline hover:text-blue-900">'+esc(part)+'</a>':esc(part);}).join("");
 }
-async function renderInspectionChecklist(){
+async async function renderInspectionChecklist(){
   const box=$("inspectionChecklist");if(!box)return;
   const r=await db.from("inspection_checklist_items").select("item_id,category,item_text,ifc_reference,ifc_url,sort_order").eq("active",true).order("sort_order");
   if(r.error){box.innerHTML='<div class="card p-4 text-red-600">Unable to load inspection checklist: '+esc(r.error.message)+'</div>';return}
   const groups={};(r.data||[]).forEach(x=>(groups[x.category]??=[]).push(x));
   box.innerHTML=Object.entries(groups).map(([title,items])=>'<div class="card p-4"><h2 class="font-black mb-3">'+esc(title)+'</h2><div class="space-y-2">'+items.map(item=>{
     const key="inspection-item-"+item.item_id;
-    return '<div class="border-b last:border-0 py-3"><div class="font-semibold text-sm">'+esc(item.item_text)+'</div><div class="text-xs text-slate-500 mt-1">'+(item.ifc_url?'<a href="'+esc(item.ifc_url)+'" target="_blank" rel="noopener" class="text-blue-700 underline">'+esc(item.ifc_reference||item.ifc_url)+'</a>':renderIfcReference(item.ifc_reference||""))+'</div><div class="grid md:grid-cols-[auto_180px_1fr] gap-2 items-center mt-2"><label class="text-sm font-medium flex items-center gap-2"><input type="checkbox" class="mt-1" data-inspection-present="'+esc(key)+'"> Checked</label><select data-inspection-check="'+esc(key)+'" class="border rounded p-2 text-sm"><option value="">Select</option><option value="OK">OK</option><option value="Violation">Violation</option><option value="N/A">N/A</option></select><input data-inspection-note="'+esc(key)+'" class="border rounded p-2 text-sm" placeholder="Notes / violation details"></div></div>';
+    const ref=item.ifc_url?'<a href="'+esc(item.ifc_url)+'" target="_blank" rel="noopener" class="text-blue-700 underline">'+esc(item.ifc_reference||item.ifc_url)+'</a>':renderIfcReference(item.ifc_reference||"");
+    return '<div class="border-b last:border-0 py-3"><div class="font-semibold text-sm">'+esc(item.item_text)+'</div><div class="text-xs text-slate-500 mt-1">'+ref+'</div><div class="flex flex-wrap gap-4 items-center mt-2"><label class="flex items-center gap-2 text-sm font-medium"><input type="radio" name="inspection-result-'+esc(key)+'" data-inspection-check="'+esc(key)+'" value="Pass"> Pass</label><label class="flex items-center gap-2 text-sm font-medium"><input type="radio" name="inspection-result-'+esc(key)+'" data-inspection-check="'+esc(key)+'" value="Fail"> Fail</label><label class="flex items-center gap-2 text-sm font-medium"><input type="radio" name="inspection-result-'+esc(key)+'" data-inspection-check="'+esc(key)+'" value="N/A"> N/A</label><input data-inspection-note="'+esc(key)+'" class="border rounded p-2 text-sm min-w-[220px]" placeholder="Notes / violation details"></div></div>';
   }).join("")+'</div></div>').join("")||'<div class="card p-4 text-sm text-slate-500">No active inspection checklist points configured.</div>';
 }
 function bindInspectionDimensions(){
@@ -506,8 +508,8 @@ function bindInspectionDimensions(){
 }
 function collectInspectionData(){
   const sig=$("signaturePad")?.toDataURL("image/png")||null;
-  const acceptance=[...document.querySelectorAll('input[name="acceptanceType"]:checked')].map(x=>({type:x.value,result:document.querySelector('[data-accept-result="'+CSS.escape(x.value)+'"]')?.value||"",notes:document.querySelector('[data-accept-notes="'+CSS.escape(x.value)+'"]')?.value||""}));
-  const checklist={};document.querySelectorAll("[data-inspection-check]").forEach(x=>{checklist[x.dataset.inspectionCheck]={present:document.querySelector('[data-inspection-present="'+CSS.escape(x.dataset.inspectionCheck)+'"]')?.checked===true,status:x.value,notes:document.querySelector('[data-inspection-note="'+CSS.escape(x.dataset.inspectionCheck)+'"]')?.value||""}});
+  const acceptance=[...document.querySelectorAll('input[name="acceptanceType"]:checked')].map(x=>({type:x.value,result:document.querySelector('[data-accept-result="'+CSS.escape(x.value)+'"]:checked')?.value||"",notes:document.querySelector('[data-accept-notes="'+CSS.escape(x.value)+'"]')?.value||""}));
+  const checklist={};document.querySelectorAll("[data-inspection-check]:checked").forEach(x=>{checklist[x.dataset.inspectionCheck]={status:x.value,notes:document.querySelector('[data-inspection-note="'+CSS.escape(x.dataset.inspectionCheck)+'"]')?.value||""}});
   return {inspector_id:Number($("inInspector")?.value||0)||null,date:$("inDate")?.value,time:$("inTime")?.value,occupancy_name:$("inOccupancy")?.value,type:$("inType")?.value,square_footage:$("inSqFt")?.value,stories:$("inStories")?.value,address:$("inAddress")?.value,city_state_zip:$("inCity")?.value,contact_name:$("inContact")?.value,contact_phone:$("inContactPhone")?.value,phone:$("inPhone")?.value,email:$("inEmail")?.value,inspection_types:[...document.querySelectorAll('input[name="inspectionType"]:checked')].map(x=>x.value),acceptance_tests:acceptance,checklist,building_length_ft:$("inLengthFt")?.value,building_width_ft:$("inWidthFt")?.value,remarks:$("inRemarks")?.value,reinspection_date:$("inReinspection")?.value,representative_signature:sig,representative_signature_date:$("inSignatureDate")?.value};
 }
 async function loadInspections(){
@@ -536,24 +538,28 @@ function renderChecks(){
   if(!canPerformApparatusChecks()){grid.innerHTML='<div class="card p-5 text-sm text-slate-500">Apparatus checks are limited to on-duty drivers, on-duty officers, and administrators.</div>';return}
   grid.innerHTML=apparatus.map(a=>'<article class="card p-4"><div class="flex justify-between items-center gap-3"><div><h3 class="font-black text-lg">'+esc(a.unit_number||"Apparatus")+'</h3><p class="text-sm text-slate-500">'+esc(a.apparatus_type||"")+'</p></div><button type="button" onclick="openCheckModal('+Number(a.apparatus_id)+')" class="bg-red-600 text-white px-3 py-2 rounded-lg font-bold">Perform Check</button><button type="button" onclick="showCheckHistory('+Number(a.apparatus_id)+')" class="border px-3 py-2 rounded-lg font-bold">History</button></div></article>').join("")||'<div class="card p-5 text-sm text-slate-500">No active apparatus.</div>';
 }
-async function openCheckModal(apparatusId){
+async async function openCheckModal(apparatusId){
   if(!canPerformApparatusChecks())return alert("Apparatus checks are limited to on-duty drivers, on-duty officers, and administrators.");
   const a=apparatus.find(x=>Number(x.apparatus_id)===Number(apparatusId));if(!a)return;
-  const r=await db.from("apparatus_check_items").select("*").eq("apparatus_id",apparatusId).eq("active",true).order("sort_order");
+  if(profile?.app_role!=="admin" && !crew.some(x=>Number(x.apparatus_id)===Number(apparatusId)&&String(x.assignment_role||"").toLowerCase()==="driver") && profile?.app_role!=="officer")return alert("Only an on-duty officer or the currently assigned driver may complete this apparatus check.");
+  const r=await db.from("apparatus_check_items").select("*").eq("apparatus_id",apparatusId).eq("active",true).order("category").order("sort_order");
   if(r.error)return alert(r.error.message);
   $("checkModalTitle").textContent="Apparatus Check · "+(a.unit_number||"");$("checkModalSub").textContent=(a.apparatus_type||"")+" · "+today();
   const items=r.data||[];const cats=[...new Set(items.map(x=>x.category||"General"))];
-  $("checkItems").innerHTML=cats.map(cat=>'<div class="border rounded-xl p-3 bg-slate-50"><h3 class="font-black mb-2">'+esc(cat)+'</h3>'+items.filter(x=>(x.category||"General")===cat).map(x=>'<div class="grid grid-cols-[1fr_auto] gap-3 items-center border-b last:border-0 py-2"><span class="text-sm">'+esc(x.item_text)+'</span><select data-check-item="'+Number(x.item_id)+'" class="border rounded p-2 text-sm"><option value="ok">OK</option><option value="attention">Needs Attention</option><option value="out">Out of Service</option></select></div>').join("")+'</div>').join("")||'<div class="text-sm text-amber-700 bg-amber-50 p-3 rounded">No checklist items are configured for this apparatus. An administrator can add them under Manage Checklists.</div>';
+  const statusHtml=x=>'<div class="border-b last:border-0 py-3"><div class="text-sm font-semibold">'+esc(x.item_text)+'</div><div class="flex flex-wrap gap-4 mt-2"><label class="flex items-center gap-2 text-sm"><input type="radio" name="check-status-'+Number(x.item_id)+'" data-check-item="'+Number(x.item_id)+'" value="ok" checked> OK</label><label class="flex items-center gap-2 text-sm"><input type="radio" name="check-status-'+Number(x.item_id)+'" data-check-item="'+Number(x.item_id)+'" value="attention"> Needs Attention</label><label class="flex items-center gap-2 text-sm"><input type="radio" name="check-status-'+Number(x.item_id)+'" data-check-item="'+Number(x.item_id)+'" value="resolved"> Issue Found and Resolved</label><input data-check-note="'+Number(x.item_id)+'" class="border rounded p-2 text-sm w-full hiddenx" placeholder="Describe the issue"></div></div>';
+  $("checkItems").innerHTML=cats.map(cat=>'<div class="border rounded-xl p-3 bg-slate-50"><h3 class="font-black mb-2">'+esc(cat)+'</h3>'+items.filter(x=>(x.category||"General")===cat).map(statusHtml).join("")+'</div>').join("")||'<div class="text-sm text-amber-700 bg-amber-50 p-3 rounded">No checklist items are configured for this apparatus.</div>';
+  $("checkItems").querySelectorAll("[data-check-item]").forEach(x=>x.addEventListener("change",()=>{const n=$("checkItems").querySelector('[data-check-note="'+x.dataset.checkItem+'"]');if(n)n.classList.toggle("hiddenx",x.value==="ok");}));
   $("checkNotes").value="";$("checkModal").classList.remove("hiddenx");window.checkState={apparatusId};
 }
 function closeCheckModal(){$("checkModal")?.classList.add("hiddenx");window.checkState=null}
-async function submitApparatusCheck(){
-  if(!canOps()||!window.checkState)return;
-  const answers=[...document.querySelectorAll("[data-check-item]")].map(x=>({item_id:Number(x.dataset.checkItem),status:x.value}));
+async async function submitApparatusCheck(){
+  if(!canPerformApparatusChecks()||!window.checkState)return;
+  const answers=[];document.querySelectorAll("[data-check-item]:checked").forEach(x=>answers.push({item_id:Number(x.dataset.checkItem),status:x.value,notes:$("checkItems").querySelector('[data-check-note="'+x.dataset.checkItem+'"]')?.value||""}));
   const problemCount=answers.filter(x=>x.status!=="ok").length;
-  const r=await db.from("apparatus_checks").insert({apparatus_id:window.checkState.apparatusId,performed_by:me?.id||null,check_date:today(),status:problemCount?"attention":"ready",checklist:answers,notes:$("checkNotes")?.value||null,check_time:new Date().toLocaleTimeString("en-US",{timeZone:JFD_TIME_ZONE,hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"}),problem_count:problemCount,email_status:"pending"}).select("check_id").maybeSingle();
+  const r=await db.from("apparatus_checks").insert({apparatus_id:window.checkState.apparatusId,performed_by:me?.id||null,check_date:today(),status:problemCount?"attention":"ready",checklist:answers,notes:$("checkNotes")?.value||null,check_time:new Date().toLocaleTimeString("en-US",{timeZone:JFD_TIME_ZONE,hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"}),problem_count:problemCount,email_status:problemCount?"pending":"not_required"}).select("check_id").maybeSingle();
   if(r.error)return alert("Could not save apparatus check: "+r.error.message);
-  alert(problemCount?"Check saved with items needing attention.":"Apparatus check completed.");closeCheckModal();
+  alert(problemCount?"Check saved with items needing attention.":"Apparatus check completed.");
+  closeCheckModal();
 }
 async function showCheckHistory(apparatusId){
   const a=apparatus.find(x=>Number(x.apparatus_id)===Number(apparatusId));if(!a)return;
@@ -669,16 +675,7 @@ function bindStaffingControls(){
   $("staffDate")?.addEventListener("change",loadStaffing);$("staffShift")?.addEventListener("change",loadStaffing);
 }
 bindStaffingControls();
-function incidentDate(v){if(!v)return "";const d=new Date(v);return Number.isNaN(d.getTime())?"":d.toLocaleDateString("en-US",{timeZone:JFD_TIME_ZONE,month:"2-digit",day:"2-digit",year:"numeric"})}function incidentTime(v){if(!v)return "";const d=new Date(v);return Number.isNaN(d.getTime())?"":d.toLocaleTimeString("en-US",{timeZone:JFD_TIME_ZONE,hour:"numeric",minute:"2-digit"})}function mapIncident(id){const el=document.querySelector("[data-incident-id=\""+Number(id)+"\"]");const q=el?.dataset.location||"";const lat=el?.dataset.lat||"";const lng=el?.dataset.lng||"";if(!q&&!lat&&!lng)return alert("No incident location is available.");const destination=(lat&&lng)?lat+","+lng:q;const url="https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(destination)+"&travelmode=driving";window.open(url,"_blank","noopener");}
-function reportTypeLabel(t){return t==="fire_neris_v2"?"Fire Incident Report":t==="pcr_neris_v2"?"Patient Care Report":"Incident Report"}
-function reportTypeIcon(t){return t==="fire_neris_v2"?"🔥":"🚑"}
-function ensureReportModal(){
-  let m=$("reportModal");if(m)return m;
-  m=document.createElement("div");m.id="reportModal";
-  m.className="hiddenx fixed inset-0 z-[70] bg-slate-950/70 backdrop-blur-sm p-3 sm:p-5 overflow-y-auto";
-  m.innerHTML='<div class="max-w-6xl mx-auto my-2 sm:my-6 bg-white rounded-2xl shadow-2xl overflow-hidden"><div class="bg-slate-950 text-white px-5 py-4 sm:px-6 flex justify-between items-start gap-4"><div><div class="text-xs font-bold uppercase tracking-wider text-slate-300">Incident Reporting</div><h2 id="reportModalTitle" class="text-xl sm:text-2xl font-black mt-1">Create Report</h2><p id="reportModalSub" class="text-sm text-slate-300 mt-1"></p></div><button type="button" onclick="closeReportModal()" class="border border-slate-600 hover:bg-slate-800 px-3 py-2 rounded-lg font-bold">Close</button></div><div class="p-4 sm:p-6"><div id="reportIncidentBanner" class="hiddenx mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4"><div class="flex flex-wrap items-start justify-between gap-3"><div><div class="text-xs font-bold uppercase tracking-wide text-blue-700">Attached Incident</div><div id="reportIncidentTitle" class="font-black text-lg"></div><div id="reportIncidentDetails" class="text-sm text-slate-600 mt-1"></div></div><button type="button" onclick="openReportIncidentMap()" class="border border-blue-300 bg-white px-3 py-2 rounded-lg font-bold text-sm">View Location</button></div></div><div id="reportChooser"></div><form id="incidentReportForm" class="hiddenx space-y-5"></form></div></div>';
-  document.body.appendChild(m);return m
-}
+function incidentDate(v){if(!v)return "";const d=new Date(v);return Number.isNaN(d.getTime())?"":d.toLocaleDateString("en-US",{timeZone:JFD_TIME_ZONE,month:"2-digit",day:"2-digit",year:"numeric"})}function incidentTime(v){if(!v)return "";const d=new Date(v);return Number.isNaN(d.getTime())?"":d.toLocaleTimeString("en-US",{timeZone:JFD_TIME_ZONE,hour:"numeric",minute:"2-digit"})}function mapIncident(id){const el=document.querySelector("[data-incident-id=\""+Number(id)+"\"]");const q=el?.dataset.location||"";const lat=el?.dataset.lat||"";const lng=el?.dataset.lng||"";if(!q&&!lat&&!lng)return alert("No incident location is available.");const url=(lat&&lng)?"https://www.google.com/maps/@?api=1&map_action=map&center="+encodeURIComponent(lat+","+lng)+"&zoom=18":"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(q);window.open(url,"_blank","noopener");}
 function closeReportModal(){const m=$("reportModal");if(!m)return;m.classList.add("hiddenx");$("reportChooser").innerHTML="";$("incidentReportForm").innerHTML="";$("incidentReportForm").classList.add("hiddenx");$("reportIncidentBanner")?.classList.add("hiddenx");$("reportModal").dataset.incidentId="";$("reportModal").dataset.cad="";$("reportModal").dataset.standalone=""}
 function reportInput(id,label,value="",type="text",required=false,cls=""){return '<label class="text-sm font-semibold '+cls+'">'+label+(required?'<span class="ml-2 text-[10px] font-black uppercase text-red-700">Required</span>':'')+'<input id="'+id+'" type="'+type+'" value="'+esc(value??"")+'" '+(required?'required':'')+' class="w-full border rounded-lg p-2 mt-1 bg-white"></label>'}
 function reportSelect(id,label,opts,value="",required=false,cls=""){let list;if(Array.isArray(opts))list=opts;else if(opts&&typeof opts[Symbol.iterator]==="function"&&typeof opts!=="string")list=Array.from(opts);else if(opts&&typeof opts==="object")list=Object.values(opts);else list=opts==null||opts===""?[]:[opts];return '<label class="text-sm font-semibold '+cls+'">'+label+(required?' *':'')+'<select id="'+id+'" '+(required?'required':'')+' class="w-full border rounded-lg p-2 mt-1 bg-white"><option value="">Select...</option>'+list.map(o=>'<option value="'+esc(o)+'" '+(String(o)===String(value)?'selected':'')+'>'+esc(o)+'</option>').join("")+'</select></label>'}
@@ -698,31 +695,29 @@ function reportResponseSection(unitRows=[]){
 }
 function reportResponseUnitRow(u){
   const apId=Number(u.apparatus_id||0),ap=apparatus.find(a=>Number(a.apparatus_id)===apId),crew=Array.isArray(u.crew_snapshot)?u.crew_snapshot:[];
-  const incidentDate=$("rDate")?.value||today(), split=v=>{const p=jfdSplitCentralDateTime(v);return p||{date:incidentDate,time:""}};
-  const en=split(u.enroute_time),on=split(u.on_scene_time),ca=split(u.cancelled_time),cl=split(u.in_service_time),cancelled=!!u.cancelled_time;
-  const event=(label,key,p)=>'<label class="text-xs font-bold">'+label+'<div class="grid grid-cols-2 gap-2 mt-1"><input data-report-unit-date="'+key+'" type="date" value="'+esc(p.date||incidentDate)+'" class="w-full border rounded p-2 font-normal"><input data-report-unit-time="'+key+'" type="text" inputmode="numeric" placeholder="HH:MM" value="'+esc(p.time||"")+'" class="w-full border rounded p-2 font-normal"></div></label>';
-  return '<div class="report-response-unit border rounded-xl p-3 bg-white" data-apparatus-id="'+apId+'" data-crew="'+esc(JSON.stringify(crew))+'"><div class="flex justify-between gap-3 items-start"><div><b>'+esc(u.unit_number_snapshot||ap?.unit_number||"Unit")+'</b><div class="text-xs text-slate-500">'+esc(u.station_snapshot||"")+'</div></div><button type="button" onclick="removeReportApparatus('+apId+')" class="text-red-600 font-bold text-sm">Remove</button></div><div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-3">'+event("En Route","enroute",en)+event("On Scene","on_scene",on)+event("Cancelled","cancelled",ca)+event("In Service","in_service",cl)+'</div></div>'
+  const incidentDate=$("rDate")?.value||today();
+  const split=v=>{const p=jfdSplitCentralDateTime(v);return p||{date:incidentDate,time:""}};
+  const di=split(u.dispatch_time||u.dispatch_at||$("rDispatch")?.value);
+  const en=split(u.enroute_time),on=split(u.on_scene_time),ca=split(u.cancelled_time),cl=split(u.in_service_time);
+  const event=(label,key,p,required)=>'<label class="text-xs font-bold">'+label+(required?' <span class="text-red-700">Required</span>':'')+'<div class="grid grid-cols-2 gap-2 mt-1"><input data-report-unit-date="'+key+'" type="date" value="'+esc(p.date||incidentDate)+'" class="w-full border rounded p-2 font-normal"><input data-report-unit-time="'+key+'" type="text" inputmode="numeric" placeholder="HH:MM" value="'+esc(p.time||"")+'" class="w-full border rounded p-2 font-normal" '+(required?'required':'')+'></div></label>';
+  return '<div class="report-response-unit border rounded-xl p-3 bg-white" data-apparatus-id="'+apId+'" data-crew="'+esc(JSON.stringify(crew))+'"><div class="flex justify-between gap-3 items-start"><div><b>'+esc(u.unit_number_snapshot||ap?.unit_number||"Unit")+'</b><div class="text-xs text-slate-500">'+esc(u.station_snapshot||"")+'</div></div><button type="button" onclick="removeReportApparatus('+apId+')" class="text-red-600 font-bold text-sm">Remove</button></div><p class="text-xs font-bold text-red-700 mt-3">Military time required. Enter times as HH:MM (0000-2359).</p><div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-2">'+event("Dispatch","dispatch",di,true)+event("En Route","enroute",en,false)+event("On Scene","on_scene",on,false)+event("Cancelled","cancelled",ca,false)+event("In Service","in_service",cl,false)+'</div></div>';
 }
 function syncReportUnitTimes(row){
   if(!row)return;
+  const dispatch=row.querySelector('[data-report-unit-time="dispatch"]');
   const cancelled=row.querySelector('[data-report-unit-time="cancelled"]');
   const inService=row.querySelector('[data-report-unit-time="in_service"]');
-  if(!cancelled||!inService)return;
+  const enroute=row.querySelector('[data-report-unit-time="enroute"]');
+  const onscene=row.querySelector('[data-report-unit-time="on_scene"]');
+  if(!dispatch||!cancelled||!inService)return;
+  const normalize=e=>{if(!e)return;const v=jfdParseTime24(e.value);if(v!==null)e.value=v||e.value;};
   const sync=()=>{
     const isCancelled=!!cancelled.value;
     inService.disabled=isCancelled;
     if(isCancelled)inService.value="";
+    if(inService.value)cancelled.value="";
   };
-  cancelled.addEventListener("input",sync);
-  cancelled.addEventListener("change",sync);
-  inService.addEventListener("input",()=>{
-    if(inService.value)cancelled.value="";
-    sync();
-  });
-  inService.addEventListener("change",()=>{
-    if(inService.value)cancelled.value="";
-    sync();
-  });
+  [dispatch,enroute,onscene,cancelled,inService].forEach(e=>{e.addEventListener("change",()=>{normalize(e);sync()});e.addEventListener("blur",()=>{normalize(e);sync()})});
   sync();
 }
 function renderOffDutyPersonnel(selectedIds=[],people=null){
@@ -805,13 +800,34 @@ async function refreshOffDutyPersonnel(dateOverride,onDutyIds=[]){
   const selected=existing.filter(id=>offDuty.some(p=>Number(p.id)===id));
   container.innerHTML=renderOffDutyPersonnel(selected,offDuty);
 }
-function commonReportFields(i,d,m,unitRows=[]){const call=d?.call_type||i.type||"";const incident=d?.incident_type||"";const primary=d?.primary_use_type||d?.primary_use||"";const secondary=d?.secondary_use_type||d?.secondary_use||"";const date=/^\\d{4}-\\d{2}-\\d{2}/.test(String(i.dispatch_time||""))?String(i.dispatch_time).slice(0,10):"";return reportSection("Incident & Location",reportInput("rDate","Incident Date",date,"date")+reportSelect("rCall","Call Type",CALL_TYPES,call)+reportSelect("rIncidentType","Incident Type",INCIDENT_TYPES,incident)+reportInput("rStation","Station",m.station)+reportSelect("rShift","Shift",["A","B","C"],m.shift||"")+reportInput("rCallArrival","Call Arrival",localDateTime(i.call_arrival||i.dispatch_time),"datetime-local")+reportInput("rCallAnswered","Call Answered",localDateTime(i.call_answered||i.dispatch_time),"datetime-local")+reportInput("rCallCreate","Call Create",localDateTime(i.call_create||i.dispatch_time),"datetime-local")+reportInput("rDispatch","Dispatch Time",localDateTime(i.dispatch_time),"datetime-local")+reportInput("rEnroute","First Unit En Route",localDateTime(i.enroute_time||i.enroute_at),"datetime-local")+reportInput("rOnscene","First Unit On Scene",localDateTime(d?.arrival_time),"datetime-local")+reportInput("rCancelled","Cancelled",localDateTime(i.cancelled_time||i.cancelled_at),"datetime-local")+reportInput("rCleared","Last Unit Cleared",localDateTime(d?.clear_time),"datetime-local")+reportInput("rLocation","Location",i.location,"text",false,"md:col-span-2")+reportInput("rLatitude","Latitude",i.latitude??"","number")+reportInput("rLongitude","Longitude",i.longitude??"","number")+reportSelect("rLocationType","Location Type",LOCATION_TYPES,d?.location_type||"")+reportSelect("rPrimaryUse","Primary Use Type",USE_TYPES,primary)+reportSelect("rSecondaryUse","Secondary Use Type",USE_TYPES,secondary)+reportSelect("rUsedAsIntended","Used as Intended",["Yes","No"],d?.used_as_intended||"")+reportSelect("rPerson","Person Involved",["None","Owner","Occupant","Other"],d?.person_involved||"")+reportSelect("rVacancy","Cause for Vacancy",["Not Vacant","Under Construction","Unoccupied","Foreclosure","Abandoned","Other"],d?.cause_for_vacancy||"")+reportSelect("rMutual","Mutual Aid",["None","Given","Received","Non-FD Aid"],d?.mutual_aid||"")+reportInput("rAgency1","Agency #1",d?.agency_1||"")+reportInput("rAgency2","Agency #2",d?.agency_2||"")+reportInput("rAgency3","Agency #3",d?.agency_3||""))+reportResponseSection([])}
-function fireReportForm(i,d,m,unitRows=[]){let h=commonReportFields(i,d,m,unitRows);h+=reportSection("Actions Taken",reportArea("rActions","Actions Taken",d?.actions_taken||"","md:col-span-2"));h+=reportSection("Incident Narrative",reportArea("rNarrative","Narrative",d?.narrative||"","md:col-span-2")+reportInput("rCompletedBy","Report Completed By"));h+=reportSection("Fire & Hazard Investigation",reportSelect("rInvestigation","Investigation Required?",["Yes","No"])+reportSelect("rFireLoc","Fire Location",["Structure","Outside"])+reportInput("rFloor","Floor of Origin")+reportSelect("rWater","Water Supply",["Hydrant","Tank Water","Shuttle","Other"])+reportSelect("rCondition","Condition",["Involved","Not Involved","Other"])+reportSelect("rDamageType","Damage Type",["None","Minor","Major","Destroyed","Other"])+reportSelect("rRoom","Room Type",["Bedroom","Kitchen","Living Area","Garage","Attic","Other"])+reportInput("rCause","Cause",d?.cause||"")+reportInput("rAcres","Wildfire Acres Burned","","number")+reportSelect("rAlarm","Alarms / Systems",["Smoke Alarm","Fire Alarm","Other Alarm","Suppression System","Cooking Fire Suppression"]));h+=reportSection("Exposures & Casualties",reportInput("rExposureDisplaced","Exposure #1 Displacement Count","0","number")+reportSelect("rExposureCause","Exposure #1 Cause",["Unknown","Natural","Accidental","Intentional","Other"])+reportSelect("rExposureDamage","Exposure #1 Damage Type",["None","Minor","Major","Destroyed"])+reportSelect("rExposureType","Exposure #1 Type",["External","Internal"])+reportSelect("rCasualtyClass","Casualty #1",["FF","Non-FF"])+reportInput("rCasualtyDob","Casualty DOB","","date")+reportSelect("rCasualtyGender","Gender",["Male","Female","Unknown"])+reportSelect("rCasualtyStatus","Status",["Uninjured","Injured","Fatal"])+reportInput("rRescueType","Rescue Type"));h+=reportSection("Hazmat & Special Hazards",reportInput("rEvac","Evacuation Count","0","number")+reportSelect("rHazmat","HAZMAT Disposition",["None","Contained","Released","Cleaned Up","Other"])+reportInput("rChemicals","Chemicals / Present / Released","","text",false,"md:col-span-2")+reportInput("rElectrical","Electrical Hazard Type")+reportInput("rOtherHazard","Other","","text",false,"md:col-span-2"));h+=reportSection("Vehicle / Property / Insurance",reportInput("rVehicle1","Vehicle #1")+reportInput("rMake1","Make")+reportInput("rModel1","Model")+reportInput("rYear1","Year","","number")+reportInput("rVin1","License / VIN")+reportInput("rOccName","Occupant Name")+reportInput("rOccPhone","Occupant Phone")+reportInput("rOccInsurance","Occupant Insurance")+reportInput("rOwnerName","Owner Name")+reportInput("rOwnerPhone","Owner Phone")+reportInput("rOwnerInsurance","Owner Insurance"));h+='<div class="flex flex-wrap justify-between gap-2 pt-2 border-t"><div class="flex flex-wrap gap-2"><button type="button" onclick="saveReportDraft(window.currentReportKind)" class="border px-4 py-2 rounded-lg font-bold">Save Draft</button><button type="button" onclick="addAnotherReportToIncident(window.currentReportKind)" class="border px-4 py-2 rounded-lg font-bold">Add Another Report to This Incident</button></div><div class="flex flex-wrap gap-2"><button type="button" onclick="closeReportModal()" class="border px-4 py-2 rounded-lg font-bold">Cancel</button><button type="button" onclick="validateAndFinishReport(window.currentReportKind)" class="bg-amber-600 text-white px-5 py-2 rounded-lg font-bold">Validate and Finish</button></div></div>';return h}
-function pcrReportForm(i,d,m,unitRows=[]){
-  let h=commonReportFields(i,d,m,unitRows);
-  h+='<section class="border-2 border-blue-200 rounded-2xl p-4 bg-blue-50"><div class="flex flex-wrap items-center justify-between gap-3"><div><h3 class="text-lg font-black">Patient Care Reports</h3><p class="text-sm text-slate-600">Start with the patient. Add one PCR per patient.</p></div><button type="button" onclick="jfdAddPatient({})" class="bg-blue-700 text-white px-4 py-2 rounded-lg font-bold">+ Add Patient</button></div><div id="jfdPatients" class="mt-4 space-y-4"><div class="rounded-xl border border-dashed bg-white p-5 text-sm text-slate-500">No patient started yet. Tap Add Patient.</div></div></section>';
-  h+='<div class="flex flex-wrap justify-between gap-2 pt-2 border-t"><div class="flex flex-wrap gap-2"><button type="button" onclick="saveReportDraft(window.currentReportKind)" class="border px-4 py-2 rounded-lg font-bold">Save Draft</button><button type="button" onclick="addAnotherReportToIncident(window.currentReportKind)" class="border px-4 py-2 rounded-lg font-bold">Add Another Report</button></div><div class="flex flex-wrap gap-2"><button type="button" onclick="closeReportModal()" class="border px-4 py-2 rounded-lg font-bold">Cancel</button><button type="button" onclick="validateAndFinishReport(window.currentReportKind)" class="bg-amber-600 text-white px-5 py-2 rounded-lg font-bold">Validate and Finish</button></div></div>';
-  return h;
+function commonReportFields(i,d,m,unitRows=[]){
+  const call=d?.call_type||"";
+  const date=/^\\d{4}-\\d{2}-\\d{2}/.test(String(i.dispatch_time||""))?String(i.dispatch_time).slice(0,10):"";
+  const hidden=(id,value)=>'<input type="hidden" id="'+id+'" value="'+esc(value??"")+'">';
+  const hiddens=hidden("rDispatchIncidentNumber",i.dispatch_incident_number||i.cad||"")+hidden("rCallArrival",localDateTime(i.call_arrival||i.dispatch_time))+hidden("rCallAnswered",localDateTime(i.call_answered||i.dispatch_time))+hidden("rCallCreate",localDateTime(i.call_create||i.dispatch_time))+hidden("rDispatch",localDateTime(i.dispatch_time))+hidden("rEnroute",localDateTime(i.enroute_time||i.enroute_at))+hidden("rOnscene",localDateTime(d?.arrival_time))+hidden("rCancelled",localDateTime(i.cancelled_time||i.cancelled_at))+hidden("rCleared",localDateTime(d?.clear_time));
+  return reportSection("Incident & Location",
+    reportInput("rDate","Incident Date",date,"date")+
+    reportSelect("rCall","Call Type",CALL_TYPES,call)+
+    jfdNerisSelect("rPrimaryIncidentType","Primary Incident Type",NERIS_INCIDENT_TYPES,"",true)+
+    reportSelect("rStation","Station",["A Shift","B Shift","C Shift"],m.shift||"")+
+    reportSelect("rShift","Shift",["A","B","C"],m.shift||"")+
+    reportInput("rLocation","Location",i.location,"text",true,"md:col-span-2")+
+    reportInput("rLatitude","Latitude",i.latitude??"","number")+
+    reportInput("rLongitude","Longitude",i.longitude??"","number")+
+    reportSelect("rLocationType","Location Type",LOCATION_TYPES,d?.location_type||"")+
+    reportSelect("rPrimaryUse","Primary Location Use",USE_TYPES,d?.primary_use_type||d?.primary_use||"","",false)+
+    reportSelect("rSecondaryUse","Secondary Location Use",USE_TYPES,d?.secondary_use_type||d?.secondary_use||"","",false)+
+    reportSelect("rLocationInUse","Location In Use",["Yes","No"],d?.location_in_use||"")+
+    reportSelect("rUsedAsIntended","Used as Intended",["Yes","No"],d?.used_as_intended||"")+
+    reportSelect("rPerson","Person Involved",["None","Owner","Occupant","Other"],d?.person_involved||"")+
+    reportSelect("rVacancy","Cause for Vacancy",["Not Vacant","Under Construction","Unoccupied","Foreclosure","Abandoned","Other"],d?.cause_for_vacancy||"")+
+    reportSelect("rMutual","Mutual Aid",["None","Given","Received","Non-FD Aid"],d?.mutual_aid||"")+
+    reportInput("rAgency1","Agency #1",d?.agency_1||"")+
+    reportInput("rAgency2","Agency #2",d?.agency_2||"")+
+    reportInput("rAgency3","Agency #3",d?.agency_3||"")+
+    hiddens+
+    reportResponseSection(unitRows||[])
+  );
 }
 function setReportIncidentContext(i,d){const m=$("reportModal");if(!m)return;const attached=!!(m.dataset.incidentId&&m.dataset.cad);const banner=$("reportIncidentBanner");if(!banner)return;if(attached){banner.classList.remove("hiddenx");$("reportIncidentTitle").textContent=i.type||"Incident";$("reportIncidentDetails").innerHTML='<div class="font-semibold text-slate-800">'+esc(i.location||"Location not provided")+'</div><div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500"><span>CAD <b class="text-slate-700">'+esc(i.cad||"")+'</b></span><span>'+esc(i.dispatch_time?incidentDate(i.dispatch_time)+" "+incidentTime(i.dispatch_time):"Time not available")+'</span><span>Attached to incident</span></div>';banner.dataset.lat=i.latitude??"";banner.dataset.lng=i.longitude??"";banner.dataset.location=i.location||"";}else banner.classList.add("hiddenx");}function openReportIncidentMap(){const b=$("reportIncidentBanner");if(b)openIncidentMap({location:b.dataset.location||"",lat:b.dataset.lat||"",lng:b.dataset.lng||""});}function renderReportChooser(i,d,units){
   const modal=$("reportModal");if(modal)modal.dataset.reportId="";
@@ -1123,7 +1139,7 @@ function buildNerisPayload(data){
   const create=nerisIso(data.rDispatch||data.rDate,baseTime);
   const times=[arrival,answered,create].sort();
   const callArrival=times[0],callAnswered=times[1],callCreate=times[2];
-  const primaryType=data.rPrimaryIncidentType||data.rNerisType||data.rIncidentType||"FIRE||STRUCTURE_FIRE||STRUCTURAL_INVOLVEMENT_FIRE";
+  const primaryType=data.rPrimaryIncidentType||data.rNerisType||data.rIncidentType||"";
   const selectedTypes=Array.isArray(data.incident_types)?data.incident_types.filter(Boolean):[];
   const incidentTypes=[primaryType,...selectedTypes.filter(x=>x!==primaryType),...(data.rSecondaryIncidentType?[data.rSecondaryIncidentType]:[])].filter(Boolean).filter((x,i,a)=>a.indexOf(x)===i);
   const location=buildNerisLocation(data.rLocation,data.rLatitude,data.rLongitude); const point=location.point||null; delete location.point;
@@ -1134,7 +1150,7 @@ function buildNerisPayload(data){
       dispatch:nerisIso(t.dispatch||data.rDispatch,callCreate),
       enroute_to_scene:nerisIso(t.enroute||data.rEnroute,callCreate),
       on_scene:nerisIso(t.on_scene||data.rOnscene,callAnswered),
-      unit_clear:nerisIso(t.clear||data.rCleared,callAnswered),
+      unit_clear:nerisIso(t.in_service||t.cancelled||t.clear||data.rCleared,callAnswered),
       unable_to_dispatch:false
     };
   });
