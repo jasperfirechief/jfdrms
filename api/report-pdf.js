@@ -20,7 +20,7 @@ export async function makePdf(incident={},reports=[]){
  const heading=s=>{need(34);page.drawText(s,{x:m,y,font:F.bold,size:11,color:rgb(.12,.18,.25)});y-=16};
  const line=(label,v)=>{need(20);page.drawText(String(label),{x:m,y,font:F.bold,size:8,color:rgb(.12,.18,.25)});wrap(val(v),8,10,false)};
  const kv=(label,v)=>line(label,v);
- const top=(title,subtitle="")=>{newPage();page.drawText("JASPER FIRE DEPARTMENT",{x:m,y,font:F.bold,size:18,color:rgb(.65,.02,.02)});y-=23;page.drawText(title,{x:m,y,font:F.bold,size:13});y-=17;if(subtitle)wrap(subtitle,8,11)};
+ const top=(title,subtitle="")=>{newPage();page.drawCircle({x:m+28,y:y-22,size:25,borderWidth:2,borderColor:rgb(.65,.02,.02),color:rgb(1,1,1)});page.drawText("JFD",{x:m+15,y:y-27,font:F.bold,size:9,color:rgb(.65,.02,.02)});page.drawText("JASPER FIRE DEPARTMENT",{x:m+62,y,font:F.bold,size:16,color:rgb(.12,.16,.22)});y-=19;page.drawText("10 18th Street East · Jasper, Alabama 35501 · 205-221-8509",{x:m+62,y,font:F.reg,size:8,color:rgb(.3,.35,.4)});y-=17;page.drawText(title,{x:m,y,font:F.bold,size:13,color:rgb(.65,.02,.02)});y-=15;if(subtitle)wrap(subtitle,8,11);y-=3;};
  const fire=(reports||[]).filter(r=>String(r?.report_type||"").startsWith("fire_"));
  const pcr=(reports||[]).filter(r=>String(r?.report_type||"").startsWith("pcr_"));
  const fd=fire[0]?.data||{};
