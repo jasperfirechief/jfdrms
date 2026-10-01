@@ -68,7 +68,7 @@ async function makeTablePdf(title, sections) {
     for(const w of words){const t=line?line+" "+w:w;if(font.widthOfTextAtSize(t,size)>contentW-125){if(line)lines.push(line);line=w;}else line=t;}
     if(line)lines.push(line);return lines;
   };
-  const header = () => {ensure(40);page.drawText("JASPER FIRE DEPARTMENT",{x:margin,y,size:16,font:bold,color:red});y-=22;page.drawText(title,{x:margin,y,size:11,font:bold});y-=20;};
+  const header = () => {ensure(78);page.drawRectangle({x:margin,y:y-58,width:contentW,height:58,borderWidth:1,borderColor:rgb(.78,.82,.87),color:rgb(1,1,1)});page.drawCircle({x:margin+30,y:y-29,size:22,borderWidth:2,borderColor:red,color:rgb(1,1,1)});page.drawText("JFD",{x:margin+19,y:y-33,size:8,font:bold,color:red});page.drawText("JASPER FIRE DEPARTMENT",{x:margin+64,y:y-21,size:15,font:bold,color:rgb(.12,.16,.22)});page.drawText("10 18th Street East · Jasper, Alabama 35501 · 205-221-8509",{x:margin+64,y:y-35,size:7.5,font:regular,color:gray});page.drawText(title,{x:margin+64,y:y-50,size:10,font:bold,color:red});y-=72;};
   header();
   for(const section of sections){
     ensure(28);page.drawText(clean(section.title),{x:margin,y,size:12,font:bold,color:red});y-=16;
