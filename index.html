@@ -586,8 +586,10 @@ function reportResponseSection(unitRows=[]){
 }
 function reportResponseUnitRow(u){
   const apId=Number(u.apparatus_id||0),ap=apparatus.find(a=>Number(a.apparatus_id)===apId),crew=Array.isArray(u.crew_snapshot)?u.crew_snapshot:[];
-  const cancelled=!!u.cancelled_time;
-  return '<div class="report-response-unit border rounded-xl p-3 bg-white" data-apparatus-id="'+apId+'" data-crew="'+esc(JSON.stringify(crew))+'"><div class="flex justify-between gap-3 items-start"><div><b>'+esc(u.unit_number_snapshot||ap?.unit_number||"Unit")+'</b><div class="text-xs text-slate-500">'+esc(u.station_snapshot||"")+'</div></div><button type="button" onclick="removeReportApparatus('+apId+')" class="text-red-600 font-bold text-sm">Remove</button></div><div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-3"><label class="text-xs font-bold">En Route<input data-report-unit-time="enroute" type="datetime-local" value="'+esc(localDateTime(u.enroute_time))+'" class="w-full border rounded p-2 mt-1 font-normal"></label><label class="text-xs font-bold">On Scene<input data-report-unit-time="on_scene" type="datetime-local" value="'+esc(localDateTime(u.on_scene_time))+'" class="w-full border rounded p-2 mt-1 font-normal"></label><label class="text-xs font-bold">Cancelled<input data-report-unit-time="cancelled" type="datetime-local" value="'+esc(localDateTime(u.cancelled_time))+'" class="w-full border rounded p-2 mt-1 font-normal"></label><label class="text-xs font-bold">In Service<input data-report-unit-time="in_service" type="datetime-local" value="'+esc(localDateTime(u.in_service_time))+'" class="w-full border rounded p-2 mt-1 font-normal" '+(cancelled?'disabled ':'')+'></label></div></div>'
+  const incidentDate=$("rDate")?.value||today(), split=v=>{const p=jfdSplitCentralDateTime(v);return p||{date:incidentDate,time:""}};
+  const en=split(u.enroute_time),on=split(u.on_scene_time),ca=split(u.cancelled_time),cl=split(u.in_service_time),cancelled=!!u.cancelled_time;
+  const event=(label,key,p)=>'<label class="text-xs font-bold">'+label+'<div class="grid grid-cols-2 gap-2 mt-1"><input data-report-unit-date="'+key+'" type="date" value="'+esc(p.date||incidentDate)+'" class="w-full border rounded p-2 font-normal"><input data-report-unit-time="'+key+'" type="text" inputmode="numeric" placeholder="HH:MM" value="'+esc(p.time||"")+'" class="w-full border rounded p-2 font-normal"></div></label>';
+  return '<div class="report-response-unit border rounded-xl p-3 bg-white" data-apparatus-id="'+apId+'" data-crew="'+esc(JSON.stringify(crew))+'"><div class="flex justify-between gap-3 items-start"><div><b>'+esc(u.unit_number_snapshot||ap?.unit_number||"Unit")+'</b><div class="text-xs text-slate-500">'+esc(u.station_snapshot||"")+'</div></div><button type="button" onclick="removeReportApparatus('+apId+')" class="text-red-600 font-bold text-sm">Remove</button></div><div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-3">'+event("En Route","enroute",en)+event("On Scene","on_scene",on)+event("Cancelled","cancelled",ca)+event("In Service","in_service",cl)+'</div></div>'
 }
 function syncReportUnitTimes(row){
   if(!row)return;
@@ -869,12 +871,16 @@ async function editSavedReport(cad,reportId){
       const cb=document.querySelector('[data-report-apparatus-check="'+id+'"]');
       if(cb&&!cb.checked){cb.checked=true;toggleReportApparatus(id,true);}
     });
-    await new Promise(resolve=>setTimeout(resolve,100));
+    await new Promise(resolve=>setTimeout(resolve,150));
     const rows=[...document.querySelectorAll(".report-response-unit")];
     savedUnits.forEach((saved,idx)=>{
       const row=rows.find(x=>Number(x.dataset.apparatusId)===Number(saved.apparatus_id||0))||rows[idx];if(!row)return;
-      if(saved.times)Object.entries(saved.times).forEach(([k,v])=>{const el=row.querySelector('[data-report-unit-time="'+k+'"]');if(el)el.value=v||"";});
+      Object.entries(saved.times||{}).forEach(([k,v])=>{
+        const p=jfdSplitCentralDateTime(v);const dateEl=row.querySelector('[data-report-unit-date="'+k+'"]'),timeEl=row.querySelector('[data-report-unit-time="'+k+'"]');
+        if(dateEl)dateEl.value=p.date||$("rDate")?.value||today();if(timeEl)timeEl.value=p.time||"";
+      });
       if(saved.crew)row.dataset.crew=JSON.stringify(saved.crew);
+      syncReportUnitTimes(row);
     });
     if(Array.isArray(rep.data?.additional_personnel)){
       const ids=new Set(rep.data.additional_personnel.map(Number));
@@ -1548,11 +1554,14 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       data[el.id]=el.value;
     });
     data.rDispatchIncidentNumber=data.rDispatchIncidentNumber||data.rCad||$("reportModal")?.dataset.cad||"";
-    data.responding_apparatus=[...document.querySelectorAll("[data-unit-row]")].map(row=>({
-      apparatus_id:Number(row.dataset.unitRow||0),unit_number:row.querySelector("b")?.textContent?.trim()||"",
-      times:Object.fromEntries(["enroute","on_scene","cancelled","clear"].map(k=>{const date=row.querySelector('[data-report-unit-date="'+k+'"]')?.value||"",time=jfdParseTime24(row.querySelector('[data-report-unit-time="'+k+'"]')?.value||"");return [k,date&&time?date+"T"+time:""]})),
-      crew:JSON.parse(row.dataset.crew||"[]")
-    }));
+    const responseRows=[...document.querySelectorAll(".report-response-unit,[data-unit-row]")];
+    data.responding_apparatus=responseRows.map(row=>{
+      const apId=Number(row.dataset.apparatusId||row.dataset.unitRow||0),name=row.querySelector("b")?.textContent?.trim()||"";
+      const keys=["enroute","on_scene","cancelled","in_service","clear"];
+      const times={};
+      keys.forEach(k=>{const date=row.querySelector('[data-report-unit-date="'+k+'"]')?.value||"",time=jfdParseTime24(row.querySelector('[data-report-unit-time="'+k+'"]')?.value||"");if(date&&time)times[k==="in_service"?"clear":k]=date+"T"+time;});
+      return {apparatus_id:apId,unit_number:name,times,crew:JSON.parse(row.dataset.crew||"[]")};
+    }).filter(x=>x.apparatus_id||x.unit_number);
     data.additional_personnel=[...document.querySelectorAll("[data-report-person]:checked")].map(x=>Number(x.dataset.reportPerson));
     // Do not enforce conditional NERIS module fields while collecting the report.
     // The RMS preserves optional/departmental information, while the NERIS review/API
