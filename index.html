@@ -847,59 +847,67 @@ function ensureSavedReportViewer(){
 }
 function closeSavedReportViewer(){const m=$("savedReportViewer");if(m)m.classList.add("hiddenx");}
 async function editSavedReport(cad,reportId){
-  closeSavedReportViewer();
-  const r=await db.from("incidents").select("*,incident_details(*)").eq("cad",cad).maybeSingle();
-  if(r.error||!r.data)return alert(r.error?.message||"Incident not found.");
-  const i=r.data,d=(r.data.incident_details||{})[0]||r.data.incident_details||{};
-  const ur=await db.from("incident_units").select("*").eq("incident_id",d.incident_id).order("id");
-  const reports=Array.isArray(i.reports)?i.reports:[],rep=reports.find(x=>x?.report_id===reportId);
-  if(!rep)return alert("Saved report not found.");
-  const kind=String(rep.report_type||"").startsWith("pcr_")?"pcr":"fire";
-  const modal=ensureReportModal();
-  modal.dataset.incidentId=String(d.incident_id||"");modal.dataset.cad=String(i.cad||cad);modal.dataset.standalone="";
-  modal.classList.remove("hiddenx");
-  await openIncidentReportForm(kind,i,d,ur.data||[]);
-  applyPreviousReportValues(rep.data||{});
-  if(Array.isArray(rep.data?.responding_apparatus)&&rep.data.responding_apparatus.length){
-    const rows=document.querySelectorAll(".report-response-unit");
-    rep.data.responding_apparatus.forEach((saved,idx)=>{
-      const row=rows[idx];if(!row)return;
-      if(saved.times)Object.entries(saved.times).forEach(([k,v])=>{const el=row.querySelector('[data-report-unit-time="'+k+'"]');if(el)el.value=v||"";});
+  try{
+    const r=await db.from("incidents").select("*,incident_details(*)").eq("cad",cad).maybeSingle();
+    if(r.error||!r.data)return alert(r.error?.message||"Incident not found.");
+    const i=r.data,d=(r.data.incident_details||{})[0]||r.data.incident_details||{};
+    const ur=await db.from("incident_units").select("*").eq("incident_id",d.incident_id).order("incident_unit_id");
+    if(ur.error)return alert(ur.error.message);
+    const reports=Array.isArray(i.reports)?i.reports:[],rep=reports.find(x=>String(x?.report_id||"")===String(reportId||""));
+    if(!rep)return alert("Saved report not found.");
+    const kind=String(rep.report_type||"").startsWith("pcr_")?"pcr":"fire";
+    const modal=ensureReportModal();
+    modal.dataset.incidentId=String(d.incident_id||"");modal.dataset.cad=String(i.cad||cad);modal.dataset.standalone="";modal.dataset.reportId=String(rep.report_id||"");
+    modal.classList.remove("hiddenx");
+    await openIncidentReportForm(kind,i,d,ur.data||[]);
+    window.currentReportKind=kind;
+    window.applyPreviousReportValues(rep.data||{});
+    modal.dataset.reportId=String(rep.report_id||"");
+    const savedUnits=Array.isArray(rep.data?.responding_apparatus)?rep.data.responding_apparatus:[];
+    savedUnits.forEach(saved=>{
+      const id=Number(saved.apparatus_id||0);if(!id)return;
+      const cb=document.querySelector('[data-report-apparatus-check="'+id+'"]');
+      if(cb&&!cb.checked){cb.checked=true;toggleReportApparatus(id,true);}
     });
-  }
-  modal.dataset.reportId=rep.report_id||"";
+    await new Promise(resolve=>setTimeout(resolve,100));
+    const rows=[...document.querySelectorAll(".report-response-unit")];
+    savedUnits.forEach((saved,idx)=>{
+      const row=rows.find(x=>Number(x.dataset.apparatusId)===Number(saved.apparatus_id||0))||rows[idx];if(!row)return;
+      if(saved.times)Object.entries(saved.times).forEach(([k,v])=>{const el=row.querySelector('[data-report-unit-time="'+k+'"]');if(el)el.value=v||"";});
+      if(saved.crew)row.dataset.crew=JSON.stringify(saved.crew);
+    });
+    if(Array.isArray(rep.data?.additional_personnel)){
+      const ids=new Set(rep.data.additional_personnel.map(Number));
+      document.querySelectorAll("[data-report-person]").forEach(x=>x.checked=ids.has(Number(x.dataset.reportPerson)));
+      const count=$("reportOffDutyCount");if(count)count.textContent=ids.size+" selected";
+    }
+    closeSavedReportViewer();window.scrollTo({top:0,behavior:"smooth"});
+  }catch(e){console.error("editSavedReport failed:",e);alert("Unable to open this saved report for editing: "+(e?.message||String(e)));}
 }
+function reportViewerField(label,value,wide=false){return '<div class="border-b border-slate-200 py-3 '+(wide?"md:col-span-2":"")+'"><div class="text-[11px] font-black uppercase tracking-wider text-slate-500">'+esc(label)+'</div><div class="mt-1 text-sm text-slate-900 break-words whitespace-pre-wrap">'+reportViewerValue(value)+'</div></div>';}
+function reportViewerSection(title,body,accent="slate"){const border=accent==="blue"?"border-blue-200 bg-blue-50/40":accent==="amber"?"border-amber-200 bg-amber-50/40":"border-slate-200 bg-white";return '<section class="rounded-xl border '+border+' overflow-hidden"><div class="px-4 py-3 border-b border-inherit"><h3 class="font-black text-base uppercase tracking-wide">'+esc(title)+'</h3></div><div class="p-4">'+body+'</div></section>';}
+function reportViewerValue(v){if(v===undefined||v===null||v==="")return '<span class="text-slate-400">Not entered</span>';if(typeof v==="boolean")return v?'Yes':'No';if(typeof v==="string"&&v.startsWith("data:image/"))return '<img src="'+v+'" alt="Saved signature" class="max-w-sm max-h-40 border rounded bg-white object-contain">';if(Array.isArray(v)){if(!v.length)return '<span class="text-slate-400">None recorded</span>';if(v.every(x=>x===null||typeof x!=="object"))return '<div class="flex flex-wrap gap-2">'+v.map(x=>'<span class="px-2 py-1 rounded bg-slate-100 border text-sm">'+esc(String(x??""))+'</span>').join("")+'</div>';return '<div class="space-y-3">'+v.map((x,i)=>'<div class="rounded-lg border bg-slate-50 p-3"><div class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Item '+(i+1)+'</div>'+reportViewerObject(x)+'</div>').join("")+'</div>';}if(typeof v==="object")return reportViewerObject(v);return esc(String(v));}
+function reportViewerObject(obj){if(!obj||typeof obj!=="object")return reportViewerValue(obj);return '<div class="grid md:grid-cols-2 gap-x-6">'+Object.entries(obj).filter(([k,v])=>v!==undefined&&v!==null&&v!==""&&k!=="report_id").map(([k,v])=>reportViewerField(humanReportKey(k),v)).join("")+'</div>';}
+function ensureSavedReportViewer(){let m=$("savedReportViewer");if(m)return m;m=document.createElement("div");m.id="savedReportViewer";m.className="hiddenx fixed inset-0 z-[80] bg-slate-950/75 backdrop-blur-sm p-3 sm:p-5 overflow-y-auto";m.innerHTML='<div class="max-w-6xl mx-auto my-2 sm:my-6 bg-white rounded-2xl shadow-2xl overflow-hidden"><div class="bg-slate-950 text-white px-5 py-4 sm:px-6 flex justify-between items-start gap-4"><div><div class="text-xs font-bold uppercase tracking-wider text-slate-300">Jasper Fire Department · RMS</div><h2 id="savedReportViewerTitle" class="text-xl sm:text-2xl font-black mt-1"></h2><p id="savedReportViewerSub" class="text-sm text-slate-300 mt-1"></p></div><button type="button" onclick="closeSavedReportViewer()" class="border border-slate-600 hover:bg-slate-800 px-3 py-2 rounded-lg font-bold">Close</button></div><div class="p-4 sm:p-6"><div id="savedReportViewerActions" class="flex flex-wrap gap-2 mb-5"></div><div id="savedReportViewerBody" class="space-y-5"></div></div></div>';document.body.appendChild(m);return m;}
+function closeSavedReportViewer(){const m=$("savedReportViewer");if(m)m.classList.add("hiddenx");}
 async function openSavedReport(cad,reportId){
-  const r=await db.from("incidents").select("*,incident_details(*)").eq("cad",cad).maybeSingle();
-  if(r.error||!r.data)return alert(r.error?.message||"Incident not found.");
-  const i=r.data,reports=Array.isArray(i.reports)?i.reports:[],rep=reports.find(x=>x?.report_id===reportId);
-  if(!rep)return alert("Saved report not found.");
-  const kind=String(rep.report_type||"").startsWith("pcr_")?"pcr":"fire";
-  const title=kind==="pcr"?"Patient Care Report":"Fire Incident Report";
-  const statusLabel={draft:"Draft",complete:"Completed",ready_for_neris:"Awaiting NERIS Review",submitted_to_neris:"Submitted to NERIS"}[rep.status]||humanReportKey(rep.status||"Saved");
-  const m=ensureSavedReportViewer();
-  $("savedReportViewerTitle").textContent=title+" · CAD "+(i.cad||"");
-  $("savedReportViewerSub").textContent=(i.location||"Location not provided")+" · "+statusLabel;
-  const actions=$("savedReportViewerActions");
-  const canEdit=rep.status!=="submitted_to_neris";
-  actions.innerHTML='<button type="button" onclick="downloadIncidentPdf('+JSON.stringify(cad)+','+JSON.stringify(reportId)+')" class="bg-blue-700 text-white px-3 py-2 rounded-lg font-bold">Download PDF</button><button type="button" onclick="emailIncidentPdf('+JSON.stringify(cad)+','+JSON.stringify(reportId)+')" class="bg-emerald-700 text-white px-3 py-2 rounded-lg font-bold">Email PDF</button>'+(canEdit?'<button type="button" onclick="editSavedReport('+JSON.stringify(cad)+','+JSON.stringify(reportId)+')" class="bg-slate-950 text-white px-3 py-2 rounded-lg font-bold">'+(rep.status==="draft"?"Edit Draft":"Edit Report")+'</button>':"")+'<button type="button" onclick="closeSavedReportViewer()" class="border px-3 py-2 rounded-lg font-bold">Close</button>';
-  const d=rep.data||{};
-  const primaryFields=["rCad","rDate","rCall","rCallType","rPrimaryIncidentType","rSecondaryIncidentType","rLocation","rLocationType","rShift","rNarrative","rCompletedBy","completedBy","report_completed_by"];
-  const used=new Set();
-  const sections=[];
-  const makeSection=(title,keys)=>{
-    const entries=keys.filter(k=>Object.prototype.hasOwnProperty.call(d,k)&&d[k]!==undefined&&d[k]!==null&&d[k]!=="");
-    if(!entries.length)return;
-    entries.forEach(k=>used.add(k));
-    sections.push('<section class="border rounded-xl p-4 bg-slate-50"><h3 class="font-black text-lg mb-3">'+esc(title)+'</h3>'+reportViewerObject(Object.fromEntries(entries.map(k=>[k,d[k]])))+'</section>');
-  };
-  makeSection("Incident Information",primaryFields);
-  makeSection("Response / Apparatus",["responding_apparatus","additional_personnel"]);
-  makeSection("Patient Information",["patients"]);
-  const remaining=Object.entries(d).filter(([k,v])=>!used.has(k)&&v!==undefined&&v!==null&&v!=="");
-  if(remaining)sections.push('<section class="border rounded-xl p-4 bg-slate-50"><h3 class="font-black text-lg mb-3">Saved Report Details</h3>'+reportViewerObject(Object.fromEntries(remaining))+'</section>');
-  $("savedReportViewerBody").innerHTML=sections.join("")||'<div class="border rounded-xl p-5 text-slate-500">No saved report fields were found.</div>';
-  m.classList.remove("hiddenx");
+  try{
+    const r=await db.from("incidents").select("*,incident_details(*)").eq("cad",cad).maybeSingle();if(r.error||!r.data)return alert(r.error?.message||"Incident not found.");
+    const i=r.data,reports=Array.isArray(i.reports)?i.reports:[],rep=reports.find(x=>String(x?.report_id||"")===String(reportId||""));if(!rep)return alert("Saved report not found.");
+    const kind=String(rep.report_type||"").startsWith("pcr_")?"pcr":"fire",title=kind==="pcr"?"Patient Care Report":"Fire Incident Report",statusLabel={draft:"Draft",complete:"Completed",ready_for_neris:"Awaiting NERIS Review",submitted_to_neris:"Submitted to NERIS"}[rep.status]||humanReportKey(rep.status||"Saved"),m=ensureSavedReportViewer(),d=rep.data||{};
+    $("savedReportViewerTitle").textContent=title;$("savedReportViewerSub").textContent="CAD "+(i.cad||"")+" · "+(i.location||"Location not provided");
+    const canEdit=rep.status!=="submitted_to_neris",actions=$("savedReportViewerActions");
+    actions.innerHTML='<span class="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 font-bold text-sm">'+esc(statusLabel)+'</span>'+(canEdit?'<button type="button" data-edit-cad="'+esc(cad)+'" data-edit-report-id="'+esc(reportId)+'" onclick="editSavedReport(this.dataset.editCad,this.dataset.editReportId)" class="bg-slate-950 text-white px-4 py-2 rounded-lg font-bold">Edit Report</button>':"")+'<button type="button" onclick="downloadIncidentPdf('+JSON.stringify(cad)+','+JSON.stringify(reportId)+')" class="bg-blue-700 text-white px-4 py-2 rounded-lg font-bold">Download PDF</button><button type="button" onclick="emailIncidentPdf('+JSON.stringify(cad)+','+JSON.stringify(reportId)+')" class="bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold">Email PDF</button><button type="button" onclick="closeSavedReportViewer()" class="border px-4 py-2 rounded-lg font-bold">Close</button>';
+    const incidentBody='<div class="grid md:grid-cols-2 gap-x-8">'+reportViewerField("CAD / Incident Number",i.cad||d.rCad||"Not entered")+reportViewerField("Incident Date",d.rDate||"Not entered")+reportViewerField("Primary Incident Type",d.rPrimaryIncidentType||d.rNerisType||d.rIncidentType||i.type||"Not entered")+reportViewerField("Location",d.rLocation||i.location||"Not entered")+reportViewerField("Location Type",d.rLocationType||"Not entered")+reportViewerField("Shift",d.rShift||"Not entered")+reportViewerField("Call Type",d.rCallType||d.rCall||i.type||"Not entered")+reportViewerField("Completed By",d.rCompletedBy||d.completedBy||d.report_completed_by||"Not entered")+'</div>';
+    const narrative=d.rNarrative||d.narrative||"";
+    const response=Array.isArray(d.responding_apparatus)?d.responding_apparatus:[],responseBody=response.length?'<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-xs uppercase tracking-wide text-slate-500 border-b"><th class="py-2 pr-3">Unit</th><th class="py-2 pr-3">Station</th><th class="py-2 pr-3">Crew</th><th class="py-2">Times</th></tr></thead><tbody>'+response.map(u=>'<tr class="border-b align-top"><td class="py-3 pr-3 font-bold">'+esc(u.unit_number||"")+'</td><td class="py-3 pr-3">'+esc(u.station||"")+'</td><td class="py-3 pr-3">'+(u.crew?.length?reportViewerValue(u.crew):'<span class="text-slate-400">None recorded</span>')+'</td><td class="py-3">'+reportViewerValue(u.times||{})+'</td></tr>').join("")+'</tbody></table></div>':'<div class="text-sm text-slate-500">No responding apparatus recorded.</div>';
+    const patientBody=Array.isArray(d.patients)&&d.patients.length?'<div class="space-y-4">'+d.patients.map((p,idx)=>reportViewerSection("Patient "+(idx+1),reportViewerObject(p),"blue")).join("")+'</div>':'<div class="text-sm text-slate-500">No patient information recorded.</div>';
+    const excluded=new Set(["rCad","rDate","rCall","rCallType","rPrimaryIncidentType","rNerisType","rIncidentType","rLocation","rLocationType","rShift","rNarrative","narrative","rCompletedBy","completedBy","report_completed_by","responding_apparatus","patients"]);
+    const remaining=Object.entries(d).filter(([k,v])=>!excluded.has(k)&&v!==undefined&&v!==null&&v!=="");
+    const details=remaining.length?reportViewerObject(Object.fromEntries(remaining)):'<div class="text-sm text-slate-500">No additional saved fields.</div>';
+    $("savedReportViewerBody").innerHTML=reportViewerSection("Incident Information",incidentBody)+(narrative?reportViewerSection("Narrative",reportViewerField("Narrative",narrative,true)):"")+reportViewerSection("Response / Apparatus",responseBody)+(kind==="pcr"?reportViewerSection("Patient Care",patientBody):"")+reportViewerSection("Saved Report Details",details);
+    m.classList.remove("hiddenx");
+  }catch(e){console.error("openSavedReport failed:",e);alert("Unable to open the saved report: "+(e?.message||String(e)));}
 }
 async function renderReports(){
   const list=$("reportsList");if(!list)return;
@@ -1112,15 +1120,20 @@ async function saveReportDraft(kind){
   const form=$("incidentReportForm");if(!form)return;
   const data=collectReportFormData(),m=$("reportModal"),incidentId=Number(m?.dataset.incidentId||0)||null;
   const reportType=kind==="fire"?"fire_neris_v2":"pcr_neris_v2";
-  const report={report_id:crypto.randomUUID(),report_type:reportType,status:"draft",data,updated_at:new Date().toISOString(),created_by:me?.id||null};
+  const editingId=String(m?.dataset.reportId||"").trim();
+  const report={report_id:editingId||crypto.randomUUID(),report_type:reportType,status:"draft",data,updated_at:new Date().toISOString(),created_by:me?.id||null};
   if(incidentId){
     const existing=await db.from("incidents").select("reports").eq("cad",m.dataset.cad||"").maybeSingle();if(existing.error)throw new Error(existing.error.message);
-    const reports=Array.isArray(existing.data?.reports)?existing.data.reports:[];reports.unshift(report);
+    const reports=Array.isArray(existing.data?.reports)?existing.data.reports:[];
+    const idx=editingId?reports.findIndex(x=>x?.report_id===editingId):-1;
+    if(idx>=0)reports[idx]={...reports[idx],...report};
+    else reports.unshift(report);
     const upd=await db.from("incidents").update({reports,updated_at:new Date().toISOString()}).eq("cad",m.dataset.cad||"");if(upd.error)throw new Error(upd.error.message);
+    m.dataset.reportId=report.report_id;
   }else{
     const ins=await db.from("standalone_reports").insert({report_type:reportType,data,status:"draft",created_by:me?.id||null});if(ins.error)throw new Error(ins.error.message);
   }
-  alert("Draft saved.");
+  alert(editingId?"Draft updated.":"Draft saved.");
   if(incidentId)await loadIncidents();
   return report;
 }
@@ -1134,8 +1147,11 @@ async function validateAndFinishReport(kind){
     if(!validation.ok)return alert("This incident is not ready for NERIS review:\n\n"+validation.errors.join("\n"));
     const nerisCheck=await validateNerisPayloadWithApi(data);
     if(!nerisCheck.ok)return alert("NERIS validation found items that must be corrected before review:\n\n"+nerisCheck.errors.join("\n"));
-    const report={report_id:crypto.randomUUID(),report_type:kind==="fire"?"fire_neris_v2":"pcr_neris_v2",status:"ready_for_neris",data,updated_at:new Date().toISOString(),created_by:me?.id||null,validation};
-    reports.unshift(report);
+    const editingId=String(m?.dataset.reportId||"").trim();
+    const report={report_id:editingId||crypto.randomUUID(),report_type:kind==="fire"?"fire_neris_v2":"pcr_neris_v2",status:"ready_for_neris",data,updated_at:new Date().toISOString(),created_by:me?.id||null,validation};
+    const existingIndex=editingId?reports.findIndex(x=>x?.report_id===editingId):-1;
+    if(existingIndex>=0)reports[existingIndex]={...reports[existingIndex],...report};
+    else reports.unshift(report);
     const upd=await db.from("incidents").update({reports,updated_at:new Date().toISOString()}).eq("cad",m.dataset.cad||"");if(upd.error)throw new Error(upd.error.message);
     const st=await db.from("incident_details").update({status:"awaiting_neris",report_by:me?.id||null}).eq("incident_id",incidentId);if(st.error)throw new Error(st.error.message);
     alert("Incident validated and sent to the NERIS review queue for an administrator."+(validation.warnings?.length?"\n\nQuality reminder:\n"+validation.warnings.join("\n"):""));
@@ -1146,6 +1162,7 @@ async function addAnotherReportToIncident(kind){
   try{
     const m=$("reportModal"),incidentId=Number(m?.dataset.incidentId||0)||null;if(!incidentId)return alert("This option is available when the report is attached to an incident.");
     await saveReportDraft(kind);
+    m.dataset.reportId="";
     const r=await db.from("incidents").select("*,incident_details(*)").eq("cad",m.dataset.cad||"").maybeSingle();if(r.error||!r.data)return alert(r.error?.message||"Incident not found.");
     const d=(r.data.incident_details||{})[0]||r.data.incident_details||{};
     const ur=await db.from("incident_units").select("*").eq("incident_id",incidentId).order("incident_unit_id");
