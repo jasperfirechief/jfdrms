@@ -1274,6 +1274,17 @@ async function submitReportToNeris(data,incidentId){
 async function saveReportDraft(kind){
   const form=$("incidentReportForm");if(!form)return;
   const data=collectReportFormData(),m=$("reportModal"),incidentId=Number(m?.dataset.incidentId||0)||null;
+    const responseErrors=[];
+    (data.responding_apparatus||[]).forEach((u,n)=>{
+      const t=u.times||{},d=jfdParseTime24(t.dispatch),e=jfdParseTime24(t.enroute),o=jfdParseTime24(t.on_scene),c=jfdParseTime24(t.cancelled),v=jfdParseTime24(t.in_service);
+      if(!d)responseErrors.push("Unit "+(u.unit_number||n+1)+": Dispatch time is required.");
+      if(!c&&(!e||!o||!v))responseErrors.push("Unit "+(u.unit_number||n+1)+": En Route, On Scene, and In Service are required unless Cancelled is entered.");
+      if(c&&v)responseErrors.push("Unit "+(u.unit_number||n+1)+": enter either Cancelled or In Service, not both.");
+      const seq=[d,e,o].filter(Boolean);if(seq.some((x,i)=>i&&x<seq[i-1]))responseErrors.push("Unit "+(u.unit_number||n+1)+": response times must be chronological.");
+      if(v&&o&&v<o)responseErrors.push("Unit "+(u.unit_number||n+1)+": In Service cannot be before On Scene.");
+      if(c&&o&&c<o)responseErrors.push("Unit "+(u.unit_number||n+1)+": Cancelled cannot be before On Scene.");
+    });
+    if(responseErrors.length)return alert("Correct the responding apparatus times before finishing:\n\n"+responseErrors.join("\n"));
   const reportType=kind==="fire"?"fire_neris_v2":"pcr_neris_v2";
   const editingId=String(m?.dataset.reportId||"").trim();
   const report={report_id:editingId||crypto.randomUUID(),report_type:reportType,status:"draft",data,updated_at:new Date().toISOString(),created_by:me?.id||null};
