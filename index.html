@@ -353,7 +353,7 @@ async function viewSubmittedInspection(id){
   if(r.error||!r.data)return alert(r.error?.message||"Inspection not found.");
   const x=r.data;
   const rows=[
-    ["Occupancy",x.occupancy_name],["Address",x.address],["City/State/ZIP",x.city_state_zip],["Inspection Date",x.inspection_date],["Inspection Time",x.inspection_time],["Inspector ID",x.inspector_user_id],["Inspection Type",x.inspection_type],["Acceptance Tests",x.acceptance_type],["Occupancy Group",x.occupancy_group],["Square Footage",x.square_footage],["Stories",x.stories],["Contact",x.contact_name],["Contact Phone",x.contact_phone],["Phone",x.phone],["Email",x.email],["Remarks",x.remarks],["Reinspection Date",x.reinspection_date],["Status",x.status]
+    ["Occupancy",x.occupancy_name],["Address",x.address],["City/State/ZIP",x.city_state_zip],["Inspection Date",x.inspection_date],["Inspection Time",x.inspection_time],["Inspector ID",x.inspector_user_id],["Inspection Type",x.inspection_type],["Acceptance Tests",x.acceptance_type],["Occupancy Group",x.occupancy_group],["Square Footage",x.square_footage],["Stories",x.stories],["Contact",x.contact_name],["Contact Phone",x.contact_phone],["Email",x.email],["Remarks",x.remarks],["Reinspection Date",x.reinspection_date],["Status",x.status]
   ];
   const checklist=Array.isArray(x.checklist)?x.checklist:x.checklist&&typeof x.checklist==="object"?Object.entries(x.checklist).map(([k,v])=>({item:k,...(v||{})})):[];
   const body=rows.filter(a=>a[1]!==null&&a[1]!==undefined&&String(a[1])!=="").map(a=>'<div class="border-b py-2"><div class="text-xs font-bold text-slate-500 uppercase">'+esc(a[0])+'</div><div class="text-sm">'+esc(a[1])+'</div></div>').join("");
