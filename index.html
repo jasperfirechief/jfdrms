@@ -315,6 +315,15 @@ function renderAcceptancePanels(){
   const chosen=[...document.querySelectorAll('input[name="acceptanceType"]:checked')].map(x=>x.value);
   box.innerHTML=chosen.map((x,i)=>'<div class="border rounded-lg p-3 bg-white"><div class="font-bold">'+esc(x)+'</div><div class="grid md:grid-cols-2 gap-2 mt-2"><select data-accept-result="'+esc(x)+'" class="border rounded p-2"><option value="">Result</option><option>Passed</option><option>Failed</option><option>Not Applicable</option></select><textarea data-accept-notes="'+esc(x)+'" class="border rounded p-2" rows="2" placeholder="Notes"></textarea></div></div>').join("");
 }
+function ifcSectionUrl(ref){
+  const m=String(ref||"").match(/(?:§§?|Chapter )?([0-9]{3,4})(?:\.([0-9.]+))?/i);if(!m)return "";
+  const sec=m[1]+(m[2]?"."+m[2]:""),ch=Number(sec.split(".")[0]);
+  const paths={3:"chapter-3-general-requirements",4:"chapter-4-emergency-planning-and-preparedness",5:"chapter-5-fire-service-features",6:"chapter-6-building-services-and-systems",7:"chapter-7-fire-and-smoke-protection-features",9:"chapter-9-fire-protection-and-life-safety-systems",10:"chapter-10-means-of-egress",50:"chapter-50-hazardous-materials-general-provisions",51:"chapter-51-aerosols",52:"chapter-52-combustible-dust-producing-operations",53:"chapter-53-compressed-gases",54:"chapter-54-corrosive-materials",55:"chapter-55-cryogenic-fluids",56:"chapter-56-explosives-and-fireworks",57:"chapter-57-flammable-combustible-liquids"};
+  const path=paths[ch];if(!path)return "";return "https://codes.iccsafe.org/content/IFC2024P1/"+path+"#IFC2024P1_Pt03_Ch"+String(ch).padStart(2,"0")+"_Sec"+sec;
+}
+function renderIfcReference(ref){
+  return String(ref||"").split(/(§§?[0-9]{3,4}(?:\.[0-9.]+)?|Chapter [0-9]{1,2}(?:-[0-9]{1,2})?)/g).map(part=>{const u=ifcSectionUrl(part);return u?'<a href="'+u+'" target="_blank" rel="noopener noreferrer" class="text-blue-700 underline hover:text-blue-900">'+esc(part)+'</a>':esc(part);}).join("");
+}
 function renderInspectionChecklist(){
   const box=$("inspectionChecklist");
   if(!box)return;
@@ -331,7 +340,7 @@ function renderInspectionChecklist(){
   box.innerHTML=sections.map(([title,items])=>{
     const rows=items.map((item,index)=>{
       const label=item[0],ref=item[1],key="inspection-"+title.replace(/[^a-z0-9]+/gi,"-")+"-"+index;
-      return '<div class="border-b last:border-0 py-3"><div class="font-semibold text-sm">'+esc(label)+'</div><div class="text-xs text-slate-500 mt-1">'+esc(ref)+'</div><div class="grid md:grid-cols-[auto_180px_1fr] gap-2 items-center mt-2"><label class="text-sm font-medium flex items-center gap-2"><input type="checkbox" class="mt-1" data-inspection-present="'+esc(key)+'"> Checked</label><select data-inspection-check="'+esc(key)+'" class="border rounded p-2 text-sm"><option value="">Select</option><option value="OK">OK</option><option value="Violation">Violation</option><option value="N/A">N/A</option></select><input data-inspection-note="'+esc(key)+'" class="border rounded p-2 text-sm" placeholder="Notes / violation details"></div></div>';
+      return '<div class="border-b last:border-0 py-3"><div class="font-semibold text-sm">'+esc(label)+'</div><div class="text-xs text-slate-500 mt-1">'+renderIfcReference(ref)+'</div><div class="grid md:grid-cols-[auto_180px_1fr] gap-2 items-center mt-2"><label class="text-sm font-medium flex items-center gap-2"><input type="checkbox" class="mt-1" data-inspection-present="'+esc(key)+'"> Checked</label><select data-inspection-check="'+esc(key)+'" class="border rounded p-2 text-sm"><option value="">Select</option><option value="OK">OK</option><option value="Violation">Violation</option><option value="N/A">N/A</option></select><input data-inspection-note="'+esc(key)+'" class="border rounded p-2 text-sm" placeholder="Notes / violation details"></div></div>';
     }).join("");
     return '<div class="card p-4"><h2 class="font-black mb-3">'+esc(title)+'</h2><div class="space-y-2">'+rows+'</div></div>';
   }).join("");
@@ -518,7 +527,7 @@ function ensureReportModal(){
   document.body.appendChild(m);return m
 }
 function closeReportModal(){const m=$("reportModal");if(!m)return;m.classList.add("hiddenx");$("reportChooser").innerHTML="";$("incidentReportForm").innerHTML="";$("incidentReportForm").classList.add("hiddenx");$("reportIncidentBanner")?.classList.add("hiddenx");$("reportModal").dataset.incidentId="";$("reportModal").dataset.cad="";$("reportModal").dataset.standalone=""}
-function reportInput(id,label,value="",type="text",required=false,cls=""){return '<label class="text-sm font-semibold '+cls+'">'+label+(required?' *':'')+'<input id="'+id+'" type="'+type+'" value="'+esc(value??"")+'" '+(required?'required':'')+' class="w-full border rounded-lg p-2 mt-1 bg-white"></label>'}
+function reportInput(id,label,value="",type="text",required=false,cls=""){return '<label class="text-sm font-semibold '+cls+'">'+label+(required?'<span class="ml-2 text-[10px] font-black uppercase text-red-700">Required</span>':'')+'<input id="'+id+'" type="'+type+'" value="'+esc(value??"")+'" '+(required?'required':'')+' class="w-full border rounded-lg p-2 mt-1 bg-white"></label>'}
 function reportSelect(id,label,opts,value="",required=false,cls=""){let list;if(Array.isArray(opts))list=opts;else if(opts&&typeof opts[Symbol.iterator]==="function"&&typeof opts!=="string")list=Array.from(opts);else if(opts&&typeof opts==="object")list=Object.values(opts);else list=opts==null||opts===""?[]:[opts];return '<label class="text-sm font-semibold '+cls+'">'+label+(required?' *':'')+'<select id="'+id+'" '+(required?'required':'')+' class="w-full border rounded-lg p-2 mt-1 bg-white"><option value="">Select...</option>'+list.map(o=>'<option value="'+esc(o)+'" '+(String(o)===String(value)?'selected':'')+'>'+esc(o)+'</option>').join("")+'</select></label>'}
 function reportArea(id,label,value="",cls=""){return '<label class="text-sm font-semibold '+cls+'">'+label+'<textarea id="'+id+'" rows="4" class="w-full border rounded-lg p-2 mt-1">'+esc(value??"")+'</textarea></label>'}
 function reportSection(title,body){return '<section class="border rounded-xl p-4 bg-slate-50"><h3 class="font-black text-lg mb-3">'+title+'</h3><div class="grid md:grid-cols-2 gap-3">'+body+'</div></section>'}
@@ -1289,10 +1298,10 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   function jfdNerisBadge(label){return '<span class="ml-2 inline-flex items-center rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide">NERIS Required</span>';}
   function jfdMarkNerisRequired(ids){
     (ids||[]).forEach(id=>{
-      const el=$(id); const lab=el?.closest("label");
-      if(lab&&!lab.querySelector(".jfd-neris-badge")){
-        const b=document.createElement("span"); b.className="jfd-neris-badge ml-2 inline-flex items-center rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide"; b.textContent="NERIS Required"; lab.appendChild(b);
-        if(el.tagName==="INPUT"||el.tagName==="SELECT"||el.tagName==="TEXTAREA") el.required=true;
+      const el=$(id),lab=el?.closest("label");
+      if(lab&&!lab.querySelector(".jfd-required-badge")){
+        const b=document.createElement("span");b.className="jfd-required-badge ml-2 text-[10px] font-black uppercase text-red-700";b.textContent="Required";lab.appendChild(b);
+        if(el.tagName==="INPUT"||el.tagName==="SELECT"||el.tagName==="TEXTAREA")el.required=true;
       }
     });
   }
