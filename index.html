@@ -488,7 +488,7 @@ function ifcSectionUrl(ref){
 function renderIfcReference(ref){
   return String(ref||"").split(/(§§?[0-9]{3,4}(?:\.[0-9.]+)?|Chapter [0-9]{1,2}(?:-[0-9]{1,2})?)/g).map(part=>{const u=ifcSectionUrl(part);return u?'<a href="'+u+'" target="_blank" rel="noopener noreferrer" class="text-blue-700 underline hover:text-blue-900">'+esc(part)+'</a>':esc(part);}).join("");
 }
-async async function renderInspectionChecklist(){
+async function renderInspectionChecklist(){
   const box=$("inspectionChecklist");if(!box)return;
   const r=await db.from("inspection_checklist_items").select("item_id,category,item_text,ifc_reference,ifc_url,sort_order").eq("active",true).order("sort_order");
   if(r.error){box.innerHTML='<div class="card p-4 text-red-600">Unable to load inspection checklist: '+esc(r.error.message)+'</div>';return}
@@ -537,7 +537,7 @@ function renderChecks(){
   if(!canPerformApparatusChecks()){grid.innerHTML='<div class="card p-5 text-sm text-slate-500">Apparatus checks are limited to on-duty drivers, on-duty officers, and administrators.</div>';return}
   grid.innerHTML=apparatus.map(a=>'<article class="card p-4"><div class="flex justify-between items-center gap-3"><div><h3 class="font-black text-lg">'+esc(a.unit_number||"Apparatus")+'</h3><p class="text-sm text-slate-500">'+esc(a.apparatus_type||"")+'</p></div><button type="button" onclick="openCheckModal('+Number(a.apparatus_id)+')" class="bg-red-600 text-white px-3 py-2 rounded-lg font-bold">Perform Check</button><button type="button" onclick="showCheckHistory('+Number(a.apparatus_id)+')" class="border px-3 py-2 rounded-lg font-bold">History</button></div></article>').join("")||'<div class="card p-5 text-sm text-slate-500">No active apparatus.</div>';
 }
-async async function openCheckModal(apparatusId){
+async function openCheckModal(apparatusId){
   if(!canPerformApparatusChecks())return alert("Apparatus checks are limited to on-duty drivers, on-duty officers, and administrators.");
   const a=apparatus.find(x=>Number(x.apparatus_id)===Number(apparatusId));if(!a)return;
   if(profile?.app_role!=="admin" && !crew.some(x=>Number(x.apparatus_id)===Number(apparatusId)&&String(x.assignment_role||"").toLowerCase()==="driver") && profile?.app_role!=="officer")return alert("Only an on-duty officer or the currently assigned driver may complete this apparatus check.");
@@ -551,7 +551,7 @@ async async function openCheckModal(apparatusId){
   $("checkNotes").value="";$("checkModal").classList.remove("hiddenx");window.checkState={apparatusId};
 }
 function closeCheckModal(){$("checkModal")?.classList.add("hiddenx");window.checkState=null}
-async async function submitApparatusCheck(){
+async function submitApparatusCheck(){
   if(!canPerformApparatusChecks()||!window.checkState)return;
   const answers=[];document.querySelectorAll("[data-check-item]:checked").forEach(x=>answers.push({item_id:Number(x.dataset.checkItem),status:x.value,notes:$("checkItems").querySelector('[data-check-note="'+x.dataset.checkItem+'"]')?.value||""}));
   const problemCount=answers.filter(x=>x.status!=="ok").length;
