@@ -96,7 +96,7 @@ async function makePdf(data){
   function ensure(h){if(y-h<margin){page=pdf.addPage([W,H]);y=H-margin;return true}return false}
   function heading(t){ensure(30);text(t,margin,y,13,bold,red);y-=19;page.drawLine({start:{x:margin,y},end:{x:W-margin,y},thickness:1,color:rgb(.85,.87,.9)});y-=12}
   function field(label,value){ensure(22);text(label,margin,y,8,bold,gray);text(value,margin+95,y,9,regular);y-=15}
-  text("JASPER FIRE DEPARTMENT",margin,y,16,bold,red); y-=19; text("FIRE INSPECTION REPORT",margin,y,11,bold); y-=24;
+  page.drawRectangle({x:margin,y:y-58,width:contentW,height:58,borderWidth:1,borderColor:rgb(.78,.82,.87),color:rgb(1,1,1)}); page.drawCircle({x:margin+30,y:y-29,size:22,borderWidth:2,borderColor:red,color:rgb(1,1,1)}); text("JFD",margin+19,y-33,8,bold,red); text("JASPER FIRE DEPARTMENT",margin+64,y-21,15,bold,rgb(.12,.16,.22)); text("10 18th Street East · Jasper, Alabama 35501 · 205-221-8509",margin+64,y-35,7.5,regular,gray); text("FIRE INSPECTION REPORT",margin+64,y-50,10,bold,red); y-=72;
   field("Inspector",data.inspector_name); field("Date",data.inspection_date); field("Time",data.inspection_time||""); field("Occupancy Name",data.occupancy_name);
   field("Type",data.occupancy_type||""); field("Square Footage",data.square_footage?Number(data.square_footage).toLocaleString()+" sq. ft.":""); field("Stories",data.stories||""); field("Address",data.address); field("Contact Name",data.contact_name); field("City/St/Zip",data.city_state_zip);
   field("Contact Phone",data.contact_phone); field("Phone",data.phone); field("Email",data.email);
