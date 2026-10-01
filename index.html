@@ -410,7 +410,7 @@ async function loadInspections(){
   if(r.error){list.innerHTML='<div class="card p-4 text-red-600">'+esc(r.error.message)+'</div>';return}
   list.innerHTML=(r.data||[]).map(x=>'<article class="card p-4"><div class="flex justify-between gap-3"><div><b>'+esc(x.occupancy_name||"Inspection")+'</b><div class="text-sm text-slate-500">'+esc(x.address||"")+" · "+esc(x.inspection_date||"")+'</div></div><span class="text-xs font-bold px-2 py-1 rounded bg-slate-100">'+esc(x.status||"submitted")+'</span></div><div class="text-sm mt-2">'+esc(x.remarks||"")+'</div></article>').join("")||'<div class="card p-4 text-sm text-slate-500">No inspections yet.</div>';
 }
-function newInspection(){
+async function newInspection(){
   if(!canInspect())return alert("Only administrators and on-duty inspectors can perform inspections.");
   $("inspectionEditor").classList.remove("hiddenx");$("inspectionForm").reset();
   $("inDate").value=today();$("inTime").value=new Date().toLocaleTimeString("en-US",{timeZone:JFD_TIME_ZONE,hour:"2-digit",minute:"2-digit",hourCycle:"h23"});$("inSignatureDate").value=today();
