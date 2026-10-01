@@ -411,7 +411,7 @@ function newInspection(){
   populateInspectionInspector();renderAcceptancePanels();renderInspectionChecklist();ensureInspectionSignaturePad();bindInspectionDimensions();window.scrollTo({top:0,behavior:"smooth"});
 }
 function closeInspectionEditor(){$("inspectionEditor")?.classList.add("hiddenx");$("inspectionForm")?.reset();clearInspectionSignature()}
-document.addEventListener("change",e=>{if(e.target.matches('input[name="acceptanceType"]'))renderAcceptancePanels()});
+document.addEventListener("change",e=>{if(e.target.matches('input[name="acceptanceType"]'))renderAcceptancePanels();if(e.target.id==="rDate")jfdSyncResponseDates();});
 $("inspectionForm")?.addEventListener("submit",async e=>{
   e.preventDefault();if(!canInspect())return alert("Only administrators and on-duty inspectors can perform inspections.");
   const d=collectInspectionData();if(!d.occupancy_name||!d.type||!d.address||!d.date||!d.time)return alert("Complete the required inspection fields.");
@@ -1219,6 +1219,9 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     return dispatch+response;
   }
   window.jfdRemoveReportUnit=function(id){document.querySelector('[data-unit-row="'+Number(id)+'"]')?.remove();const cb=document.querySelector('[data-runit="'+Number(id)+'"]');if(cb)cb.checked=false;};
+  window.jfdSyncResponseDates=function(){
+    const date=$("rDate")?.value||today();document.querySelectorAll("[data-unit-row]").forEach(row=>row.querySelectorAll("[data-report-unit-date]").forEach(x=>{if(!x.value||x.dataset.reportUnitDateAuto==="1"){x.value=date;x.dataset.reportUnitDateAuto="1";}}));
+  };
   window.clearManualResponseSelection=function(){document.querySelectorAll("[data-runit]").forEach(x=>x.checked=false);document.querySelectorAll("[data-unit-row]").forEach(x=>x.remove());const box=$("jfdUnitRows");if(box)box.innerHTML='<p class="text-sm text-slate-500">Select responding apparatus above.</p>';};
   window.jfdSyncUnits=function(){
     const box=$("jfdUnitRows");if(!box)return;
@@ -1404,12 +1407,20 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   window.jfdAids={fd:[],nonfd:[]};
   window.jfdAddIncidentType=function(){window.jfdIncidentTypes.push("");jfdRenderIncidentTypes();jfdUpdateNerisRequirements();};
   window.jfdRemoveIncidentType=function(i){window.jfdIncidentTypes.splice(i,1);jfdRenderIncidentTypes();jfdUpdateNerisRequirements();};
+  window.jfdUpdateConditionalReportSections=function(){
+    const types=[$("rPrimaryIncidentType")?.value,...[...document.querySelectorAll("[id^='rIncidentType_']")].map(x=>x.value)].filter(Boolean);
+    const fire=types.some(x=>/^FIRE\\|/.test(String(x)));
+    const haz=types.some(x=>/^HAZSIT\\|/.test(String(x)));
+    $("jfdFireDetailsSection")?.classList.toggle("hiddenx",!fire);
+    $("jfdHazardSection")?.classList.toggle("hiddenx",!haz);
+  };
   function jfdRenderIncidentTypes(){
     const box=$("jfdIncidentTypes");if(!box)return;
     box.innerHTML=(window.jfdIncidentTypes||[]).map((v,i)=>{
       const remove="jfdRemoveIncidentType("+i+")";
       return '<div class="flex items-end gap-2 mb-2"><div class="flex-1">'+jfdNerisSelect("rIncidentType_"+i,"Incident Type "+(i+2),NERIS_INCIDENT_TYPES,v)+'</div><button type="button" onclick="'+remove+'" class="border px-3 py-2 rounded-lg text-sm font-bold text-red-600">Remove</button></div>';
     }).join("");
+    jfdUpdateConditionalReportSections();
   }
   window.jfdRenderActionControls=function(){
     const box=$("jfdActionControls");if(!box)return;
@@ -1476,11 +1487,12 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       '<label class="flex items-center gap-2 text-sm font-semibold"><input id="rActionTaken" type="checkbox" '+(d?.action_taken?"checked":"")+' onchange="jfdRenderActionControls()"> Action Taken</label>'+
       '<label class="flex items-center gap-2 text-sm font-semibold"><input id="rNoActionTaken" type="checkbox" '+(d?.no_action_taken?"checked":"")+' onchange="jfdRenderActionControls()"> No Action Taken</label>'+
       '</div><div id="jfdActionControls"></div></div>');
-    setTimeout(()=>{jfdRenderIncidentTypes();jfdRenderActionControls();jfdUpdateNerisRequirements();},0);
+    setTimeout(()=>{jfdRenderIncidentTypes();jfdRenderActionControls();jfdUpdateConditionalReportSections();jfdUpdateNerisRequirements();jfdSyncResponseDates();},0);
     
-    h+=fireDetails(i,d);
-    h+=card("Hazardous Situation Details",'<div class="grid md:grid-cols-2 gap-3"><label class="text-sm font-semibold">Hazardous Situation Disposition<span class="ml-2 text-[10px] font-black uppercase text-red-700">NERIS Required when HazSit</span><select id="rHazDisposition" class="w-full border rounded p-2 mt-1"><option value="">Select...</option><option value="COMPLETED_FIRE_SERVICE_ONLY">Completed Fire Service Only</option><option value="REFERRED_TO_OTHER_AGENCY">Referred To Other Agency</option><option value="OTHER">Other</option></select></label><label class="text-sm font-semibold">People Evacuated<span class="ml-2 text-[10px] font-black uppercase text-red-700">NERIS Required when HazSit</span><input id="rHazEvacuated" type="number" min="0" value="" class="w-full border rounded p-2 mt-1"></label><label class="text-sm font-semibold">Chemical Name(s)<input id="rChemicalName" class="w-full border rounded p-2 mt-1"></label><label class="text-sm font-semibold">Chemical DOT Class(es)<input id="rChemicalClass" class="w-full border rounded p-2 mt-1"></label><label class="text-sm font-semibold">Chemical Release Occurred<select id="rChemicalRelease" class="w-full border rounded p-2 mt-1"><option value="">Select...</option><option value="Yes">Yes</option><option value="No">No</option></select></label></div>');
+    h+='<div id="jfdFireDetailsSection">'+fireDetails(i,d)+'</div>';
+    h+='<div id="jfdHazardSection">'+card("Hazardous Situation Details",'<div class="grid md:grid-cols-2 gap-3"><label class="text-sm font-semibold">Hazardous Situation Disposition<span class="ml-2 text-[10px] font-black uppercase text-red-700">NERIS Required when HazSit</span><select id="rHazDisposition" class="w-full border rounded p-2 mt-1"><option value="">Select...</option><option value="COMPLETED_FIRE_SERVICE_ONLY">Completed Fire Service Only</option><option value="REFERRED_TO_OTHER_AGENCY">Referred To Other Agency</option><option value="OTHER">Other</option></select></label><label class="text-sm font-semibold">People Evacuated<span class="ml-2 text-[10px] font-black uppercase text-red-700">NERIS Required when HazSit</span><input id="rHazEvacuated" type="number" min="0" value="" class="w-full border rounded p-2 mt-1"></label><label class="text-sm font-semibold">Chemical Name(s)<input id="rChemicalName" class="w-full border rounded p-2 mt-1"></label><label class="text-sm font-semibold">Chemical DOT Class(es)<input id="rChemicalClass" class="w-full border rounded p-2 mt-1"></label><label class="text-sm font-semibold">Chemical Release Occurred<select id="rChemicalRelease" class="w-full border rounded p-2 mt-1"><option value="">Select...</option><option value="Yes">Yes</option><option value="No">No</option></select></label></div>');
 
+    h+='</div></div>';
     h+=repeatedSection("Exposures","exposures","Exposure",window.jfdRepeats.exposures,x=>x);
     h+=repeatedSection("Casualties / Rescues","casualties","Casualty / Rescue",window.jfdRepeats.casualties,x=>x);
     h+=repeatedSection("Hazards","hazards","Hazard",window.jfdRepeats.hazards,x=>x);
