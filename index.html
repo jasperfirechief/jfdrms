@@ -607,7 +607,7 @@ window.adminSubmitReport=async function(cad,idx){
   if(u.error)return alert(u.error.message);
   let emailMessage="";
   try{
-    const er=await fetch("/api/report-pdf",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"email",incident:incident.data,reports})});
+    const session=(await db.auth.getSession()).data?.session;if(!session)throw new Error("Authentication required.");const er=await fetch("/api/report-pdf",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({action:"email",incident:incident.data,reports})});
     let eb={};try{eb=await er.json()}catch{}
     if(er.ok&&eb.ok){reports[idx]={...reports[idx],email_status:"sent",email_id:eb.email_id||null,email_sent_at:new Date().toISOString()};emailMessage=" The PDF was also emailed to the department report address.";}else{reports[idx]={...reports[idx],email_status:"failed",email_error:eb.error||"Email failed."};emailMessage=" NERIS submission succeeded, but the PDF email failed: "+(eb.error||"unknown email error");}
     await db.from("incidents").update({reports,updated_at:new Date().toISOString()}).eq("cad",cad);
