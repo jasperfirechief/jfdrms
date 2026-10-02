@@ -1777,7 +1777,8 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     setTimeout(()=>{jfdRenderPatients(saved);jfdBindSignaturePads();jfdUpdateNerisRequirements();},0);
     return h;
   }
-  // Expose the rebuilt report renderers used by the report modal. Keep this wrapper only for rendering; searchable dropdown enhancement is handled globally.\n  window.fireReportForm=function(){return fireFormNew.apply(this,arguments);};\n  window.pcrReportForm=function(){return pcrFormNew.apply(this,arguments);};\n  const baseCollect=window.collectReportFormData;
+  // Expose the rebuilt report renderers used by the report modal. Keep this wrapper only for rendering; searchable dropdown enhancement is handled globally.
+  window.fireReportForm=function(){return fireFormNew.apply(this,arguments);};\n  window.pcrReportForm=function(){return pcrFormNew.apply(this,arguments);};\n  const baseCollect=window.collectReportFormData;
   window.collectReportFormData=function(){
     const data={};
     $("incidentReportForm")?.querySelectorAll("input,select,textarea").forEach(el=>{
