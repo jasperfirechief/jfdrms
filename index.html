@@ -191,34 +191,7 @@ const jfdUpgradeTimeInputs=()=>{document.querySelectorAll('input[type="time"]:no
 const jfdUpgradeAllDateTimeInputs=()=>{jfdUpgradeDateTimeInputs();jfdUpgradeTimeInputs()};
 const jfdTimeObserver=new MutationObserver(()=>jfdUpgradeAllDateTimeInputs());
 
-const jfdSearchableSelects=()=>{
-  document.querySelectorAll('select:not([multiple]):not([data-jfd-search-upgraded])').forEach(sel=>{
-    if(sel.id==='staffShift')return;
-    if(sel.closest('[data-jfd-search-shell]'))return;
-    sel.dataset.jfdSearchUpgraded="1";
-    const shell=document.createElement("div"); shell.dataset.jfdSearchShell="1"; shell.className="relative mt-1";
-    const input=document.createElement("input"); input.type="text"; input.autocomplete="off";
-    input.className=(sel.className||"").replace(/mt-1/g,"")+" bg-white"; input.placeholder="Type to search...";
-    input.setAttribute("aria-label",(sel.getAttribute("aria-label")||sel.id||"Select")+" search"); input.setAttribute("role","combobox"); input.setAttribute("aria-expanded","false");
-    const menu=document.createElement("div"); menu.className="hidden absolute left-0 right-0 top-full z-[90] mt-1 max-h-64 overflow-y-auto rounded-lg border bg-white shadow-xl";
-    const render=()=>{
-      const q=input.value.trim().toLowerCase();
-      const opts=[...sel.options].filter(o=>!o.disabled&&(!q||String(o.textContent||"").toLowerCase().includes(q)||String(o.value||"").toLowerCase().includes(q)));
-      menu.innerHTML=opts.length?opts.map(o=>'<button type="button" class="block w-full text-left px-3 py-2 hover:bg-slate-100 text-sm '+(o.value===sel.value?'font-bold bg-slate-50':'')+'" data-jfd-option-value="'+esc(o.value)+'">'+esc(o.textContent||"")+'</button>').join(""):'<div class="px-3 py-2 text-sm text-slate-500">No matches</div>';
-      menu.querySelectorAll("[data-jfd-option-value]").forEach(btn=>btn.addEventListener("mousedown",e=>{e.preventDefault();sel.value=btn.dataset.jfdOptionValue||"";input.value=sel.options[sel.selectedIndex]?.textContent||"";sel.dispatchEvent(new Event("change",{bubbles:true}));menu.classList.add("hidden");input.setAttribute("aria-expanded","false");}));
-    };
-    input.value=sel.options[sel.selectedIndex]?.textContent||"";
-    input.addEventListener("focus",()=>{input.select();render();menu.classList.remove("hidden");input.setAttribute("aria-expanded","true")});
-    input.addEventListener("input",()=>{render();menu.classList.remove("hidden");input.setAttribute("aria-expanded","true")});
-    input.addEventListener("keydown",e=>{if(e.key==="Enter"){const first=menu.querySelector("[data-jfd-option-value]");if(first){e.preventDefault();first.dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));}}else if(e.key==="Escape"){menu.classList.add("hidden");input.setAttribute("aria-expanded","false");input.value=sel.options[sel.selectedIndex]?.textContent||"";}});
-    input.addEventListener("blur",()=>setTimeout(()=>{menu.classList.add("hidden");input.setAttribute("aria-expanded","false");input.value=sel.options[sel.selectedIndex]?.textContent||""},150));
-    sel.addEventListener("change",()=>{input.value=sel.options[sel.selectedIndex]?.textContent||""});
-    sel.style.display="none"; shell.append(input,menu); sel.parentNode.insertBefore(shell,sel);
-  });
-};
-const jfdSelectObserver=new MutationObserver(()=>jfdSearchableSelects());
-document.addEventListener("DOMContentLoaded",()=>{jfdSearchableSelects();jfdSelectObserver.observe(document.body,{childList:true,subtree:true})});
-
+// Keep native HTML select controls. The report forms depend on the browser-native option list.\nconst jfdSearchableSelects=()=>{};\n
 document.addEventListener("DOMContentLoaded",()=>{jfdUpgradeAllDateTimeInputs();jfdTimeObserver.observe(document.body,{childList:true,subtree:true})});
 const today=()=>{const p=jfdCentralParts(new Date());return p?p.year+"-"+p.month+"-"+p.day:""};
 const localDateTime=(v)=>{if(!v)return "";const s=String(v).trim();if(/^\\d{4}-\\d{2}-\\d{2}$/.test(s))return s+"T00:00";const d=new Date(s);const p=jfdCentralParts(d);return p?p.year+"-"+p.month+"-"+p.day+"T"+p.hour+":"+p.minute:""};
