@@ -1615,12 +1615,22 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   function jfdRenderAids(){
     const render=(kind,boxId)=>{
       const box=$(boxId);if(!box)return;
+      const types=kind==="fd"?NERIS_AID_TYPES:NERIS_NONFD_AID_TYPES;
       box.innerHTML=(window.jfdAids[kind]||[]).map((x,i)=>{
         const title=kind==="fd"?"Fire Department Aid":"Non-Fire Department Aid";
-        return `<div class="border rounded-lg p-3 mb-2"><div class="flex justify-between items-center mb-2"><b>${title} ${i+1}</b><button type="button" onclick="jfdRemoveAid('${kind}',${i})" class="text-red-600 font-bold">Remove</button></div><div class="grid md:grid-cols-3 gap-2">${select("","Direction",["Given","Received"],x.direction)}${jfdNerisSelect("","Aid Type",NERIS_AID_TYPES,x.type)}${field("","Agency",x.agency||"")}</div></div>`;
+        const options=(items,value)=>'<option value="">Select...</option>'+items.map(o=>'<option value="'+esc(o.value)+'" '+(String(o.value)===String(value||"")?'selected':'')+'>'+esc(o.label)+'</option>').join("");
+        return '<div class="border rounded-lg p-3 mb-2"><div class="flex justify-between items-center mb-2"><b>'+title+' '+(i+1)+'</b><button type="button" onclick="jfdRemoveAid(\''+kind+'\','+i+')" class="text-red-600 font-bold">Remove</button></div><div class="grid md:grid-cols-3 gap-2">'+
+          '<label class="text-sm font-semibold">Direction<select data-jfd-aid-field="direction" data-jfd-aid-kind="'+kind+'" data-jfd-aid-index="'+i+'" class="w-full border rounded-lg p-2 mt-1 bg-white">'+options([{value:"GIVEN",label:"Given"},{value:"RECEIVED",label:"Received"}],x.direction)+'</select></label>'+
+          '<label class="text-sm font-semibold">Aid Type<select data-jfd-aid-field="type" data-jfd-aid-kind="'+kind+'" data-jfd-aid-index="'+i+'" class="w-full border rounded-lg p-2 mt-1 bg-white">'+options(types,x.type)+'</select></label>'+
+          '<label class="text-sm font-semibold">Agency<input data-jfd-aid-field="agency" data-jfd-aid-kind="'+kind+'" data-jfd-aid-index="'+i+'" value="'+esc(x.agency||"")+'" class="w-full border rounded-lg p-2 mt-1 bg-white"></label></div></div>';
       }).join("");
+      box.querySelectorAll("[data-jfd-aid-field]").forEach(el=>{
+        const sync=()=>{const row=(window.jfdAids[el.dataset.jfdAidKind]||[])[Number(el.dataset.jfdAidIndex)];if(row)row[el.dataset.jfdAidField]=el.value;};
+        el.addEventListener(el.tagName==="INPUT"?"input":"change",sync);
+      });
     };
     render("fd","jfdFdAid");render("nonfd","jfdNonFdAid");
+    setTimeout(()=>window.jfdEnhanceReportDropdowns?.(),0);
   }
   window.jfdRepeats={exposures:[],casualties:[],vehicles:[],hazards:[]};
   window.jfdAddRepeat=function(key){(window.jfdRepeats[key]||(window.jfdRepeats[key]=[])).push({});jfdRenderRepeats(key)};
@@ -1732,24 +1742,26 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       }
       sel.dataset.jfdSearchable="1";
       const wrap=document.createElement("div");
-      wrap.className="relative mt-1";
+      wrap.className="relative mt-1 w-full";
       const input=document.createElement("input");
       input.type="text";
       input.autocomplete="off";
       input.setAttribute("data-jfd-select-input","1");
-      input.className="w-full border rounded-lg p-2 bg-white";
+      input.setAttribute("role","combobox");
+      input.setAttribute("aria-expanded","false");
+      input.className="w-full border rounded-lg p-2 mt-1 bg-white font-normal";
       const initial=sel.options[sel.selectedIndex];
       input.value=(initial&&initial.value)?initial.textContent.trim():"";
-      input.placeholder="Click to view all options or type to search...";
+      input.placeholder="Select or type to search…";
       const menu=document.createElement("div");
       menu.className="hiddenx absolute left-0 right-0 top-full mt-1 z-[80] max-h-72 overflow-auto rounded-lg border border-slate-300 bg-white shadow-xl";
       const render=filter=>{
         const q=String(filter||"").trim().toLowerCase();
         menu.innerHTML="";
-        [...sel.options].filter(o=>o.value!==""&&( !q || o.textContent.toLowerCase().includes(q) || String(o.value).toLowerCase().includes(q))).forEach(o=>{
+        [...sel.options].filter(o=>o.value!==""&&(!q||o.textContent.toLowerCase().includes(q)||String(o.value).toLowerCase().includes(q))).forEach(o=>{
           const b=document.createElement("button");
           b.type="button";
-          b.className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100";
+          b.className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 focus:bg-slate-100";
           b.textContent=o.textContent;
           b.addEventListener("mousedown",e=>e.preventDefault());
           b.addEventListener("click",()=>{
@@ -1757,6 +1769,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
             sel.dispatchEvent(new Event("change",{bubbles:true}));
             input.value=o.textContent.trim();
             menu.classList.add("hiddenx");
+            input.setAttribute("aria-expanded","false");
           });
           menu.appendChild(b);
         });
@@ -1767,17 +1780,26 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
           menu.appendChild(empty);
         }
       };
-      const open=()=>{render("");menu.classList.remove("hiddenx");input.select();};
+      const open=()=>{render(input.value);menu.classList.remove("hiddenx");input.setAttribute("aria-expanded","true");};
+      const close=()=>{menu.classList.add("hiddenx");input.setAttribute("aria-expanded","false");};
       input.addEventListener("focus",open);
       input.addEventListener("click",open);
-      input.addEventListener("input",()=>{render(input.value);menu.classList.remove("hiddenx");});
-      input.addEventListener("keydown",e=>{if(e.key==="Escape"){menu.classList.add("hiddenx");input.blur();}});
-      document.addEventListener("click",e=>{if(!wrap.contains(e.target))menu.classList.add("hiddenx");});
+      input.addEventListener("input",()=>{render(input.value);menu.classList.remove("hiddenx");input.setAttribute("aria-expanded","true");});
+      input.addEventListener("keydown",e=>{
+        if(e.key==="Escape"){close();input.blur();}
+        if(e.key==="ArrowDown"&&menu.classList.contains("hiddenx"))open();
+        if(e.key==="Enter"&&!menu.classList.contains("hiddenx")){
+          const first=menu.querySelector("button");if(first){e.preventDefault();first.click();}
+        }
+      });
+      document.addEventListener("click",e=>{if(!wrap.contains(e.target))close();});
       sel.addEventListener("change",()=>{
         const opt=sel.options[sel.selectedIndex];
         input.value=(opt&&opt.value)?opt.textContent.trim():"";
       });
-      sel.classList.add("hiddenx");
+      // Keep the native select only as the form's data/state control. The user sees one searchable box.
+      sel.style.display="none";
+      sel.tabIndex=-1;
       sel.parentNode.insertBefore(wrap,sel);
       wrap.appendChild(input);
       wrap.appendChild(menu);
@@ -1785,6 +1807,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     });
   }
   window.jfdEnhanceReportDropdowns=jfdEnhanceReportDropdowns;
+  let jfdReportDropdownObserver=null;
   window.jfdRefreshReportDropdowns=function(){
     const root=$("incidentReportForm");
     if(!root)return;
@@ -1794,8 +1817,15 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       if(input)input.value=(opt&&opt.value)?opt.textContent.trim():"";
     });
   };
-  window.fireReportForm=function(){const html=fireFormNew.apply(this,arguments);setTimeout(jfdEnhanceReportDropdowns,0);return html;};
-  window.pcrReportForm=function(){const html=pcrFormNew.apply(this,arguments);setTimeout(jfdEnhanceReportDropdowns,0);return html;};
+  function jfdObserveReportDropdowns(){
+    const root=$("incidentReportForm");if(!root)return;
+    if(jfdReportDropdownObserver)jfdReportDropdownObserver.disconnect();
+    jfdReportDropdownObserver=new MutationObserver(()=>jfdEnhanceReportDropdowns());
+    jfdReportDropdownObserver.observe(root,{childList:true,subtree:true});
+    jfdEnhanceReportDropdowns();
+  }
+  window.fireReportForm=function(){const html=fireFormNew.apply(this,arguments);setTimeout(jfdObserveReportDropdowns,0);return html;};
+  window.pcrReportForm=function(){const html=pcrFormNew.apply(this,arguments);setTimeout(jfdObserveReportDropdowns,0);return html;};
   const baseCollect=window.collectReportFormData;
   window.collectReportFormData=function(){
     const data={};
