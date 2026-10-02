@@ -191,69 +191,57 @@ const jfdUpgradeTimeInputs=()=>{document.querySelectorAll('input[type="time"]:no
 const jfdUpgradeAllDateTimeInputs=()=>{jfdUpgradeDateTimeInputs();jfdUpgradeTimeInputs()};
 const jfdTimeObserver=new MutationObserver(()=>jfdUpgradeAllDateTimeInputs());
 
-// Searchable report selects: every single-select dropdown in Fire Incident Reports and PCRs
-// keeps the normal field appearance, but typing directly into the field filters its options.
+// Searchable report dropdowns. These are upgraded after the Fire/PCR form is rendered,
+// so every dynamically-created single-select gets the same type-to-filter behavior.
 const jfdSearchableSelects=()=>{
   const root=document.querySelector("#reportModal");
   if(!root)return;
   root.querySelectorAll('select:not([multiple]):not([data-jfd-search-upgraded])').forEach(sel=>{
-    if(sel.closest('[data-jfd-search-shell]'))return;
     sel.dataset.jfdSearchUpgraded="1";
     const shell=document.createElement("div");
-    shell.dataset.jfdSearchShell="1";
     shell.className="relative mt-1";
+    shell.dataset.jfdSearchShell="1";
     const input=document.createElement("input");
     input.type="text"; input.autocomplete="off"; input.spellcheck=false;
     input.className=(sel.className||"").replace(/mt-1/g,"").trim()+" bg-white";
     input.style.width="100%";
     input.placeholder=sel.options[0]?.textContent||"Select...";
-    input.setAttribute("aria-label",sel.getAttribute("aria-label")||sel.id||"Select");
-    input.setAttribute("role","combobox"); input.setAttribute("aria-autocomplete","list");
+    input.setAttribute("role","combobox");
+    input.setAttribute("aria-autocomplete","list");
     input.setAttribute("aria-expanded","false");
     const menu=document.createElement("div");
-    menu.className="hidden absolute left-0 right-0 top-full z-[90] mt-1 max-h-64 overflow-y-auto rounded-lg border border-slate-300 bg-white shadow-xl";
-    menu.setAttribute("role","listbox");
+    menu.className="hidden absolute left-0 right-0 top-full z-[200] mt-1 max-h-64 overflow-y-auto rounded-lg border border-slate-300 bg-white shadow-xl";
     const selectedText=()=>sel.options[sel.selectedIndex]?.textContent||"";
     const close=()=>{menu.classList.add("hidden");input.setAttribute("aria-expanded","false");};
     const render=()=>{
       const q=input.value.trim().toLowerCase();
-      const opts=[...sel.options].filter(o=>{
-        if(o.disabled)return false;
-        const text=String(o.textContent||""),value=String(o.value||"");
-        return !q||text.toLowerCase().includes(q)||value.toLowerCase().includes(q);
-      });
-      menu.innerHTML=opts.length
-        ? opts.map((o,i)=>'<button type="button" role="option" aria-selected="'+(o.value===sel.value?'true':'false')+'" data-jfd-option-value="'+esc(o.value)+'" data-jfd-option-index="'+i+'" class="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 focus:bg-slate-100 focus:outline-none '+(o.value===sel.value?'font-bold bg-slate-50':'')+'">'+esc(o.textContent||"")+'</button>').join("")
-        : '<div class="px-3 py-2 text-sm text-slate-500">No matches</div>';
+      const opts=[...sel.options].filter(o=>!o.disabled&&(!q||String(o.textContent||"").toLowerCase().includes(q)||String(o.value||"").toLowerCase().includes(q)));
+      menu.innerHTML=opts.length?opts.map(o=>'<button type="button" data-jfd-option-value="'+esc(o.value)+'" class="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 focus:bg-slate-100">'+esc(o.textContent||"")+'</button>').join(""):'<div class="px-3 py-2 text-sm text-slate-500">No matches</div>';
       menu.querySelectorAll("[data-jfd-option-value]").forEach(btn=>{
-        const choose=()=>{
+        btn.addEventListener("mousedown",e=>{
+          e.preventDefault();
           sel.value=btn.dataset.jfdOptionValue||"";
           input.value=selectedText();
           sel.dispatchEvent(new Event("change",{bubbles:true}));
           close();
-        };
-        btn.addEventListener("mousedown",e=>{e.preventDefault();choose()});
-        btn.addEventListener("click",e=>{e.preventDefault();choose()});
+        });
       });
     };
-    const open=()=>{render();menu.classList.remove("hidden");input.setAttribute("aria-expanded","true");};
     input.value=selectedText();
-    input.addEventListener("focus",()=>{input.select();open()});
-    input.addEventListener("input",open);
+    input.addEventListener("focus",()=>{input.select();render();menu.classList.remove("hidden");input.setAttribute("aria-expanded","true");});
+    input.addEventListener("input",()=>{render();menu.classList.remove("hidden");input.setAttribute("aria-expanded","true");});
     input.addEventListener("keydown",e=>{
-      const buttons=[...menu.querySelectorAll("[data-jfd-option-value]")];
-      if(e.key==="ArrowDown"){if(!buttons.length)return;e.preventDefault();buttons[0].focus();}
-      else if(e.key==="ArrowUp"){if(!buttons.length)return;e.preventDefault();input.focus();}
-      else if(e.key==="Enter"){const first=menu.querySelector("[data-jfd-option-value]");if(first){e.preventDefault();first.dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));}}
-      else if(e.key==="Escape"){e.preventDefault();input.value=selectedText();close();}
+      if(e.key==="Enter"){const first=menu.querySelector("[data-jfd-option-value]");if(first){e.preventDefault();first.dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));}}
+      if(e.key==="Escape"){e.preventDefault();input.value=selectedText();close();}
     });
-    input.addEventListener("blur",()=>setTimeout(()=>{close();input.value=selectedText();},180));
+    input.addEventListener("blur",()=>setTimeout(()=>{input.value=selectedText();close();},200));
     sel.addEventListener("change",()=>{input.value=selectedText();});
     sel.style.position="absolute"; sel.style.opacity="0"; sel.style.width="1px"; sel.style.height="1px"; sel.style.pointerEvents="none"; sel.setAttribute("tabindex","-1");
-    shell.append(input,menu); sel.parentNode.insertBefore(shell,sel);
+    shell.append(input,menu);
+    sel.parentNode.insertBefore(shell,sel);
   });
 };
-const jfdSelectObserver=new MutationObserver(()=>window.requestAnimationFrame(jfdSearchableSelects));
+const jfdSelectObserver=new MutationObserver(()=>jfdSearchableSelects());
 document.addEventListener("DOMContentLoaded",()=>{
   jfdSearchableSelects();
   const reportModal=document.querySelector("#reportModal");
