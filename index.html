@@ -1310,6 +1310,7 @@ async function saveReportDraft(kind){
   if(incidentId)await loadIncidents();
   return report;
 }
+window.jfdCopyOwnerToOccupant=function(checked){if(!checked)return;[["rOwnerName","rOccupantName"],["rOwnerAddress","rOccupantAddress"],["rOwnerPhone","rOccupantPhone"]].forEach(([a,b])=>{const from=$(a),to=$(b);if(from&&to)to.value=from.value;});};
 async function validateAndFinishReport(kind){
   try{
     const data=collectReportFormData(),m=$("reportModal"),incidentId=Number(m?.dataset.incidentId||0)||null;
@@ -1317,11 +1318,10 @@ async function validateAndFinishReport(kind){
     for(const row of [...document.querySelectorAll(".report-response-unit")]){
       const t=k=>String(row.querySelector('[data-report-unit-time="'+k+'"]')?.value||"").trim();
       const dispatch=t("dispatch"),enroute=t("enroute"),onscene=t("on_scene"),cancelled=t("cancelled"),inservice=t("in_service");
+      const normalizeResponseTime=v=>{const raw=String(v||"").trim();if(!raw)return "";if(/^\\d{4}-\\d{2}-\\d{2}T/.test(raw)){const m=raw.match(/T(\\d{2}:\\d{2})/);return m?m[1]:""}return jfdParseTime24(raw)||null;};
       if(!dispatch)return alert("Dispatch time is required for every responding apparatus.");
       if(!cancelled&&!inservice)return alert("Each responding apparatus must have either Cancelled or In Service entered.");
-      if(cancelled&&inservice&&cancelled!==inservice)return alert("Cancelled and In Service may both be entered, but they must be the same time.");
-      const normalizeResponseTime=v=>{const raw=String(v||"").trim();if(!raw)return "";if(/^\d{4}-\d{2}-\d{2}T/.test(raw)){const m=raw.match(/T(\d{2}:\d{2})/);return m?m[1]:""}return jfdParseTime24(raw)||null;};
-      const normalized=[["Dispatch",dispatch],["En Route",enroute],["On Scene",onscene],["Cancelled",cancelled],["In Service",inservice]].filter(x=>x[1]).map(([label,value])=>[label,normalizeResponseTime(value)]);
+      if(cancelled&&inservice&&normalizeResponseTime(cancelled)!==normalizeResponseTime(inservice))return alert("Cancelled and In Service may both be entered, but they must be the same time.");
       let previous=null;for(const [label,value] of normalized){if(value===null)return alert(label+" time must use military time HH:MM.");const mins=Number(value.slice(0,2))*60+Number(value.slice(3,5));if(previous!==null&&mins<previous)return alert("Responding apparatus times must be chronological.");previous=mins;}
     }
     const existing=await db.from("incidents").select("reports").eq("cad",m.dataset.cad||"").maybeSingle();if(existing.error)throw new Error(existing.error.message);
@@ -1656,8 +1656,8 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       jfdNerisSelect("rSecondaryUse","Secondary Location Use (optional)",NERIS_LOCATION_USES,d?.secondary_use||"","md:col-span-2")+
       '</div>')+
       card("Owner / Occupant Information",'<div class="grid md:grid-cols-2 gap-4">'+
-      '<div class="border rounded-xl p-3"><h4 class="font-black mb-2">Owner</h4>'+field("rOwnerName","Owner Name",d?.owner_name||"")+field("rOwnerAddress","Owner Address",d?.owner_address||"")+field("rOwnerPhone","Owner Phone",d?.owner_phone||"","tel")+'</div>'+
-      '<div class="border rounded-xl p-3"><h4 class="font-black mb-2">Occupant</h4>'+field("rOccupantName","Occupant Name",d?.occupant_name||"")+field("rOccupantAddress","Occupant Address",d?.occupant_address||"")+field("rOccupantPhone","Occupant Phone",d?.occupant_phone||"","tel")+'</div>'+
+      '<div class="border rounded-xl p-3"><h4 class="font-black mb-2">Owner</h4>'+field("rOwnerName","Owner Name",d?.owner_name||"")+field("rOwnerAddress","Owner Address",d?.owner_address||i.location||"")+field("rOwnerPhone","Owner Phone",d?.owner_phone||"","tel")+'</div>'+
+      '<div class="border rounded-xl p-3"><h4 class="font-black mb-2">Occupant</h4><label class="flex items-center gap-2 text-sm mb-2"><input id="rOccupantSameAsOwner" type="checkbox" onchange="jfdCopyOwnerToOccupant(this.checked)"> Same as owner</label>'+field("rOccupantName","Occupant Name",d?.occupant_name||"")+field("rOccupantAddress","Occupant Address",d?.occupant_address||i.location||"")+field("rOccupantPhone","Occupant Phone",d?.occupant_phone||"","tel")+'</div>'+
       '<div class="border rounded-xl p-3 md:col-span-2"><h4 class="font-black mb-2">Property Insurance</h4><div class="grid md:grid-cols-3 gap-2">'+field("rInsuranceCompany","Insurance Company",d?.insurance_company||"")+field("rInsurancePhone","Insurance Phone",d?.insurance_phone||"","tel")+field("rInsurancePolicy","Policy Number",d?.insurance_policy||"")+'</div></div>'+
       '</div>');
     window.jfdIncidentTypes=(d?.incident_types||[]).filter(Boolean);
