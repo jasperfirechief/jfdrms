@@ -1718,8 +1718,84 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     setTimeout(()=>{jfdRenderPatients(saved);jfdBindSignaturePads();jfdUpdateNerisRequirements();},0);
     return h;
   }
-  window.fireReportForm=fireFormNew;
-  window.pcrReportForm=pcrFormNew;
+  function jfdEnhanceReportDropdowns(){
+    const root=$("incidentReportForm");
+    if(!root)return;
+    root.querySelectorAll("select").forEach(sel=>{
+      if(sel.dataset.jfdSearchable==="1"){
+        const input=sel.parentElement?.querySelector("[data-jfd-select-input]");
+        if(input){
+          const opt=sel.options[sel.selectedIndex];
+          input.value=(opt&&opt.value)?opt.textContent.trim():"";
+        }
+        return;
+      }
+      sel.dataset.jfdSearchable="1";
+      const wrap=document.createElement("div");
+      wrap.className="relative mt-1";
+      const input=document.createElement("input");
+      input.type="text";
+      input.autocomplete="off";
+      input.setAttribute("data-jfd-select-input","1");
+      input.className="w-full border rounded-lg p-2 bg-white";
+      const initial=sel.options[sel.selectedIndex];
+      input.value=(initial&&initial.value)?initial.textContent.trim():"";
+      input.placeholder="Click to view all options or type to search...";
+      const menu=document.createElement("div");
+      menu.className="hiddenx absolute left-0 right-0 top-full mt-1 z-[80] max-h-72 overflow-auto rounded-lg border border-slate-300 bg-white shadow-xl";
+      const render=filter=>{
+        const q=String(filter||"").trim().toLowerCase();
+        menu.innerHTML="";
+        [...sel.options].filter(o=>o.value!==""&&( !q || o.textContent.toLowerCase().includes(q) || String(o.value).toLowerCase().includes(q))).forEach(o=>{
+          const b=document.createElement("button");
+          b.type="button";
+          b.className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100";
+          b.textContent=o.textContent;
+          b.addEventListener("mousedown",e=>e.preventDefault());
+          b.addEventListener("click",()=>{
+            sel.value=o.value;
+            sel.dispatchEvent(new Event("change",{bubbles:true}));
+            input.value=o.textContent.trim();
+            menu.classList.add("hiddenx");
+          });
+          menu.appendChild(b);
+        });
+        if(!menu.children.length){
+          const empty=document.createElement("div");
+          empty.className="px-3 py-2 text-sm text-slate-500";
+          empty.textContent="No matching options";
+          menu.appendChild(empty);
+        }
+      };
+      const open=()=>{render("");menu.classList.remove("hiddenx");input.select();};
+      input.addEventListener("focus",open);
+      input.addEventListener("click",open);
+      input.addEventListener("input",()=>{render(input.value);menu.classList.remove("hiddenx");});
+      input.addEventListener("keydown",e=>{if(e.key==="Escape"){menu.classList.add("hiddenx");input.blur();}});
+      document.addEventListener("click",e=>{if(!wrap.contains(e.target))menu.classList.add("hiddenx");});
+      sel.addEventListener("change",()=>{
+        const opt=sel.options[sel.selectedIndex];
+        input.value=(opt&&opt.value)?opt.textContent.trim():"";
+      });
+      sel.classList.add("hiddenx");
+      sel.parentNode.insertBefore(wrap,sel);
+      wrap.appendChild(input);
+      wrap.appendChild(menu);
+      wrap.appendChild(sel);
+    });
+  }
+  window.jfdEnhanceReportDropdowns=jfdEnhanceReportDropdowns;
+  window.jfdRefreshReportDropdowns=function(){
+    const root=$("incidentReportForm");
+    if(!root)return;
+    root.querySelectorAll("select[data-jfd-searchable='1']").forEach(sel=>{
+      const input=sel.parentElement?.querySelector("[data-jfd-select-input]");
+      const opt=sel.options[sel.selectedIndex];
+      if(input)input.value=(opt&&opt.value)?opt.textContent.trim():"";
+    });
+  };
+  window.fireReportForm=function(){const html=fireFormNew.apply(this,arguments);setTimeout(jfdEnhanceReportDropdowns,0);return html;};
+  window.pcrReportForm=function(){const html=pcrFormNew.apply(this,arguments);setTimeout(jfdEnhanceReportDropdowns,0);return html;};
   const baseCollect=window.collectReportFormData;
   window.collectReportFormData=function(){
     const data={};
