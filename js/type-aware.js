@@ -9,7 +9,7 @@
     {key:"public",icon:"🛠️",title:"Public Service / Other",desc:"Citizen assists, alarms, weather and other service calls.",test:/^PUBSERV|^LAWENFORCE/},
     {key:"noemerg",icon:"🚫",title:"No Emergency / Cancelled",desc:"False alarms, cancelled calls and good-intent responses.",test:/^NOEMERG\|?/}
   ];
-  const groupFor=v=>groups.find(g=>g.test.test(String(v||"").toUpperCase()))||groups[6];
+  const groupFor=v=>groups.find(g=>g.test.test(String(v||"").toUpperCase()))||null;
   const fld=(id,label,val="",type="text",cls="",req=false)=>'<label class="text-sm font-semibold '+cls+'">'+esc(label)+(req?' *':'')+'<input id="'+id+'" type="'+type+'" value="'+esc(val??"")+'" '+(req?'required':'')+' class="w-full border rounded-lg p-2 mt-1 bg-white"></label>';
   const sel=(id,label,opts,val="",cls="",req=false)=>'<label class="text-sm font-semibold '+cls+'">'+esc(label)+(req?' *':'')+'<select id="'+id+'" '+(req?'required':'')+' class="w-full border rounded-lg p-2 mt-1 bg-white"><option value="">Select...</option>'+opts.map(o=>'<option value="'+esc(o.value??o)+'" '+(String(o.value??o)===String(val)?'selected':'')+'>'+esc(o.label??o)+'</option>').join('')+'</select></label>';
   const area=(id,label,val="",cls="")=>'<label class="text-sm font-semibold '+cls+'">'+esc(label)+'<textarea id="'+id+'" rows="4" class="w-full border rounded-lg p-2 mt-1 bg-white">'+esc(val??"")+'</textarea></label>';
@@ -35,24 +35,26 @@
     setTimeout(()=>{jfdRenderIncidentTypes?.();jfdRenderActionControls?.();window.jfdRenderTypeModules?.();if(Array.isArray(d?.patients))jfdRenderPatients(d.patients);},0);return h;
   }
   window.jfdRenderTypeModules=function(){
-    const v=$("rPrimaryIncidentType")?.value||"",g=groupFor(v),isStructure=/^FIRE\\|\\|STRUCTURE_FIRE/.test(v);
+    const v=$("rPrimaryIncidentType")?.value||"",g=groupFor(v),call=$("rCall")?.value||"",isStructure=/^FIRE\\|\\|STRUCTURE_FIRE/.test(v);
     document.querySelectorAll(".jfd-type-module").forEach(x=>x.classList.add("hiddenx"));
-    const ids=g.key==="fire"?["jfdTypeFire"].concat(isStructure?["jfdTypeStructureExtras"]:[]):g.key==="ems"?["jfdTypeMedical"]:g.key==="mva"?["jfdTypeMva"]:g.key==="rescue"?["jfdTypeRescue"]:g.key==="hazmat"?["jfdTypeHazmat"]:g.key==="public"?["jfdTypePublic"]:["jfdTypeNoemerg"];
+    const detailsReady=!!(call&&v);
+    ["rLocationType","rPrimaryUse","rSecondaryUse","rLocationInUse","rUsedAsIntended","rPeoplePresent"].forEach(id=>{const e=$(id)?.closest("section");if(e)e.classList.toggle("hiddenx",!detailsReady)});
+    const ids=!g||!detailsReady?[]:g.key==="fire"?["jfdTypeFire"].concat(isStructure?["jfdTypeStructureExtras"]:[]):g.key==="ems"?["jfdTypeMedical"]:g.key==="mva"?["jfdTypeMva"]:g.key==="rescue"?["jfdTypeRescue"]:g.key==="hazmat"?["jfdTypeHazmat"]:g.key==="public"?["jfdTypePublic"]:["jfdTypeNoemerg"];
     ids.forEach(id=>$(id)?.classList.remove("hiddenx"));
     ["rSmokePresence","rFireAlarm","rOtherAlarm","rSuppression"].forEach(id=>{const e=$(id);if(e)e.required=isStructure});
     const cooking=$("rCookingSuppression");if(cooking)cooking.required=/CONFINED_COOKING_APPLIANCE_FIRE/.test(v);
-    $("reportModalTitle").textContent=g.key==="ems"?"Patient Care Report":g.title+" Incident Report";
+    $("reportModalTitle").textContent=!g?"Fire Incident Report":g.key==="ems"?"Patient Care Report":g.title+" Incident Report";
   };
-  window.jfdOpenGeneralReport=async function(i,d,units){window.currentReportKind="general";$("reportChooser").classList.add("hiddenx");$("incidentReportForm").classList.remove("hiddenx");$("incidentReportForm").innerHTML=form(i,d,{shift:$("staffShift")?.value||""},units);bindReportForm("general");try{await refreshReportApparatusCrews(iDateForReport(i?.dispatch_time))}catch(e){}window.jfdRenderTypeModules();};
+  window.jfdOpenGeneralReport=async function(i,d,units){window.currentReportKind="general";$("reportChooser").classList.add("hiddenx");$("incidentReportForm").classList.remove("hiddenx");$("incidentReportForm").innerHTML=form(i,d,{shift:$("staffShift")?.value||""},units);bindReportForm("general");$("rCall")?.addEventListener("change",()=>window.jfdRenderTypeModules());$("rPrimaryIncidentType")?.addEventListener("change",()=>window.jfdRenderTypeModules());try{await refreshReportApparatusCrews(iDateForReport(i?.dispatch_time))}catch(e){}window.jfdRenderTypeModules();};
   window.jfdChooseExactIncidentType=function(){const v=$("jfdChooserNerisType")?.value;if(!v)return alert("Select a primary NERIS incident type first.");const m=$("reportModal"),id=m?.dataset.incidentId||"",cad=m?.dataset.cad||"";if(!id){const i={cad:"",type:"",location:"",dispatch_time:"",latitude:"",longitude:""};const d={primary_incident_type:v};jfdOpenGeneralReport(i,d,[]);$("rPrimaryIncidentType").value=v;window.jfdRenderTypeModules();return;}Promise.all([db.from("incidents").select("*").eq("cad",cad).maybeSingle(),db.from("incident_details").select("*").eq("incident_id",id).maybeSingle(),db.from("incident_units").select("*").eq("incident_id",id).order("incident_unit_id")]).then(async r=>{if(r[0].error||!r[0].data)return alert(r[0].error?.message||"Incident not found.");const d={...(r[1].data||{}),primary_incident_type:v};await jfdOpenGeneralReport(r[0].data,d,r[2].data||[]);$("rPrimaryIncidentType").value=v;window.jfdRenderTypeModules();});};
   window.jfdChooseGroup=function(key){const g=groups.find(x=>x.key===key)||groups[0];const hit=NERIS_INCIDENT_TYPES.find(x=>g.test.test(String(x.value||x)));if(hit){$("jfdChooserNerisType").value=hit.value;window.jfdChooseExactIncidentType();}else alert("Choose an exact NERIS incident type from the list.");};
   window.renderReportChooser=function(i,d,units){
   setReportIncidentContext(i,d);
-  $("reportModalTitle").textContent="Create Incident Report";
-  $("reportModalSub").textContent=(i?.location||"")+" · Complete the incident report below";
-  $("reportChooser").classList.add("hiddenx");
-  $("incidentReportForm").classList.remove("hiddenx");
-  return jfdOpenGeneralReport(i,d,units||[]);
+  $("reportModalTitle").textContent="Create Report";
+  $("reportModalSub").textContent=(i?.location||"")+(i?.cad?" · CAD "+i.cad:"")+" · Select a report type";
+  $("incidentReportForm").classList.add("hiddenx");
+  $("reportChooser").classList.remove("hiddenx");
+  $("reportChooser").innerHTML='<div class="max-w-4xl mx-auto"><h3 class="text-xl font-black mb-2">Choose a report</h3><p class="text-sm text-slate-500 mb-5">Available CAD information will be pre-populated. Missing information can be entered manually.</p><div class="grid md:grid-cols-2 gap-4"><button type="button" onclick="openIncidentReportFromChooser(\\'fire\\')" class="border-2 border-slate-200 hover:border-red-500 rounded-2xl p-6 text-left"><div class="font-black text-lg">Fire Incident Report</div></button><button type="button" onclick="openIncidentReportFromChooser(\\'pcr\\')" class="border-2 border-slate-200 hover:border-blue-500 rounded-2xl p-6 text-left"><div class="font-black text-lg">Patient Care Report</div></button></div></div>';
 };
   window.newReport=function(){if(!canOps())return alert("You must be on duty.");const m=ensureReportModal();m.dataset.incidentId="";m.dataset.cad="";m.dataset.standalone="1";m.classList.remove("hiddenx");window.renderReportChooser({},{},[]);};
 })();
