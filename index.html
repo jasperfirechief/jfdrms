@@ -211,7 +211,7 @@ const jfdSearchableSelects=()=>{
     const render=()=>{
       const q=input.value.trim().toLowerCase();
       const opts=[...sel.options].filter(o=>!o.disabled&&(!q||String(o.textContent||"").toLowerCase().includes(q)||String(o.value||"").toLowerCase().includes(q)));
-      menu.innerHTML=opts.length?opts.map(o=>'<button type="button" data-jfd-option-value="'+esc(o.value)+'" class="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100">'+esc(o.textContent||"")+'</button>').join(""):'<div class="px-3 py-2 text-sm text-slate-500">No matches</div>';
+      menu.innerHTML=opts.length?opts.map(o=>'<button type="button" data-jfd-option-value="'+jfdEscapeHtml(o.value)+'" class="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100">'+jfdEscapeHtml(o.textContent||"")+'</button>').join(""):'<div class="px-3 py-2 text-sm text-slate-500">No matches</div>';
       menu.querySelectorAll("[data-jfd-option-value]").forEach(btn=>btn.addEventListener("mousedown",e=>{e.preventDefault();sel.value=btn.dataset.jfdOptionValue||"";input.value=selected();sel.dispatchEvent(new Event("change",{bubbles:true}));close();}));
     };
     const open=()=>{render();menu.classList.remove("hidden");input.setAttribute("aria-expanded","true");};
