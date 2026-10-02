@@ -1680,7 +1680,6 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       });
     };
     render("fd","jfdFdAid");render("nonfd","jfdNonFdAid");
-    setTimeout(()=>window.jfdEnhanceReportDropdowns?.(),0);
   }
   window.jfdRepeats={exposures:[],casualties:[],vehicles:[],hazards:[]};
   window.jfdAddRepeat=function(key){(window.jfdRepeats[key]||(window.jfdRepeats[key]=[])).push({});jfdRenderRepeats(key)};
@@ -1778,110 +1777,6 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     setTimeout(()=>{jfdRenderPatients(saved);jfdBindSignaturePads();jfdUpdateNerisRequirements();},0);
     return h;
   }
-  function jfdEnhanceReportDropdowns(){
-    const root=$("incidentReportForm");
-    if(!root)return;
-    root.querySelectorAll("select").forEach(sel=>{
-      // The native select is a state/data control only. Never leave it as a second visible form control.
-      if(sel.dataset.jfdSearchable==="1"){
-        sel.hidden=true;
-        sel.classList.add("hiddenx");
-        sel.style.cssText+=";display:none!important;visibility:hidden!important;width:0!important;height:0!important;position:absolute!important;pointer-events:none!important;";
-        const owner=sel.closest("label");
-        const inputs=owner?[...owner.querySelectorAll("[data-jfd-select-input]")]:[];
-        inputs.slice(1).forEach(x=>x.remove());
-        return;
-      }
-      sel.dataset.jfdSearchable="1";
-      const wrap=document.createElement("div");
-      wrap.className="relative mt-1 w-full";
-      const input=document.createElement("input");
-      input.type="text";
-      input.autocomplete="off";
-      input.setAttribute("data-jfd-select-input","1");
-      input.setAttribute("role","combobox");
-      input.setAttribute("aria-expanded","false");
-      input.className="w-full border rounded-lg p-2 bg-white font-normal";
-      const initial=sel.options[sel.selectedIndex];
-      input.value=(initial&&initial.value)?initial.textContent.trim():"";
-      input.placeholder="Select or type to search…";
-      const menu=document.createElement("div");
-      menu.className="hiddenx absolute left-0 right-0 top-full mt-1 z-[80] max-h-72 overflow-auto rounded-lg border border-slate-300 bg-white shadow-xl";
-      const render=filter=>{
-        const q=String(filter||"").trim().toLowerCase();
-        menu.innerHTML="";
-        [...sel.options].filter(o=>o.value!==""&&(!q||o.textContent.toLowerCase().includes(q)||String(o.value).toLowerCase().includes(q))).forEach(o=>{
-          const b=document.createElement("button");
-          b.type="button";
-          b.className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 focus:bg-slate-100";
-          b.textContent=o.textContent;
-          b.addEventListener("mousedown",e=>e.preventDefault());
-          b.addEventListener("click",()=>{
-            sel.value=o.value;
-            sel.dispatchEvent(new Event("change",{bubbles:true}));
-            input.value=o.textContent.trim();
-            menu.classList.add("hiddenx");
-            input.setAttribute("aria-expanded","false");
-          });
-          menu.appendChild(b);
-        });
-        if(!menu.children.length){
-          const empty=document.createElement("div");
-          empty.className="px-3 py-2 text-sm text-slate-500";
-          empty.textContent="No matching options";
-          menu.appendChild(empty);
-        }
-      };
-      const open=()=>{render(input.value);menu.classList.remove("hiddenx");input.setAttribute("aria-expanded","true");};
-      const close=()=>{menu.classList.add("hiddenx");input.setAttribute("aria-expanded","false");};
-      input.addEventListener("focus",open);
-      input.addEventListener("click",open);
-      input.addEventListener("input",()=>{render(input.value);menu.classList.remove("hiddenx");input.setAttribute("aria-expanded","true");});
-      input.addEventListener("keydown",e=>{
-        if(e.key==="Escape"){close();input.blur();}
-        if(e.key==="ArrowDown"&&menu.classList.contains("hiddenx"))open();
-        if(e.key==="Enter"&&!menu.classList.contains("hiddenx")){
-          const first=menu.querySelector("button");if(first){e.preventDefault();first.click();}
-        }
-      });
-      document.addEventListener("click",e=>{if(!wrap.contains(e.target))close();});
-      sel.addEventListener("change",()=>{
-        const opt=sel.options[sel.selectedIndex];
-        input.value=(opt&&opt.value)?opt.textContent.trim():"";
-      });
-      // Keep the native select only as the form's data/state control. The user sees one searchable box.
-      sel.setAttribute("data-jfd-native-state","1");
-      sel.hidden=true;
-      sel.classList.add("hiddenx");
-      sel.style.cssText+=";display:none!important;visibility:hidden!important;width:0!important;height:0!important;position:absolute!important;pointer-events:none!important;";
-      sel.tabIndex=-1;
-      sel.setAttribute("aria-hidden","true");
-      sel.parentNode.insertBefore(wrap,sel);
-      wrap.appendChild(input);
-      wrap.appendChild(menu);
-      wrap.appendChild(sel);
-    });
-  }
-  window.jfdEnhanceReportDropdowns=jfdEnhanceReportDropdowns;
-  let jfdReportDropdownObserver=null;
-  window.jfdRefreshReportDropdowns=function(){
-    const root=$("incidentReportForm");
-    if(!root)return;
-    root.querySelectorAll("select[data-jfd-searchable='1']").forEach(sel=>{
-      const input=sel.parentElement?.querySelector("[data-jfd-select-input]");
-      const opt=sel.options[sel.selectedIndex];
-      if(input)input.value=(opt&&opt.value)?opt.textContent.trim():"";
-    });
-  };
-  function jfdObserveReportDropdowns(){
-    const root=$("incidentReportForm");if(!root)return;
-    if(jfdReportDropdownObserver)jfdReportDropdownObserver.disconnect();
-    jfdReportDropdownObserver=new MutationObserver(()=>jfdEnhanceReportDropdowns());
-    jfdReportDropdownObserver.observe(root,{childList:true,subtree:true});
-    jfdEnhanceReportDropdowns();
-  }
-  window.fireReportForm=function(){const html=fireFormNew.apply(this,arguments);setTimeout(jfdObserveReportDropdowns,0);return html;};
-  window.pcrReportForm=function(){const html=pcrFormNew.apply(this,arguments);setTimeout(jfdObserveReportDropdowns,0);return html;};
   const baseCollect=window.collectReportFormData;
   window.collectReportFormData=function(){
     const data={};
