@@ -191,6 +191,11 @@ const jfdUpgradeTimeInputs=()=>{document.querySelectorAll('input[type="time"]:no
 const jfdUpgradeAllDateTimeInputs=()=>{jfdUpgradeDateTimeInputs();jfdUpgradeTimeInputs()};
 const jfdTimeObserver=new MutationObserver(()=>jfdUpgradeAllDateTimeInputs());
 
+function jfdEscapeHtml(value){
+  const d=document.createElement("div");
+  d.textContent=String(value??"");
+  return d.innerHTML;
+}
 // Searchable report dropdowns for dynamically-rendered Fire/PCR forms.
 const jfdSearchableSelects=()=>{
   const roots=[document.querySelector("#reportModal"),document.querySelector("#incidentReportForm")].filter(Boolean);
