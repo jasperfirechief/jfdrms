@@ -471,7 +471,7 @@ function ensureInspectionSignaturePad(){
 function clearInspectionSignature(){const c=$("signaturePad");if(!c)return;c.getContext("2d").clearRect(0,0,c.width,c.height)}
 function populateInspectionInspector(){
   const s=$("inInspector");if(!s)return;
-  s.innerHTML=personnel.filter(p=>p.active!==false&&(p.is_inspector||p.auth_user_id===me?.id)).map(p=>'<option value="'+Number(p.id)+'">'+esc((p.first_name||"")+" "+(p.last_name||""))+'</option>').join("");
+  s.innerHTML=personnel.filter(p=>p.active!==false&&(p.role==="admin"||p.app_role==="admin"||p.is_inspector||p.auth_user_id===me?.id)).map(p=>'<option value="'+Number(p.id)+'">'+esc((p.first_name||"")+" "+(p.last_name||"")+(p.role==="admin"||p.app_role==="admin"?" (Admin)":""))+'</option>').join("");
   if(currentPersonnel()?.id)s.value=String(currentPersonnel().id);
 }
 function renderAcceptancePanels(){
@@ -1074,7 +1074,7 @@ async function renderReports(){
 }
 function completedReportSearchText(x){
   const rep=x.rep||{},i=x.i||{};
-  return [i.cad,i.type,i.location,i.dispatch_time,i.updated_at,rep.report_type,rep.status,JSON.stringify(rep.data||{}),JSON.stringify(rep||{})].filter(Boolean).join(" ").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+  return [i.cad,i.type,i.location,i.dispatch_time,i.updated_at,rep.report_type,rep.status,JSON.stringify(rep.data||{}),JSON.stringify(rep||{}),rep.data?.rLocation,rep.data?.location,rep.data?.address,rep.data?.rOwnerAddress,rep.data?.rOccupantAddress,rep.data?.occupancy_name,rep.data?.rOccupancyName,rep.data?.rNarrative,rep.data?.narrative].filter(Boolean).join(" ").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
 }
 function completedReportDate(x){
   const rep=x.rep||{},i=x.i||{};
