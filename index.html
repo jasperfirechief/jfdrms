@@ -1620,7 +1620,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
         const title=kind==="fd"?"Fire Department Aid":"Non-Fire Department Aid";
         const options=(items,value)=>'<option value="">Select...</option>'+items.map(o=>'<option value="'+esc(o.value)+'" '+(String(o.value)===String(value||"")?'selected':'')+'>'+esc(o.label)+'</option>').join("");
         return '<div class="border rounded-lg p-3 mb-2"><div class="flex justify-between items-center mb-2"><b>'+title+' '+(i+1)+'</b><button type="button" onclick="jfdRemoveAid(\''+kind+'\','+i+')" class="text-red-600 font-bold">Remove</button></div><div class="grid md:grid-cols-3 gap-2">'+
-          '<label class="text-sm font-semibold">Direction<select data-jfd-aid-field="direction" data-jfd-aid-kind="'+kind+'" data-jfd-aid-index="'+i+'" class="w-full border rounded-lg p-2 mt-1 bg-white">'+options([{value:"GIVEN",label:"Given"},{value:"RECEIVED",label:"Received"}],x.direction)+'</select></label>'+
+          '<label class="text-sm font-semibold">Direction<select data-jfd-aid-field="direction" data-jfd-aid-kind="'+kind+'" data-jfd-aid-index="'+i+'" class="w-full border rounded-lg p-2 mt-1 bg-white">'+options([{value:"Given",label:"Given"},{value:"Received",label:"Received"}],x.direction)+'</select></label>'+
           '<label class="text-sm font-semibold">Aid Type<select data-jfd-aid-field="type" data-jfd-aid-kind="'+kind+'" data-jfd-aid-index="'+i+'" class="w-full border rounded-lg p-2 mt-1 bg-white">'+options(types,x.type)+'</select></label>'+
           '<label class="text-sm font-semibold">Agency<input data-jfd-aid-field="agency" data-jfd-aid-kind="'+kind+'" data-jfd-aid-index="'+i+'" value="'+esc(x.agency||"")+'" class="w-full border rounded-lg p-2 mt-1 bg-white"></label></div></div>';
       }).join("");
@@ -1732,14 +1732,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     const root=$("incidentReportForm");
     if(!root)return;
     root.querySelectorAll("select").forEach(sel=>{
-      if(sel.dataset.jfdSearchable==="1"){
-        const input=sel.parentElement?.querySelector("[data-jfd-select-input]");
-        if(input){
-          const opt=sel.options[sel.selectedIndex];
-          input.value=(opt&&opt.value)?opt.textContent.trim():"";
-        }
-        return;
-      }
+      if(sel.dataset.jfdSearchable==="1")return;
       sel.dataset.jfdSearchable="1";
       const wrap=document.createElement("div");
       wrap.className="relative mt-1 w-full";
