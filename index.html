@@ -945,7 +945,7 @@ async function createIncidentReportByCad(cad){
   const m=ensureReportModal();m.dataset.incidentId=String(dr.data.incident_id);m.dataset.cad=String(r.data.cad||cad);m.dataset.standalone="";m.classList.remove("hiddenx");renderReportChooser(r.data,dr.data,ur.data||[]);
 }
 
-async function openIncidentReportForm(kind,i,d,unitRows=[]){window.currentReportKind=kind;const m=ensureReportModal();m.dataset.standalone="";$("reportChooser").classList.add("hiddenx");$("incidentReportForm").classList.remove("hiddenx");$("reportModalTitle").textContent=kind==="fire"?"Fire Incident Report":"Patient Care Report";$("reportModalSub").textContent="CAD "+(i.cad||"")+" · "+(i.location||"")+" · Available CAD information has been pre-populated. Missing information can be entered manually.";setReportIncidentContext(i,d);const stationNames=[...new Set((unitRows||[]).map(u=>u.station_snapshot).filter(Boolean))].join(", ");const meta={station:stationNames,officer:"",crew:"",units:(unitRows||[]).map(u=>u.unit_number_snapshot).filter(Boolean).join(", "),lat:i.latitude??"",lng:i.longitude??"",shift:$("staffShift")?.value||""};const reportList=Array.isArray(i.reports)?i.reports:[];const firstReport=reportList.length?(reportList[0]?.data||reportList[0]||null):null;$("incidentReportForm").innerHTML=kind==="fire"?window.fireReportForm(i,d,meta,unitRows):window.pcrReportForm(i,d,meta,unitRows);if(firstReport)applyPreviousReportValues(firstReport);window.clearManualResponseSelection();bindReportForm(kind);try{await refreshReportApparatusCrews(iDateForReport(i.dispatch_time));}catch(e){console.error("Report apparatus refresh failed",e)}$("rDate")?.addEventListener("change",()=>refreshReportApparatusCrews($("rDate").value));}
+async function openIncidentReportForm(kind,i,d,unitRows=[]){window.currentReportKind=kind;const m=ensureReportModal();m.dataset.standalone="";$("reportChooser").classList.add("hiddenx");$("incidentReportForm").classList.remove("hiddenx");$("reportModalTitle").textContent=kind==="fire"?"Fire Incident Report":"Patient Care Report";$("reportModalSub").textContent="CAD information has been pre-populated. Missing information can be entered manually.";setReportIncidentContext(i,d);const stationNames=[...new Set((unitRows||[]).map(u=>u.station_snapshot).filter(Boolean))].join(", ");const meta={station:stationNames,officer:"",crew:"",units:(unitRows||[]).map(u=>u.unit_number_snapshot).filter(Boolean).join(", "),lat:i.latitude??"",lng:i.longitude??"",shift:$("staffShift")?.value||""};const reportList=Array.isArray(i.reports)?i.reports:[];const firstReport=reportList.length?(reportList[0]?.data||reportList[0]||null):null;$("incidentReportForm").innerHTML=kind==="fire"?window.fireReportForm(i,d,meta,unitRows):window.pcrReportForm(i,d,meta,unitRows);if(firstReport)applyPreviousReportValues(firstReport);window.clearManualResponseSelection();bindReportForm(kind);try{await refreshReportApparatusCrews(iDateForReport(i.dispatch_time));}catch(e){console.error("Report apparatus refresh failed",e)}$("rDate")?.addEventListener("change",()=>refreshReportApparatusCrews($("rDate").value));}
 
 function iDateForReport(v){if(!v)return today();const d=new Date(v);return Number.isNaN(d.getTime())?today():new Intl.DateTimeFormat("en-CA",{timeZone:"America/Chicago"}).format(d)}
 async function startIncidentReport(kind){
@@ -961,7 +961,7 @@ async function startIncidentReport(kind){
   const meta={station:stationNames,officer:"",crew:"",units,lat:i.latitude??"",lng:i.longitude??"",shift:$("staffShift")?.value||""};
   $("reportChooser").classList.add("hiddenx");$("incidentReportForm").classList.remove("hiddenx");
   $("reportModalTitle").textContent=kind==="fire"?"Fire Incident Report":"Patient Care Report";
-  $("reportModalSub").textContent="CAD "+(i.cad||"")+" · "+(i.location||"")+" · Available CAD information has been pre-populated. Missing information can be entered manually.";setReportIncidentContext(i,d);
+  $("reportModalSub").textContent="CAD information has been pre-populated. Missing information can be entered manually.";setReportIncidentContext(i,d);
   $("incidentReportForm").innerHTML=kind==="fire"?window.fireReportForm(i,d,meta,unitRows):window.pcrReportForm(i,d,meta,unitRows);
   if(firstReport) applyPreviousReportValues(firstReport);
   bindReportForm(kind); try{await refreshReportApparatusCrews(iDateForReport(i.dispatch_time));}catch(e){console.error("Report apparatus refresh failed",e);}
@@ -1777,7 +1777,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     setTimeout(()=>{jfdRenderPatients(saved);jfdBindSignaturePads();jfdUpdateNerisRequirements();},0);
     return h;
   }
-  const baseCollect=window.collectReportFormData;
+  // Expose the rebuilt report renderers used by the report modal. Keep this wrapper only for rendering; searchable dropdown enhancement is handled globally.\n  window.fireReportForm=function(){return fireFormNew.apply(this,arguments);};\n  window.pcrReportForm=function(){return pcrFormNew.apply(this,arguments);};\n  const baseCollect=window.collectReportFormData;
   window.collectReportFormData=function(){
     const data={};
     $("incidentReportForm")?.querySelectorAll("input,select,textarea").forEach(el=>{
