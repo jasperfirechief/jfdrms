@@ -1282,13 +1282,26 @@ async function saveReportDraft(kind){
   const data=collectReportFormData(),m=$("reportModal"),incidentId=Number(m?.dataset.incidentId||0)||null;
     const responseErrors=[];
     (data.responding_apparatus||[]).forEach((u,n)=>{
-      const t=u.times||{},d=jfdParseTime24(t.dispatch),e=jfdParseTime24(t.enroute),o=jfdParseTime24(t.on_scene),c=jfdParseTime24(t.cancelled),v=jfdParseTime24(t.in_service);
+      const raw=u.times||{};
+      const parse=(value)=>{
+        const s=String(value??"").trim();
+        if(!s)return "";
+        const match=s.match(/^(?:\\d{4}-\\d{2}-\\d{2}T)?(\\d{1,2}):?(\\d{2})(?::\\d{2})?$/);
+        if(!match)return null;
+        const h=Number(match[1]),min=Number(match[2]);
+        if(h>23||min>59)return null;
+        return String(h).padStart(2,"0")+":"+String(min).padStart(2,"0");
+      };
+      const t={};for(const key of ["dispatch","enroute","on_scene","cancelled","in_service"])t[key]=parse(raw[key]);
+      const d=t.dispatch,e=t.enroute,o=t.on_scene,c=t.cancelled,v=t.in_service;
+      if(d===null||e===null||o===null||c===null||v===null){responseErrors.push("Unit "+(u.unit_number||n+1)+": enter valid 24-hour times (HH:MM).");return;}
       if(!d)responseErrors.push("Unit "+(u.unit_number||n+1)+": Dispatch time is required.");
       if(!c&&(!e||!o||!v))responseErrors.push("Unit "+(u.unit_number||n+1)+": En Route, On Scene, and In Service are required unless Cancelled is entered.");
-      if(c&&v)responseErrors.push("Unit "+(u.unit_number||n+1)+": enter either Cancelled or In Service, not both.");
+      if(c&&v&&c!==v)responseErrors.push("Unit "+(u.unit_number||n+1)+": Cancelled and In Service must match if both are entered.");
       const seq=[d,e,o].filter(Boolean);if(seq.some((x,i)=>i&&x<seq[i-1]))responseErrors.push("Unit "+(u.unit_number||n+1)+": response times must be chronological.");
       if(v&&o&&v<o)responseErrors.push("Unit "+(u.unit_number||n+1)+": In Service cannot be before On Scene.");
       if(c&&o&&c<o)responseErrors.push("Unit "+(u.unit_number||n+1)+": Cancelled cannot be before On Scene.");
+      u.times={...raw,...Object.fromEntries(Object.entries(t).filter(([,value])=>value!==null))};
     });
     if(responseErrors.length)return alert("Correct the responding apparatus times before finishing:\n\n"+responseErrors.join("\n"));
   const reportType=kind==="fire"?"fire_neris_v2":"pcr_neris_v2";
@@ -1316,7 +1329,8 @@ async function validateAndFinishReport(kind){
     if(!incidentId)return alert("Standalone reports can be saved as drafts, but must be attached to an incident before NERIS review.");
     for(const row of [...document.querySelectorAll(".report-response-unit")]){
       const t=k=>String(row.querySelector('[data-report-unit-time="'+k+'"]')?.value||"").trim();
-      const dispatch=t("dispatch"),enroute=t("enroute"),onscene=t("on_scene"),cancelled=t("cancelled"),inservice=t("in_service");
+      const normalizeInput=v=>{const s=String(v||"").trim();if(!s)return "";const m=s.match(/^(?:\\d{4}-\\d{2}-\\d{2}T)?(\\d{1,2}):?(\\d{2})(?::\\d{2})?$/);if(!m)return jfdParseTime24(s)||null;const h=Number(m[1]),min=Number(m[2]);return h<=23&&min<=59?String(h).padStart(2,"0")+":"+String(min).padStart(2,"0"):null;};
+      const dispatch=normalizeInput(t("dispatch")),enroute=normalizeInput(t("enroute")),onscene=normalizeInput(t("on_scene")),cancelled=normalizeInput(t("cancelled")),inservice=normalizeInput(t("in_service"));
       const normalizeResponseTime=v=>{const raw=String(v||"").trim();if(!raw)return "";if(/^\\d{4}-\\d{2}-\\d{2}T/.test(raw)){const m=raw.match(/T(\\d{2}:\\d{2})/);return m?m[1]:""}return jfdParseTime24(raw)||null;};
       if(!dispatch)return alert("Dispatch time is required for every responding apparatus.");
       if(!cancelled&&!inservice)return alert("Each responding apparatus must have either Cancelled or In Service entered.");
