@@ -1935,7 +1935,93 @@ async function fetchAllArchiveTable(table,dateColumn){
   while(true){const r=await db.from(table).select("*").order(dateColumn,{ascending:false}).range(from,from+pageSize-1);if(r.error)throw new Error(r.error.message);const page=r.data||[];rows.push(...page);if(page.length<pageSize)break;from+=pageSize;}
   return rows;
 }
-async function searchAdminReportArchive(){if(profile?.app_role!=="admin")return alert("Administrator access required.");const el=$("adminReportArchiveResults");if(!el)return;el.innerHTML='<div class="card p-4 text-sm text-slate-500">Searching reports...</div>';const type=$("adminReportType")?.value||"",q=String($("adminReportSearch")?.value||"").trim().toLowerCase(),from=$("adminReportFrom")?.value||"",to=$("adminReportTo")?.value||"",limit=Number($("adminReportLimit")?.value||100);let sr=[],cr=[],ck=[],ins=[];try{[sr,cr,ck,ins]=await Promise.all([(!type||type==="staffing")?fetchAllArchiveTable("daily_staffing","staffing_date"):Promise.resolve([]),(!type||type==="incident")?fetchAllArchiveTable("incidents","updated_at"):Promise.resolve([]),(!type||type==="check")?fetchAllArchiveTable("apparatus_checks","check_date"):Promise.resolve([]),(!type||type==="inspection")?fetchAllArchiveTable("inspections","inspection_date"):Promise.resolve([])])}catch(e){el.innerHTML='<div class="card p-4 text-red-600">'+esc(e?.message||String(e))+'</div>';return}const rows=[];(sr||[]).forEach(x=>rows.push({kind:"staffing",date:x.staffing_date,title:"Daily Staffing · "+(x.shift||"")+" Shift",text:JSON.stringify(x),id:x.staffing_id}));(cr||[]).forEach(x=>(Array.isArray(x.reports)?x.reports:[]).forEach(rep=>rows.push({kind:"incident",date:(rep.data||{}).rDate||x.dispatch_time,title:rep.report_type==="pcr_neris_v2"?"Patient Care Report":"Fire Incident Report",text:JSON.stringify(rep)+" "+JSON.stringify(x),id:x.cad,reportId:rep.report_id})));(ck||[]).forEach(x=>rows.push({kind:"check",date:x.check_date,title:"Apparatus Check",text:JSON.stringify(x),id:x.check_id}));(ins||[]).forEach(x=>rows.push({kind:"inspection",date:x.inspection_date,title:"Fire Inspection · "+(x.occupancy_name||""),text:JSON.stringify(x),id:x.inspection_id}));const nq=q.replace(/[^a-z0-9]+/g," ").trim();const filtered=rows.filter(x=>{const tx=x.text.toLowerCase().replace(/[^a-z0-9]+/g," ");return(!nq||nq.split(/\s+/).every(t=>tx.includes(t)))&&(!from||String(x.date||"").slice(0,10)>=from)&&(!to||String(x.date||"").slice(0,10)<=to)}).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).slice(0,limit);el.innerHTML=filtered.map(x=>'<div class="border rounded-lg p-3 flex flex-wrap justify-between gap-3 items-center"><div><div class="font-bold">'+esc(x.title)+'</div><div class="text-sm text-slate-500">'+esc(String(x.date||"").slice(0,10))+"</div></div><div class=\"flex gap-2\">"+(x.kind==="incident"?'<button type="button" data-cad="'+esc(x.id)+'" data-report-id="'+esc(x.reportId||"")+'" onclick="openSavedReportFromButton(this)" class="bg-slate-950 text-white px-3 py-2 rounded font-bold text-sm">Open</button><button type="button" data-cad="'+esc(x.id)+'" data-report-id="'+esc(x.reportId||"")+'" onclick="downloadIncidentPdf(this.dataset.cad,this.dataset.reportId)" class="bg-blue-700 text-white px-3 py-2 rounded font-bold text-sm">PDF</button><button type="button" data-cad="'+esc(x.id)+'" data-report-id="'+esc(x.reportId||"")+'" onclick="emailIncidentPdf(this.dataset.cad,this.dataset.reportId)" class="bg-emerald-700 text-white px-3 py-2 rounded font-bold text-sm">Email PDF</button>':"")+"</div></div>").join("")||'<div class="card p-4 text-sm text-slate-500">No reports matched those criteria.</div>'}
+async function searchAdminReportArchive(){
+  if(profile?.app_role!=="admin")return alert("Administrator access required.");
+  const el=$("adminReportArchiveResults");if(!el)return;
+  el.innerHTML='<div class="card p-4 text-sm text-slate-500">Searching reports...</div>';
+  const type=$("adminReportType")?.value||"";
+  const q=String($("adminReportSearch")?.value||"").trim().toLowerCase();
+  const from=$("adminReportFrom")?.value||"";
+  const to=$("adminReportTo")?.value||"";
+  const limit=Math.min(500,Math.max(1,Number($("adminReportLimit")?.value||100)));
+  let sr=[],cr=[],ck=[],ins=[],standalone=[];
+  try{
+    [sr,cr,ck,ins,standalone]=await Promise.all([
+      (!type||type==="staffing")?fetchAllArchiveTable("daily_staffing","staffing_date"):Promise.resolve([]),
+      (!type||type==="incident")?fetchAllArchiveTable("incidents","updated_at"):Promise.resolve([]),
+      (!type||type==="check")?fetchAllArchiveTable("apparatus_checks","check_date"):Promise.resolve([]),
+      (!type||type==="inspection")?fetchAllArchiveTable("inspections","inspection_date"):Promise.resolve([]),
+      (!type||type==="incident")?fetchAllArchiveTable("standalone_reports","created_at"):Promise.resolve([])
+    ]);
+  }catch(e){
+    el.innerHTML='<div class="card p-4 text-red-600">'+esc(e?.message||String(e))+'</div>';
+    return;
+  }
+
+  const rows=[];
+  const add=(row)=>{if(row&&row.id!==undefined&&row.id!==null)rows.push(row);};
+
+  (sr||[]).forEach(x=>add({
+    kind:"staffing",date:x.staffing_date||x.created_at,title:"Daily Staffing · "+(x.shift&&x.shift!=="daily"?x.shift+" Shift":"Daily"),
+    text:JSON.stringify(x),id:x.staffing_id
+  }));
+
+  (cr||[]).forEach(i=>{
+    const reps=Array.isArray(i.reports)?i.reports:[];
+    reps.forEach(rep=>{
+      const d=rep?.data||{};
+      add({
+        kind:"incident",
+        date:String(rep?.updated_at||d.rDate||i.dispatch_time||i.updated_at||""),
+        title:rep?.report_type==="pcr_neris_v2"?"Patient Care Report":"Fire Incident Report",
+        text:[i.cad,i.type,i.location,i.dispatch_time,JSON.stringify(rep),JSON.stringify(i)].filter(Boolean).join(" "),
+        id:i.cad,reportId:rep?.report_id||"",status:rep?.status||""
+      });
+    });
+  });
+
+  (standalone||[]).forEach(rep=>{
+    const d=rep?.data||{};
+    add({
+      kind:"incident",
+      date:String(rep?.updated_at||d.rDate||rep?.created_at||""),
+      title:rep?.report_type==="pcr_neris_v2"?"Patient Care Report":"Fire Incident Report",
+      text:JSON.stringify(rep),
+      id:"",
+      reportId:rep?.report_id||"",
+      status:rep?.status||"",
+      standalone:true
+    });
+  });
+
+  (ck||[]).forEach(x=>add({
+    kind:"check",date:x.check_date||x.created_at,title:"Apparatus Check · "+(x.apparatus_id||""),
+    text:JSON.stringify(x),id:x.check_id
+  }));
+
+  (ins||[]).forEach(x=>add({
+    kind:"inspection",date:x.inspection_date||x.created_at,title:"Fire Inspection · "+(x.occupancy_name||""),
+    text:JSON.stringify(x),id:x.inspection_id
+  }));
+
+  const normalize=v=>String(v??"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+  const nq=normalize(q);
+  const filtered=rows.filter(x=>{
+    const tx=normalize(x.text);
+    const d=String(x.date||"").slice(0,10);
+    return (!nq||nq.split(/\s+/).every(token=>tx.includes(token)))&&(!from||d>=from)&&(!to||d<=to);
+  }).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).slice(0,limit);
+
+  el.innerHTML=filtered.length?filtered.map(x=>{
+    const date=String(x.date||"").slice(0,10)||"Date not recorded";
+    const status=x.status?'<span class="ml-2 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold">'+esc(String(x.status).replaceAll("_"," "))+'</span>':"";
+    const buttons=x.kind==="incident"&&!x.standalone&&x.id
+      ?'<button type="button" data-cad="'+esc(x.id)+'" data-report-id="'+esc(x.reportId||"")+'" onclick="openSavedReportFromButton(this)" class="bg-slate-950 text-white px-3 py-2 rounded font-bold text-sm">Open</button><button type="button" data-cad="'+esc(x.id)+'" data-report-id="'+esc(x.reportId||"")+'" onclick="downloadIncidentPdf(this.dataset.cad,this.dataset.reportId)" class="bg-blue-700 text-white px-3 py-2 rounded font-bold text-sm">PDF</button><button type="button" data-cad="'+esc(x.id)+'" data-report-id="'+esc(x.reportId||"")+'" onclick="emailIncidentPdf(this.dataset.cad,this.dataset.reportId)" class="bg-emerald-700 text-white px-3 py-2 rounded font-bold text-sm">Email PDF</button>'
+      :"";
+    return '<div class="border rounded-lg p-3 flex flex-wrap justify-between gap-3 items-center"><div><div class="font-bold">'+esc(x.title)+status+'</div><div class="text-sm text-slate-500">'+esc(date)+(x.standalone?' · Standalone saved report':"")+'</div></div><div class="flex flex-wrap gap-2">'+buttons+'</div></div>';
+  }).join(""):'<div class="card p-4 text-sm text-slate-500">No reports matched those criteria.</div>';
+}
+
 async function adminArchivePdf(kind,id,email){
   if(profile?.app_role!=="admin")return alert("Administrator access required.");
   const payload={archiveType:kind,archiveId:id,action:email?"email":"download"};
