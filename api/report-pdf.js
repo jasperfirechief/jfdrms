@@ -117,7 +117,7 @@ export async function makePdf(incident={},reports=[]){
  // Every patient gets a separate page group. No other patient's information is placed on that group.
  for(let i=0;i<patients.length;i++){
    const p=patients[i]||{};
-   top("PATIENT CARE REPORT","Patient "+(i+1)+" • Front page of the JFD paper Patient Care Report. This page group contains information for this patient only.");
+   top("PATIENT CARE REPORT","Patient "+(i+1)+" of "+patients.length+" • Complete JFD Patient Care Report. This report is for this patient only.");
    heading("PATIENT INFORMATION");
    kv("Patient Name",p.name);kv("Date of Birth",date(p.dob));kv("Age",p.age);kv("Sex",p.sex);kv("Patient Address",p.address);kv("Patient Phone",p.phone);
    kv("Incident / CAD",incident.cad||fd.rCad);kv("Incident Date",date(fd.rDate||incident.dispatch_time));kv("Incident Time",time(fd.rDateTime||fd.rDispatch||incident.dispatch_time));kv("Incident Location",fd.rLocation||incident.location);
@@ -149,16 +149,14 @@ export async function makePdf(incident={},reports=[]){
      kv("Risks Explained / Acknowledged",p.risksExplained||p.risksAcknowledged);
      kv("Refusal Date / Time",p.refusalDateTime||p.refusalDate||p.signedAt);
      kv("Provider",p.provider||"JFD RMS user / electronic record");
-     kv("Witness",p.witnessName);
-     kv("Witness Signature",p.witnessSignatureText||p.witnessSignature);
      kv("Minor Patients",Array.isArray(p.minorPatients)?p.minorPatients.map(x=>x.name+" (DOB "+x.dob+")").join(", "):"");
-     const sigs=[["Patient / Guardian Signature",p.signature],["Witness Signature",p.witnessSignature]];
+     const sigs=[["Patient / Guardian Signature",p.signature]];
      for(const [label,dataUrl] of sigs){if(!String(dataUrl||"").startsWith("data:image/png"))continue;try{const bytes=Buffer.from(String(dataUrl).split(",")[1],"base64");const img=await pdf.embedPng(bytes);need(105);page.drawText(label,{x:m,y,font:F.bold,size:8});y-=12;page.drawImage(img,{x:m,y:y-70,width:250,height:70});page.drawRectangle({x:m,y:y-70,width:250,height:70,borderWidth:.5,borderColor:rgb(.6,.6,.6)});y-=82}catch{}}
    }
    heading("NARRATIVE");
    wrap(p.narrative||p.comments||"No narrative entered.",9,13);
    kv("Person Completing Report",p.completedBy||p.reportCompletedBy||p.provider||"JFD RMS user / electronic record");
-   page.drawText("JFD RMS • Patient Care Report • Patient "+(i+1),{x:m,y:38,font:F.reg,size:7,color:rgb(.4,.4,.4)});
+   page.drawText("JFD RMS • Patient Care Report • Patient "+(i+1)+" of "+patients.length,{x:m,y:38,font:F.reg,size:7,color:rgb(.4,.4,.4)});
  }
  if(!patients.length){top("PATIENT CARE REPORT","No patient records were attached to this incident.");kv("Patient Records","None recorded");}
 
