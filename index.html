@@ -196,8 +196,6 @@ function jfdEscapeHtml(value){
   d.textContent=String(value??"");
   return d.innerHTML;
 }
-// Shared HTML escaping helper used by the dynamically-rendered report sections.
-function esc(value){ return jfdEscapeHtml(value); }
 // Searchable report dropdowns for dynamically-rendered Fire/PCR forms.
 const jfdSearchableSelects=()=>{
   const roots=[document.querySelector("#reportModal"),document.querySelector("#incidentReportForm")].filter(Boolean);
