@@ -319,13 +319,14 @@ function jfdEscapeHtml(value){
     input.type="text";
     input.autocomplete="off";
     input.spellcheck=false;
-    input.className="w-full border rounded-lg p-2 bg-white";
+    input.className="jfd-report-select-input w-full border rounded-lg p-2 bg-white";
     input.placeholder="Select...";
     input.setAttribute("role","combobox");
     input.setAttribute("aria-autocomplete","list");
     input.setAttribute("aria-expanded","false");
     input.setAttribute("aria-controls","jfdReportSelectMenu");
     input.value=selectedText(sel);
+    input._jfdSelect=sel;
 
     input.addEventListener("focus",()=>openFor(sel,input));
     input.addEventListener("click",()=>openFor(sel,input));
