@@ -239,7 +239,9 @@ function jfdEscapeHtml(value){
   }
 
   function selectedText(sel){
-    return sel?.options?.[sel.selectedIndex]?.textContent||"";
+    const opt=sel?.options?.[sel.selectedIndex];
+    if(!opt || opt.value==="") return "";
+    return opt.textContent||"";
   }
 
   function positionMenu(){
