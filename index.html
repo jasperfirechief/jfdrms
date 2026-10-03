@@ -196,15 +196,125 @@ function jfdEscapeHtml(value){
   d.textContent=String(value??"");
   return d.innerHTML;
 }
-// Searchable report dropdowns for dynamically-rendered Fire/PCR forms.
-// Full list opens on focus/click. Typing filters the list in the same field.
-// The hidden native select remains the source of truth for the RMS.
-const jfdSearchableSelects=()=>{
-  const roots=[document.querySelector("#reportModal"),document.querySelector("#incidentReportForm")].filter(Boolean);
-  roots.forEach(root=>root.querySelectorAll('select:not([multiple]):not([data-jfd-search-upgraded])').forEach(sel=>{
+
+/*
+ * JFD report searchable selects
+ * -----------------------------
+ * Every single-choice <select> inside a Fire Incident Report or PCR gets one
+ * visible text field. The real <select> remains hidden and is the source of
+ * truth for collection, validation, saving, PDF generation, and NERIS.
+ *
+ * UX:
+ *   - Focus/click: show the COMPLETE option list.
+ *   - Type: filter that same list immediately.
+ *   - Delete the search text: restore the COMPLETE list.
+ *   - Choose an option: update the real select and fire its normal change event.
+ *
+ * This is deliberately implemented as one shared dropdown menu rather than
+ * one menu/listener per select. That avoids clipped menus, stale menus, and
+ * listener accumulation when PCR patients or repeat sections are re-rendered.
+ */
+(function(){
+  let activeSelect=null;
+  let activeInput=null;
+  let activeOptions=[];
+  let activeIndex=-1;
+  let menu=null;
+
+  function ensureMenu(){
+    if(menu)return menu;
+    menu=document.createElement("div");
+    menu.id="jfdReportSelectMenu";
+    menu.className="hidden fixed z-[100000] max-h-72 overflow-y-auto rounded-lg border border-slate-300 bg-white shadow-2xl";
+    menu.setAttribute("role","listbox");
+    document.body.appendChild(menu);
+    return menu;
+  }
+
+  function isReportSelect(sel){
+    if(!sel || sel.multiple)return false;
+    const form=sel.closest("#incidentReportForm");
+    const modal=sel.closest("#reportModal");
+    return !!(form||modal);
+  }
+
+  function selectedText(sel){
+    return sel?.options?.[sel.selectedIndex]?.textContent||"";
+  }
+
+  function positionMenu(){
+    if(!menu||menu.classList.contains("hidden")||!activeInput)return;
+    const r=activeInput.getBoundingClientRect();
+    const viewportH=window.innerHeight||document.documentElement.clientHeight;
+    const spaceBelow=viewportH-r.bottom-8;
+    const maxH=Math.max(120,Math.min(288,spaceBelow));
+    menu.style.left=Math.max(4,r.left)+"px";
+    menu.style.width=Math.min(r.width,Math.max(120,(window.innerWidth||document.documentElement.clientWidth)-Math.max(4,r.left)-4))+"px";
+    menu.style.maxHeight=maxH+"px";
+    menu.style.top=(r.bottom+4)+"px";
+  }
+
+  function closeMenu(restore=true){
+    if(!menu)return;
+    if(restore&&activeSelect&&activeInput)activeInput.value=selectedText(activeSelect);
+    menu.classList.add("hidden");
+    activeInput?.setAttribute("aria-expanded","false");
+    activeSelect=null;
+    activeInput=null;
+    activeOptions=[];
+    activeIndex=-1;
+  }
+
+  function chooseOption(index){
+    if(!activeSelect||!activeInput||!activeOptions[index])return;
+    const opt=activeOptions[index];
+    activeSelect.value=opt.value;
+    activeInput.value=selectedText(activeSelect);
+    activeSelect.dispatchEvent(new Event("change",{bubbles:true}));
+    closeMenu(false);
+    activeInput?.focus();
+  }
+
+  function renderMenu(){
+    const m=ensureMenu();
+    if(!activeSelect||!activeInput)return;
+    const q=String(activeInput.value||"").trim().toLowerCase();
+    activeOptions=[...activeSelect.options].filter(o=>{
+      if(o.disabled)return false;
+      if(!q)return true;
+      return String(o.textContent||"").toLowerCase().includes(q) ||
+             String(o.value||"").toLowerCase().includes(q);
+    });
+    activeIndex=-1;
+    m.innerHTML=activeOptions.length
+      ?activeOptions.map((o,i)=>
+        '<button type="button" tabindex="-1" role="option" data-jfd-report-option="'+i+
+        '" class="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 focus:bg-slate-100">'+
+        jfdEscapeHtml(o.textContent||"")+'</button>').join("")
+      :'<div class="px-3 py-2 text-sm text-slate-500">No matches</div>';
+
+    positionMenu();
+  }
+
+  function openFor(sel,input){
+    if(!isReportSelect(sel))return;
+    activeSelect=sel;
+    activeInput=input;
+    input.setAttribute("aria-expanded","true");
+    input.value=selectedText(sel);
+    input.select();
+    renderMenu();
+    ensureMenu().classList.remove("hidden");
+    positionMenu();
+  }
+
+  function upgradeSelect(sel){
+    if(!isReportSelect(sel)||sel.dataset.jfdSearchUpgraded==="1")return;
     sel.dataset.jfdSearchUpgraded="1";
+
     const shell=document.createElement("div");
     shell.className="relative w-full mt-1";
+
     const input=document.createElement("input");
     input.type="text";
     input.autocomplete="off";
@@ -214,89 +324,106 @@ const jfdSearchableSelects=()=>{
     input.setAttribute("role","combobox");
     input.setAttribute("aria-autocomplete","list");
     input.setAttribute("aria-expanded","false");
-    const menu=document.createElement("div");
-    menu.className="hidden fixed z-[100000] max-h-72 overflow-y-auto rounded-lg border border-slate-300 bg-white shadow-2xl";
-    document.body.appendChild(menu);
+    input.setAttribute("aria-controls","jfdReportSelectMenu");
+    input.value=selectedText(sel);
 
-    const selected=()=>sel.options[sel.selectedIndex]?.textContent||"";
-    let active=-1;
-
-    const position=()=>{
-      if(menu.classList.contains("hidden"))return;
-      const r=input.getBoundingClientRect();
-      menu.style.left=r.left+"px";
-      menu.style.top=(r.bottom+4)+"px";
-      menu.style.width=r.width+"px";
-    };
-    const close=()=>{
-      menu.classList.add("hidden");
-      input.setAttribute("aria-expanded","false");
-      active=-1;
-    };
-    const render=()=>{
-      const q=String(input.value||"").trim().toLowerCase();
-      const opts=[...sel.options].filter(o=>!o.disabled&&(!q||String(o.textContent||"").toLowerCase().includes(q)||String(o.value||"").toLowerCase().includes(q)));
-      menu.innerHTML=opts.length
-        ?opts.map((o,i)=>'<button type="button" tabindex="-1" data-jfd-option-index="'+i+'" data-jfd-option-value="'+jfdEscapeHtml(o.value)+'" class="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100 focus:bg-slate-100">'+jfdEscapeHtml(o.textContent||"")+'</button>').join("")
-        :'<div class="px-3 py-2 text-sm text-slate-500">No matches</div>';
-      menu.querySelectorAll("[data-jfd-option-value]").forEach(btn=>{
-        btn.addEventListener("mousedown",e=>{
-          e.preventDefault();
-          const value=btn.getAttribute("data-jfd-option-value")||"";
-          sel.value=value;
-          input.value=selected();
-          sel.dispatchEvent(new Event("change",{bubbles:true}));
-          close();
-          input.focus();
-        });
-      });
-      active=-1;
-      position();
-    };
-    const open=()=>{
-      input.setAttribute("aria-expanded","true");
-      render();
-      menu.classList.remove("hidden");
-      position();
-    };
-    const move=(delta)=>{
-      const buttons=[...menu.querySelectorAll("[data-jfd-option-value]")];
-      if(!buttons.length)return;
-      active=Math.max(0,Math.min(buttons.length-1,active+delta));
-      buttons.forEach((b,i)=>b.classList.toggle("bg-slate-100",i===active));
-      buttons[active]?.scrollIntoView({block:"nearest"});
-    };
-
-    input.value=selected();
-    input.addEventListener("focus",()=>{input.select();open();});
-    input.addEventListener("click",()=>{input.select();open();});
-    input.addEventListener("input",()=>{open();});
-    input.addEventListener("keydown",e=>{
-      if(e.key==="ArrowDown"){e.preventDefault();move(1);}
-      else if(e.key==="ArrowUp"){e.preventDefault();move(-1);}
-      else if(e.key==="Enter"){
-        const buttons=[...menu.querySelectorAll("[data-jfd-option-value]")];
-        if(active>=0&&buttons[active]){e.preventDefault();buttons[active].click();}
-        else if(buttons[0]){e.preventDefault();buttons[0].click();}
-      }else if(e.key==="Escape"){e.preventDefault();input.value=selected();close();}
+    input.addEventListener("focus",()=>openFor(sel,input));
+    input.addEventListener("click",()=>openFor(sel,input));
+    input.addEventListener("input",()=>{
+      if(activeSelect!==sel||activeInput!==input)openFor(sel,input);
+      else{
+        ensureMenu().classList.remove("hidden");
+        input.setAttribute("aria-expanded","true");
+        renderMenu();
+      }
     });
-    input.addEventListener("blur",()=>setTimeout(()=>{input.value=selected();close();},150));
-    sel.addEventListener("change",()=>{input.value=selected();});
-    window.addEventListener("resize",position);
-    window.addEventListener("scroll",position,true);
+    input.addEventListener("keydown",e=>{
+      if(e.key==="Escape"){
+        e.preventDefault();
+        input.value=selectedText(sel);
+        closeMenu(false);
+        return;
+      }
+      if(activeSelect!==sel||activeInput!==input){
+        if(e.key==="ArrowDown"||e.key==="Enter"){
+          e.preventDefault();
+          openFor(sel,input);
+        }
+        return;
+      }
+      if(e.key==="ArrowDown"){
+        e.preventDefault();
+        if(activeOptions.length)activeIndex=Math.min(activeOptions.length-1,activeIndex+1);
+      }else if(e.key==="ArrowUp"){
+        e.preventDefault();
+        if(activeOptions.length)activeIndex=Math.max(0,activeIndex-1);
+      }else if(e.key==="Enter"){
+        if(activeOptions.length){
+          e.preventDefault();
+          chooseOption(activeIndex>=0?activeIndex:0);
+        }
+      }
+      const buttons=[...ensureMenu().querySelectorAll("[data-jfd-report-option]")];
+      buttons.forEach((b,i)=>b.classList.toggle("bg-slate-100",i===activeIndex));
+      if(activeIndex>=0)buttons[activeIndex]?.scrollIntoView({block:"nearest"});
+    });
+    input.addEventListener("blur",()=>setTimeout(()=>{
+      if(activeInput===input)closeMenu(true);
+    },200));
+
+    sel.addEventListener("change",()=>{
+      input.value=selectedText(sel);
+      if(activeSelect===sel)renderMenu();
+    });
 
     shell.appendChild(input);
     sel.parentNode.insertBefore(shell,sel);
+
     sel.style.position="absolute";
     sel.style.opacity="0";
     sel.style.width="1px";
     sel.style.height="1px";
     sel.style.pointerEvents="none";
     sel.tabIndex=-1;
-  }));
-};
-const jfdSelectObserver=new MutationObserver(jfdSearchableSelects);
-document.addEventListener("DOMContentLoaded",()=>{jfdSearchableSelects();jfdSelectObserver.observe(document.body,{childList:true,subtree:true});});
+  }
+
+  function scan(){
+    const roots=[
+      document.querySelector("#incidentReportForm"),
+      document.querySelector("#reportModal")
+    ].filter(Boolean);
+    roots.forEach(root=>{
+      root.querySelectorAll("select:not([multiple]):not([data-jfd-search-upgraded])").forEach(upgradeSelect);
+    });
+  }
+
+  document.addEventListener("pointerdown",e=>{
+    const option=e.target.closest?.("[data-jfd-report-option]");
+    if(option&&menu&&!menu.classList.contains("hidden")){
+      e.preventDefault();
+      e.stopPropagation();
+      chooseOption(Number(option.dataset.jfdReportOption));
+      return;
+    }
+    if(activeSelect&&activeInput&&!e.target.closest("#jfdReportSelectMenu")&&!e.target.closest(".jfd-report-select-input")){
+      closeMenu(true);
+    }
+  },true);
+
+  document.addEventListener("focusin",e=>{
+    const input=e.target.closest?.(".jfd-report-select-input");
+    if(input&&input._jfdSelect)openFor(input._jfdSelect,input);
+  });
+
+  // Mark the visible inputs so outside-click handling can distinguish them.
+  const observer=new MutationObserver(scan);
+  document.addEventListener("DOMContentLoaded",()=>{
+    scan();
+    observer.observe(document.body,{childList:true,subtree:true});
+    window.addEventListener("resize",positionMenu);
+    window.addEventListener("scroll",positionMenu,true);
+  });
+})(); 
 
 document.addEventListener("DOMContentLoaded",()=>{jfdUpgradeAllDateTimeInputs();jfdTimeObserver.observe(document.body,{childList:true,subtree:true})});
 const today=()=>{const p=jfdCentralParts(new Date());return p?p.year+"-"+p.month+"-"+p.day:""};
