@@ -1122,25 +1122,23 @@ function bindUnassignedCrew(el){
   });
 }
 function toggleUnassignedReportApparatus(id,checked){
-  const box=$("reportResponseUnits");if(!box)return;
-  const existing=box.querySelector('.report-response-unit[data-apparatus-id="'+Number(id)+'"]');
+  const host=$("reportUnassignedCrewSelections"),responseBox=$("reportResponseUnits");if(!host||!responseBox)return;
+  const existing=document.querySelector('.report-response-unit[data-apparatus-id="'+Number(id)+'"][data-unassigned="true"]');
   if(checked&&!existing){
     const ap=reportApparatusById(id);if(!ap)return;
-    box.querySelector("p")?.remove();
     const row=document.createElement("div");
     row.innerHTML=reportResponseUnitRow({apparatus_id:Number(id),unit_number_snapshot:ap.unit_number,station_snapshot:"Unassigned Apparatus",crew_snapshot:[],unassigned:true,dispatch_time:$("rDispatch")?.value||"",enroute_time:"",on_scene_time:"",cancelled_time:"",in_service_time:""});
     const rowEl=row.firstElementChild;
     rowEl.dataset.unassigned="true";
-    box.appendChild(rowEl);
-    const el=rowEl;
-    syncReportUnitTimes(el);bindUnassignedCrew(el);
+    host.appendChild(rowEl);
+    syncReportUnitTimes(rowEl);bindUnassignedCrew(rowEl);
     const detail=$("reportUnassignedApparatusDetails");
     if(detail)detail.setAttribute("open","");
-    setTimeout(()=>el.scrollIntoView({behavior:"smooth",block:"nearest"}),0);
+    setTimeout(()=>rowEl.scrollIntoView({behavior:"smooth",block:"nearest"}),0);
   }else if(!checked&&existing){
     existing.remove();
-    if(!box.querySelector(".report-response-unit"))box.innerHTML='<p class="text-sm text-slate-500">Select responding apparatus above.</p>';
   }
+  if(!responseBox.querySelector(".report-response-unit")&&!host.querySelector(".report-response-unit"))responseBox.innerHTML='<p class="text-sm text-slate-500">Select responding apparatus above.</p>';
   updateUnassignedReportApparatusCount();
 }
 function finishReportUnassignedApparatusSelection(){
