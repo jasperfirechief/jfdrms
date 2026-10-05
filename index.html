@@ -507,7 +507,15 @@ async function savePersonnel(){
   if(password||data.role==="admin"||!id){
     const login=await db.functions.invoke("provision-personnel-login",{body:{personnel_id:personnelId,email:data.email,password,role:data.role}});
     if(login.error||login.data?.error){
-      return alert("Personnel was saved, but the login could not be created/updated: "+(login.data?.error||login.error?.message||"Unknown error"));
+      let loginError=login.data?.error||"";
+      if(!loginError && login.error?.context){
+        try{
+          const body=await login.error.context.clone().json();
+          loginError=body?.error||body?.message||"";
+        }catch(_){}
+      }
+      if(!loginError)loginError=login.error?.message||"Unknown error";
+      return alert("Personnel was saved, but the login could not be created/updated: "+loginError);
     }
   }
   closePersonnelForm();await loadAdminData();renderAdmin();
