@@ -1029,14 +1029,11 @@ function renderUnassignedCrewSelect(crew=[]){
 }
 function reportResponseSection(unitRows=[]){
   const selected=new Set();
-  const normal=apparatus.filter(a=>a.active!==false&&!/^JF-[123]$/i.test(String(a.unit_number||""))).sort((a,b)=>String(a.unit_number||"").localeCompare(String(b.unit_number||"")));
-  const normalOptions=normal.map(a=>{
-    const stationName=(stations.find(s=>Number(s.station_id)===Number(a.station_id))||{}).station_name||"";
-    return '<label class="flex items-center gap-2 border rounded-lg p-2 bg-white text-sm"><input type="checkbox" data-report-apparatus-check="'+Number(a.apparatus_id)+'" onchange="toggleReportApparatus('+Number(a.apparatus_id)+',this.checked)" class="h-4 w-4"><span class="font-semibold">'+esc(a.unit_number||"Apparatus")+'<span class="text-xs text-slate-500"> · '+esc(a.apparatus_type||"")+(stationName?" · "+esc(stationName):"")+'</span></span></label>';
-  }).join("");
-  const fixedOptions=JFD_FIXED_RESPONSE_UNITS.map(a=>'<label class="flex items-center gap-2 border-2 border-red-200 rounded-lg p-2 bg-white text-sm"><input type="checkbox" data-report-apparatus-check="'+Number(a.apparatus_id)+'" onchange="toggleReportApparatus('+Number(a.apparatus_id)+',this.checked)" class="h-4 w-4"><span class="font-black">'+a.unit_number+'</span><span class="text-xs text-slate-500"> · Crew '+a.unit_number+'</span></label>').join("");
-  setTimeout(()=>document.querySelectorAll(".report-response-unit").forEach(syncReportUnitTimes),0);setTimeout(()=>loadUnassignedReportApparatus(),0);
-  return '<section class="border rounded-xl p-4 bg-slate-50 md:col-span-2"><h3 class="font-black text-lg mb-1">Responding Apparatus</h3><p class="text-xs text-slate-500 mb-3">Select every department apparatus that responded. Dispatch time is pre-populated from CAD and is editable. En Route and On Scene are optional; each responding unit must have Dispatch and either Cancelled or In Service.</p><details id="reportApparatusDetails" class="border rounded-xl bg-white"><summary class="cursor-pointer list-none p-3 font-bold flex justify-between"><span>Select Responding Apparatus</span><span id="reportApparatusCount" class="text-xs text-slate-500">'+selected.size+' selected</span></summary><div class="border-t p-3"><div class="grid md:grid-cols-2 gap-2">'+(normalOptions||'<p class="text-sm text-slate-500">No shift-assigned apparatus available.</p>')+'</div><div class="mt-4 pt-4 border-t"><div class="text-xs font-black uppercase tracking-wide text-slate-500 mb-2">Always Available</div><div class="grid md:grid-cols-3 gap-2">'+fixedOptions+'</div></div><button type="button" onclick="finishReportApparatusSelection()" class="mt-3 px-4 py-2 rounded-lg bg-slate-800 text-white font-bold text-sm">Finish</button></div></details><div id="reportResponseUnits" class="space-y-3 mt-4"><p class="text-sm text-slate-500">Select responding apparatus above.</p></div><details id="reportUnassignedApparatusDetails" class="border rounded-xl bg-white mt-3"><summary class="cursor-pointer list-none p-3 font-bold flex justify-between"><span>Unassigned Apparatus</span><span id="reportUnassignedCount" class="text-xs text-slate-500">0 selected</span></summary><div class="border-t p-3"><p class="text-xs text-slate-500 mb-3">Select any department apparatus that does not have a crew assigned for this shift. Each selected apparatus will have its own crew selection.</p><div id="reportUnassignedApparatusList" class="grid md:grid-cols-2 gap-2"><p class="text-sm text-slate-500">Loading unassigned apparatus...</p></div><button type="button" onclick="finishReportUnassignedApparatusSelection()" class="mt-3 px-4 py-2 rounded-lg bg-slate-800 text-white font-bold text-sm">Finish</button></div></details><div class="mt-5 border-t pt-4"><div id="reportOffDutyPersonnel">'+renderOffDutyPersonnel([])+'</div></div></section>'
+  const placeholder='<p class="text-sm text-slate-500">Loading shift-assigned apparatus...</p>';
+  setTimeout(()=>{loadShiftAssignedReportApparatus().catch(e=>console.error("Report apparatus assignment load failed",e));},0);
+  setTimeout(()=>{loadUnassignedReportApparatus().catch(e=>console.error("Unassigned apparatus load failed",e));},0);
+  setTimeout(()=>document.querySelectorAll(".report-response-unit").forEach(syncReportUnitTimes),0);
+  return '<section class="border rounded-xl p-4 bg-slate-50 md:col-span-2"><h3 class="font-black text-lg mb-1">Responding Apparatus</h3><p class="text-xs text-slate-500 mb-3">Only apparatus with personnel assigned in Daily Staffing for this incident date appears in the main response list. Unassigned apparatus is available separately for incident-specific crew assignment. Dispatch time is pre-populated from CAD.</p><details id="reportApparatusDetails" class="border rounded-xl bg-white" open><summary class="cursor-pointer list-none p-3 font-bold flex justify-between"><span>Select Responding Apparatus</span><span id="reportApparatusCount" class="text-xs text-slate-500">0 selected</span></summary><div class="border-t p-3"><div id="reportMainResponseApparatusList" class="grid md:grid-cols-2 gap-2">'+placeholder+'</div><button type="button" onclick="finishReportApparatusSelection()" class="mt-3 px-4 py-2 rounded-lg bg-slate-800 text-white font-bold text-sm">Finish</button></div></details><div id="reportResponseUnits" class="space-y-3 mt-4"><p class="text-sm text-slate-500">Select responding apparatus above.</p></div><details id="reportUnassignedApparatusDetails" class="border rounded-xl bg-white mt-3"><summary class="cursor-pointer list-none p-3 font-bold flex justify-between"><span>Unassigned Apparatus</span><span id="reportUnassignedCount" class="text-xs text-slate-500">0 selected</span></summary><div class="border-t p-3"><p class="text-xs text-slate-500 mb-3">Only department apparatus with no personnel assigned in Daily Staffing for this shift is shown here. Each selected apparatus gets its own incident-specific crew selection.</p><div id="reportUnassignedApparatusList" class="grid md:grid-cols-2 gap-2"><p class="text-sm text-slate-500">Loading unassigned apparatus...</p></div><button type="button" onclick="finishReportUnassignedApparatusSelection()" class="mt-3 px-4 py-2 rounded-lg bg-slate-800 text-white font-bold text-sm">Finish</button></div></details><div class="mt-5 border-t pt-4"><div id="reportOffDutyPersonnel">'+renderOffDutyPersonnel([])+'</div></div></section>';
 }
 function reportResponseUnitRow(u){
   const apId=Number(u.apparatus_id||0),ap=reportApparatusById(apId),crew=Array.isArray(u.crew_snapshot)?u.crew_snapshot:(Array.isArray(u.crew)?u.crew:[]);
@@ -1050,19 +1047,37 @@ function reportResponseUnitRow(u){
   const crewHtml=isUnassigned?renderUnassignedCrewSelect(crew):'<div class="text-xs mt-2"><b>Crew:</b> <span data-report-crew-label>'+esc(reportCrewLabel(crew))+'</span></div>';
   return '<div class="report-response-unit border rounded-xl p-3 bg-white" data-report-response-selected="true" data-apparatus-id="'+apId+'" data-crew="'+esc(JSON.stringify(crew))+'" data-unassigned="'+(isUnassigned?'true':'false')+'"><div class="flex justify-between gap-3 items-start"><div><b>'+esc(unitName)+'</b><div class="text-xs text-slate-500">'+(isUnassigned?'Unassigned Apparatus':esc(u.station_snapshot||""))+'</div></div><button type="button" onclick="removeReportApparatus('+apId+')" class="text-red-600 font-bold text-sm">Remove</button></div>'+crewHtml+'<p class="text-xs font-bold text-red-700 mt-3">Military time required. Dispatch is pre-populated from CAD and remains editable.</p><div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-2">'+event("Dispatch","dispatch",di,true)+event("En Route","enroute",en,false)+event("On Scene","on_scene",on,false)+event("Cancelled","cancelled",ca,false)+event("In Service","in_service",cl,false)+'</div></div>';
 }
+async function loadShiftReportAssignments(date){
+  const staff=await db.from("daily_staffing").select("staffing_id").eq("staffing_date",date).eq("shift","daily").maybeSingle();
+  if(staff.error)throw staff.error;
+  if(!staff.data)return [];
+  const q=await db.from("daily_app_assignments").select("assignment_id,station_id,apparatus_id,daily_personnel_assignments(personnel_id,assignment_role,personnel(id,first_name,last_name,role,shift))").eq("staffing_id",staff.data.staffing_id);
+  if(q.error)throw q.error;
+  return q.data||[];
+}
+async function loadShiftAssignedReportApparatus(){
+  const box=$("reportMainResponseApparatusList");if(!box)return;
+  const date=$("rDate")?.value||today();
+  const assignments=await loadShiftReportAssignments(date);
+  const assigned=assignments.filter(a=>(a.daily_personnel_assignments||[]).length>0);
+  const byId=new Map(assigned.map(a=>[Number(a.apparatus_id),a]));
+  const normal=apparatus.filter(a=>a.active!==false&&byId.has(Number(a.apparatus_id))).sort((a,b)=>String(a.unit_number||"").localeCompare(String(b.unit_number||"")));
+  if(!normal.length){box.innerHTML='<p class="text-sm text-slate-500">No apparatus with personnel assigned for this shift.</p>';return;}
+  box.innerHTML=normal.map(a=>{
+    const stationName=(stations.find(s=>Number(s.station_id)===Number(a.station_id))||{}).station_name||"";
+    const assignment=byId.get(Number(a.apparatus_id));
+    const crew=(assignment?.daily_personnel_assignments||[]).map(p=>({id:Number(p.personnel_id),name:(p.personnel?.first_name||"")+" "+(p.personnel?.last_name||""),role:p.assignment_role||p.personnel?.role||""}));
+    return '<label class="flex items-center gap-2 border rounded-lg p-2 bg-white text-sm"><input type="checkbox" data-report-apparatus-check="'+Number(a.apparatus_id)+'" onchange="toggleReportApparatus('+Number(a.apparatus_id)+',this.checked)" class="h-4 w-4"><span class="font-semibold">'+esc(a.unit_number||"Apparatus")+'<span class="text-xs text-slate-500"> · '+esc(a.apparatus_type||"")+(stationName?" · "+esc(stationName):"")+'</span><span class="block text-xs text-slate-600">'+esc(reportCrewLabel(crew))+'</span></span></label>';
+  }).join("");
+}
 async function loadUnassignedReportApparatus(){
   const list=$("reportUnassignedApparatusList");if(!list)return;
   const date=$("rDate")?.value||today();
-  let crewAssignedIds=new Set();
-  try{
-    const staff=await db.from("daily_staffing").select("staffing_id").eq("staffing_date",date).eq("shift","daily").maybeSingle();
-    if(!staff.error&&staff.data){
-      const q=await db.from("daily_app_assignments").select("apparatus_id,daily_personnel_assignments(personnel_id)").eq("staffing_id",staff.data.staffing_id);
-      if(!q.error)(q.data||[]).forEach(a=>{if((a.daily_personnel_assignments||[]).length)crewAssignedIds.add(Number(a.apparatus_id));});
-    }
-  }catch(e){}
-  const active=apparatus.filter(a=>a.active!==false&&!/^JF-[123]$/i.test(String(a.unit_number||""))&&!crewAssignedIds.has(Number(a.apparatus_id))).sort((a,b)=>String(a.unit_number||"").localeCompare(String(b.unit_number||"")));
-  if(!active.length){list.innerHTML='<p class="text-sm text-slate-500">No apparatus without an assigned crew available.</p>';updateUnassignedReportApparatusCount();return;}
+  let assignments=[];
+  try{assignments=await loadShiftReportAssignments(date)}catch(e){console.error(e)}
+  const crewAssignedIds=new Set(assignments.filter(a=>(a.daily_personnel_assignments||[]).length>0).map(a=>Number(a.apparatus_id)));
+  const active=apparatus.filter(a=>a.active!==false&&!crewAssignedIds.has(Number(a.apparatus_id))).sort((a,b)=>String(a.unit_number||"").localeCompare(String(b.unit_number||"")));
+  if(!active.length){list.innerHTML='<p class="text-sm text-slate-500">No apparatus without assigned personnel available.</p>';updateUnassignedReportApparatusCount();return;}
   const selected=new Set([...document.querySelectorAll('[data-report-unassigned-apparatus]:checked')].map(x=>Number(x.value)));
   list.innerHTML=active.map(a=>{
     const checked=selected.has(Number(a.apparatus_id))||!!document.querySelector('.report-response-unit[data-apparatus-id="'+Number(a.apparatus_id)+'"][data-unassigned="true"]');
