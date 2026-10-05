@@ -2051,6 +2051,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
         const raw=input?.value||"";
         const time=jfdParseTime24(raw);
         if(time) times[k]=date?date+"T"+time:time;
+        else if(String(raw).trim()) times[k]=date?date+"T"+String(raw).trim():String(raw).trim();
       });
       let crew=[];
       try{crew=JSON.parse(row.dataset.crew||"[]")}catch{}
