@@ -958,26 +958,57 @@ function reportInput(id,label,value="",type="text",required=false,cls=""){return
 function reportSelect(id,label,opts,value="",required=false,cls=""){let list;if(Array.isArray(opts))list=opts;else if(opts&&typeof opts[Symbol.iterator]==="function"&&typeof opts!=="string")list=Array.from(opts);else if(opts&&typeof opts==="object")list=Object.values(opts);else list=opts==null||opts===""?[]:[opts];return '<label class="text-sm font-semibold '+cls+'">'+label+(required?' *':'')+'<select id="'+id+'" '+(required?'required':'')+' class="w-full border rounded-lg p-2 mt-1 bg-white"><option value="">Select...</option>'+list.map(o=>'<option value="'+esc(o)+'" '+(String(o)===String(value)?'selected':'')+'>'+esc(o)+'</option>').join("")+'</select></label>'}
 function reportArea(id,label,value="",cls=""){return '<label class="text-sm font-semibold '+cls+'">'+label+'<textarea id="'+id+'" rows="4" class="w-full border rounded-lg p-2 mt-1">'+esc(value??"")+'</textarea></label>'}
 function reportSection(title,body){return '<section class="border rounded-xl p-4 bg-slate-50"><h3 class="font-black text-lg mb-3">'+title+'</h3><div class="grid md:grid-cols-2 gap-3">'+body+'</div></section>'}
+const JFD_FIXED_RESPONSE_UNITS=[{apparatus_id:-1,unit_number:"JF-1",crew:[{name:"JF-1",role:"Crew"}]},{apparatus_id:-2,unit_number:"JF-2",crew:[{name:"JF-2",role:"Crew"}]},{apparatus_id:-3,unit_number:"JF-3",crew:[{name:"JF-3",role:"Crew"}]}];
+function reportApparatusById(id){
+  const n=Number(id);
+  return apparatus.find(a=>Number(a.apparatus_id)===n)||JFD_FIXED_RESPONSE_UNITS.find(a=>Number(a.apparatus_id)===n)||null;
+}
+function reportCrewLabel(crew){
+  const c=Array.isArray(crew)?crew:[];
+  return c.map(x=>x?.name||"").filter(Boolean).join(", ")||"Crew not assigned";
+}
+function renderUnassignedCrewSelect(crew=[]){
+  const chosen=new Set((crew||[]).map(x=>Number(x?.id)).filter(Number.isFinite));
+  const opts=personnel.filter(p=>p.active!==false).sort((a,b)=>(a.last_name||"").localeCompare(b.last_name||"")).map(p=>'<option value="'+Number(p.id)+'" '+(chosen.has(Number(p.id))?'selected':'')+'>'+esc((p.first_name||"")+" "+(p.last_name||""))+'</option>').join("");
+  return '<label class="text-xs font-bold block mt-3">Crew <span class="text-slate-500 font-normal">Select personnel in response</span><select multiple size="5" data-unassigned-crew class="w-full border rounded p-2 mt-1 bg-white">'+(opts||'<option disabled>No active personnel available</option>')+'</select></label>';
+}
 function reportResponseSection(unitRows=[]){
   const selected=new Set();
-  const options=apparatus.filter(a=>a.active!==false).sort((a,b)=>String(a.unit_number||"").localeCompare(String(b.unit_number||""))).map(a=>{
+  const normal=apparatus.filter(a=>a.active!==false&&!/^JF-[123]$/i.test(String(a.unit_number||""))).sort((a,b)=>String(a.unit_number||"").localeCompare(String(b.unit_number||"")));
+  const normalOptions=normal.map(a=>{
     const stationName=(stations.find(s=>Number(s.station_id)===Number(a.station_id))||{}).station_name||"";
-    return '<label class="flex items-center gap-2 border rounded-lg p-2 bg-white text-sm"><input type="checkbox" data-report-apparatus-check="'+Number(a.apparatus_id)+'" '+(selected.has(Number(a.apparatus_id))?'checked':'')+' onchange="toggleReportApparatus('+Number(a.apparatus_id)+',this.checked)" class="h-4 w-4"><span class="font-semibold">'+esc(a.unit_number||"Apparatus")+'<span class="text-xs text-slate-500"> · '+esc(a.apparatus_type||"")+(stationName?" · "+esc(stationName):"")+'</span></span></label>'
+    return '<label class="flex items-center gap-2 border rounded-lg p-2 bg-white text-sm"><input type="checkbox" data-report-apparatus-check="'+Number(a.apparatus_id)+'" onchange="toggleReportApparatus('+Number(a.apparatus_id)+',this.checked)" class="h-4 w-4"><span class="font-semibold">'+esc(a.unit_number||"Apparatus")+'<span class="text-xs text-slate-500"> · '+esc(a.apparatus_type||"")+(stationName?" · "+esc(stationName):"")+'</span></span></label>';
   }).join("");
-  // CAD/Active911 incident_units are dispatch snapshots only. They must never create responding-apparatus rows.
-  // Responding apparatus is selected manually from the department apparatus list below.
-  const existingRows="";
+  const fixedOptions=JFD_FIXED_RESPONSE_UNITS.map(a=>'<label class="flex items-center gap-2 border-2 border-red-200 rounded-lg p-2 bg-white text-sm"><input type="checkbox" data-report-apparatus-check="'+Number(a.apparatus_id)+'" onchange="toggleReportApparatus('+Number(a.apparatus_id)+',this.checked)" class="h-4 w-4"><span class="font-black">'+a.unit_number+'</span><span class="text-xs text-slate-500"> · Crew '+a.unit_number+'</span></label>').join("");
   setTimeout(()=>document.querySelectorAll(".report-response-unit").forEach(syncReportUnitTimes),0);
-  return '<section class="border rounded-xl p-4 bg-slate-50 md:col-span-2"><h3 class="font-black text-lg mb-1">Responding Apparatus</h3><p class="text-xs text-slate-500 mb-3">Select every department apparatus that responded. Personnel assigned to those apparatus are tracked automatically from Daily Staffing for NERIS.</p><details id="reportApparatusDetails" class="border rounded-xl bg-white"><summary class="cursor-pointer list-none p-3 font-bold flex justify-between"><span>Select Responding Apparatus</span><span id="reportApparatusCount" class="text-xs text-slate-500">'+selected.size+' selected</span></summary><div class="border-t p-3"><div class="grid md:grid-cols-2 gap-2">'+(options||'<p class="text-sm text-slate-500">No active apparatus available.</p>')+'</div><button type="button" onclick="finishReportApparatusSelection()" class="mt-3 px-4 py-2 rounded-lg bg-slate-800 text-white font-bold text-sm">Finish</button></div></details><div id="reportResponseUnits" class="space-y-3 mt-4">'+(existingRows||'<p class="text-sm text-slate-500">No apparatus selected yet.</p>')+'</div><div class="mt-5 border-t pt-4"><div id="reportOffDutyPersonnel">'+renderOffDutyPersonnel([])+'</div></div></section>'
+  return '<section class="border rounded-xl p-4 bg-slate-50 md:col-span-2"><h3 class="font-black text-lg mb-1">Responding Apparatus</h3><p class="text-xs text-slate-500 mb-3">Select every department apparatus that responded. Dispatch time is pre-populated from CAD and is editable. En Route and On Scene are optional; each responding unit must have Dispatch and either Cancelled or In Service.</p><details id="reportApparatusDetails" class="border rounded-xl bg-white"><summary class="cursor-pointer list-none p-3 font-bold flex justify-between"><span>Select Responding Apparatus</span><span id="reportApparatusCount" class="text-xs text-slate-500">'+selected.size+' selected</span></summary><div class="border-t p-3"><div class="grid md:grid-cols-2 gap-2">'+(normalOptions||'<p class="text-sm text-slate-500">No shift-assigned apparatus available.</p>')+'</div><div class="mt-4 pt-4 border-t"><div class="text-xs font-black uppercase tracking-wide text-slate-500 mb-2">Always Available</div><div class="grid md:grid-cols-3 gap-2">'+fixedOptions+'</div></div><button type="button" onclick="finishReportApparatusSelection()" class="mt-3 px-4 py-2 rounded-lg bg-slate-800 text-white font-bold text-sm">Finish</button></div></details><div id="reportResponseUnits" class="space-y-3 mt-4"><p class="text-sm text-slate-500">Select responding apparatus above.</p></div><button type="button" onclick="addUnassignedReportApparatus()" class="mt-3 border border-dashed border-slate-400 bg-white px-4 py-2 rounded-lg font-bold text-sm">+ Add Unassigned Apparatus</button><div class="mt-5 border-t pt-4"><div id="reportOffDutyPersonnel">'+renderOffDutyPersonnel([])+'</div></div></section>'
 }
 function reportResponseUnitRow(u){
-  const apId=Number(u.apparatus_id||0),ap=apparatus.find(a=>Number(a.apparatus_id)===apId),crew=Array.isArray(u.crew_snapshot)?u.crew_snapshot:[];
+  const apId=Number(u.apparatus_id||0),ap=reportApparatusById(apId),crew=Array.isArray(u.crew_snapshot)?u.crew_snapshot:(Array.isArray(u.crew)?u.crew:[]);
   const incidentDate=$("rDate")?.value||today();
   const split=v=>{const p=jfdSplitCentralDateTime(v);return p||{date:incidentDate,time:""}};
   const di=split(u.dispatch_time||u.dispatch_at||$("rDispatch")?.value);
   const en=split(u.enroute_time),on=split(u.on_scene_time),ca=split(u.cancelled_time),cl=split(u.in_service_time);
   const event=(label,key,p,required)=>'<label class="text-xs font-bold">'+label+(required?' <span class="text-red-700">Required</span>':'')+'<div class="grid grid-cols-2 gap-2 mt-1"><input data-report-unit-date="'+key+'" type="date" value="'+esc(p.date||incidentDate)+'" class="w-full border rounded p-2 font-normal"><input data-report-unit-time="'+key+'" type="text" inputmode="numeric" placeholder="HH:MM" value="'+esc(p.time||"")+'" class="w-full border rounded p-2 font-normal" '+(required?'required':'')+'></div></label>';
-  return '<div class="report-response-unit border rounded-xl p-3 bg-white" data-report-response-selected="true" data-apparatus-id="'+apId+'" data-crew="'+esc(JSON.stringify(crew))+'"><div class="flex justify-between gap-3 items-start"><div><b>'+esc(u.unit_number_snapshot||ap?.unit_number||"Unit")+'</b><div class="text-xs text-slate-500">'+esc(u.station_snapshot||"")+'</div></div><button type="button" onclick="removeReportApparatus('+apId+')" class="text-red-600 font-bold text-sm">Remove</button></div><p class="text-xs font-bold text-red-700 mt-3">Military time required. Enter times as HH:MM (0000-2359).</p><div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-2">'+event("Dispatch","dispatch",di,true)+event("En Route","enroute",en,false)+event("On Scene","on_scene",on,false)+event("Cancelled","cancelled",ca,false)+event("In Service","in_service",cl,false)+'</div></div>';
+  const isUnassigned=apId<=-1000||u.unassigned===true;
+  const unitName=u.unit_number_snapshot||u.unit_number||ap?.unit_number||"Unassigned Apparatus";
+  const crewHtml=isUnassigned?renderUnassignedCrewSelect(crew):'<div class="text-xs mt-2"><b>Crew:</b> <span data-report-crew-label>'+esc(reportCrewLabel(crew))+'</span></div>';
+  return '<div class="report-response-unit border rounded-xl p-3 bg-white" data-report-response-selected="true" data-apparatus-id="'+apId+'" data-crew="'+esc(JSON.stringify(crew))+'" data-unassigned="'+(isUnassigned?'true':'false')+'"><div class="flex justify-between gap-3 items-start"><div><b>'+esc(unitName)+'</b><div class="text-xs text-slate-500">'+(isUnassigned?'Unassigned Apparatus':esc(u.station_snapshot||""))+'</div></div><button type="button" onclick="removeReportApparatus('+apId+')" class="text-red-600 font-bold text-sm">Remove</button></div>'+crewHtml+'<p class="text-xs font-bold text-red-700 mt-3">Military time required. Dispatch is pre-populated from CAD and remains editable.</p><div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-2">'+event("Dispatch","dispatch",di,true)+event("En Route","enroute",en,false)+event("On Scene","on_scene",on,false)+event("Cancelled","cancelled",ca,false)+event("In Service","in_service",cl,false)+'</div></div>';
+}
+function addUnassignedReportApparatus(saved){
+  const box=$("reportResponseUnits");if(!box)return;
+  box.querySelector("p")?.remove();
+  const existing=[...box.querySelectorAll(".report-response-unit[data-unassigned='true']")];
+  const id=Number(saved?.apparatus_id||(-1000-existing.length));
+  const row=document.createElement("div");
+  row.innerHTML=reportResponseUnitRow({apparatus_id:id,unit_number:saved?.unit_number||"Unassigned Apparatus",crew:saved?.crew||[],dispatch_time:saved?.times?.dispatch||$("rDispatch")?.value||"",enroute_time:saved?.times?.enroute||"",on_scene_time:saved?.times?.on_scene||"",cancelled_time:saved?.times?.cancelled||"",in_service_time:saved?.times?.in_service||"",unassigned:true});
+  box.appendChild(row.firstElementChild);
+  const el=box.lastElementChild;syncReportUnitTimes(el);
+  el.querySelector("[data-unassigned-crew]")?.addEventListener("change",e=>{
+    const crew=[...e.target.selectedOptions].map(o=>{const p=personnel.find(x=>Number(x.id)===Number(o.value));return p?{id:Number(p.id),name:(p.first_name||"")+" "+(p.last_name||""),role:p.role||""}:null}).filter(Boolean);
+    el.dataset.crew=JSON.stringify(crew);
+  });
+  return el;
 }
 function syncReportUnitTimes(row){
   if(!row)return;
@@ -1011,16 +1042,16 @@ function toggleReportApparatus(id,checked){
   const box=$("reportResponseUnits");if(!box)return;
   const existing=box.querySelector('[data-apparatus-id="'+Number(id)+'"]');
   if(checked&&!existing){
-    const ap=apparatus.find(a=>Number(a.apparatus_id)===Number(id));if(!ap)return;
+    const ap=reportApparatusById(id);if(!ap)return;
     box.querySelector("p")?.remove();
     const row=document.createElement("div");
-    row.innerHTML=reportResponseUnitRow({apparatus_id:Number(id),unit_number_snapshot:ap.unit_number,station_snapshot:"",crew_snapshot:[],enroute_time:"",on_scene_time:"",cancelled_time:"",in_service_time:""});
+    row.innerHTML=reportResponseUnitRow({apparatus_id:Number(id),unit_number_snapshot:ap.unit_number,station_snapshot:"",crew_snapshot:ap.crew||[],dispatch_time:$("rDispatch")?.value||"",enroute_time:"",on_scene_time:"",cancelled_time:"",in_service_time:""});
     box.appendChild(row.firstElementChild);
     syncReportUnitTimes(row.firstElementChild);
     refreshReportApparatusCrews($("rDate")?.value);
   }else if(!checked&&existing){
     existing.remove();
-    if(!box.querySelector(".report-response-unit"))box.innerHTML='<p class="text-sm text-slate-500">No apparatus selected yet.</p>';
+    if(!box.querySelector(".report-response-unit"))box.innerHTML='<p class="text-sm text-slate-500">Select responding apparatus above.</p>';
     refreshReportApparatusCrews($("rDate")?.value);
   }
   updateReportApparatusCount();
@@ -1028,7 +1059,7 @@ function toggleReportApparatus(id,checked){
 function removeReportApparatus(id){
   const row=document.querySelector('[data-apparatus-id="'+Number(id)+'"]');row?.remove();
   const cb=document.querySelector('[data-report-apparatus-check="'+Number(id)+'"]');if(cb)cb.checked=false;
-  const box=$("reportResponseUnits");if(box&&!box.querySelector(".report-response-unit"))box.innerHTML='<p class="text-sm text-slate-500">No apparatus selected yet.</p>';
+  const box=$("reportResponseUnits");if(box&&!box.querySelector(".report-response-unit"))box.innerHTML='<p class="text-sm text-slate-500">Select responding apparatus above.</p>';
 }
 async function refreshReportApparatusCrews(dateOverride){
   const date=dateOverride||$("rDate")?.value||today();
@@ -1069,10 +1100,11 @@ function commonReportFields(i,d,m,unitRows=[]){
   const call=d?.call_type||"";
   const date=/^\\d{4}-\\d{2}-\\d{2}/.test(String(i.dispatch_time||""))?String(i.dispatch_time).slice(0,10):"";
   const hidden=(id,value)=>'<input type="hidden" id="'+id+'" value="'+esc(value??"")+'">';
-  const hiddens=hidden("rDispatchIncidentNumber",i.dispatch_incident_number||i.cad||"")+hidden("rCallArrival",localDateTime(i.call_arrival||i.dispatch_time))+hidden("rCallAnswered",localDateTime(i.call_answered||i.dispatch_time))+hidden("rCallCreate",localDateTime(i.call_create||i.dispatch_time))+hidden("rDispatch",localDateTime(i.dispatch_time))+hidden("rEnroute",localDateTime(i.enroute_time||i.enroute_at))+hidden("rOnscene",localDateTime(d?.arrival_time))+hidden("rCancelled",localDateTime(i.cancelled_time||i.cancelled_at))+hidden("rCleared",localDateTime(d?.clear_time));
+  const hiddens=hidden("rDispatchIncidentNumber",i.dispatch_incident_number||i.cad||"")+hidden("rCallArrival",localDateTime(i.call_arrival||i.dispatch_time))+hidden("rCallAnswered",localDateTime(i.call_answered||i.dispatch_time))+hidden("rCallCreate",localDateTime(i.call_create||i.dispatch_time))+hidden("rEnroute",localDateTime(i.enroute_time||i.enroute_at))+hidden("rOnscene",localDateTime(d?.arrival_time))+hidden("rCancelled",localDateTime(i.cancelled_time||i.cancelled_at))+hidden("rCleared",localDateTime(d?.clear_time));
   return reportSection("Incident & Location",
     reportInput("rDate","Incident Date",date,"date")+
     reportSelect("rCall","Call Type",CALL_TYPES,call)+
+    reportInput("rDispatch","Dispatch Time",localDateTime(i.dispatch_time),"datetime-local",false)+
     jfdNerisSelect("rPrimaryIncidentType","Primary Incident Type",NERIS_INCIDENT_TYPES,"",true)+
     reportSelect("rStation","Station",["A Shift","B Shift","C Shift"],m.shift||"")+
     reportSelect("rShift","Shift",["A","B","C"],m.shift||"")+
@@ -1324,6 +1356,7 @@ async function editSavedReport(cad,reportId){
     window.applyPreviousReportValues(rep.data||{});
     modal.dataset.reportId=String(rep.report_id||"");
     const savedUnits=Array.isArray(rep.data?.responding_apparatus)?rep.data.responding_apparatus:[];
+    savedUnits.filter(saved=>!saved.apparatus_id||Number(saved.apparatus_id)<=-1000).forEach(saved=>addUnassignedReportApparatus(saved));
     savedUnits.forEach(saved=>{
       const id=Number(saved.apparatus_id||0);if(!id)return;
       const cb=document.querySelector('[data-report-apparatus-check="'+id+'"]');
@@ -1508,7 +1541,7 @@ function collectReportFormData(){
       station:row.querySelector(".text-xs.text-slate-500")?.textContent?.trim()||"",
       crew,times
     };
-  }).filter(x=>x.apparatus_id>0);
+  }).filter(x=>x.unit_number);
   data.additional_personnel=[...(reportModal?.querySelectorAll("[data-report-person]:checked")||[])].map(x=>Number(x.dataset.reportPerson));
   return data;
 }
@@ -1832,8 +1865,8 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       field("rLongitude","Longitude",d?.rLongitude??i.longitude??"","number")+
       select("rShift","Shift",["A","B","C"],d?.rShift||m.shift||"")+
       jfdNerisSelect("rPrimaryIncidentType","Primary Incident Type",NERIS_INCIDENT_TYPES,d?.primary_incident_type||d?.rPrimaryIncidentType||d?.neris_incident_type||d?.incident_type||"","md:col-span-2",true);
-    if(kind==="fire")return jfdDocumentHeader("FIRE INCIDENT REPORT","Rev. 7/1/26")+card("Incident Information",common+'<div class="md:col-span-3"><div id="jfdIncidentTypes"></div><button type="button" onclick="jfdAddIncidentType()" class="mt-2 bg-white border px-3 py-2 rounded-lg font-bold text-sm">+ Add Incident Type</button></div></div>');
-    return jfdDocumentHeader("PATIENT CARE REPORT","Rev. 7/8/26")+card("Incident Information",common+jfdNerisSelect("rSecondaryIncidentType","Secondary Incident Type (optional)",NERIS_INCIDENT_TYPES,d?.secondary_incident_type||"","md:col-span-2")+'</div>');
+    if(kind==="fire")return jfdDocumentHeader("FIRE INCIDENT REPORT")+card("Incident Information",common+'<div class="md:col-span-3"><div id="jfdIncidentTypes"></div><button type="button" onclick="jfdAddIncidentType()" class="mt-2 bg-white border px-3 py-2 rounded-lg font-bold text-sm">+ Add Incident Type</button></div></div>');
+    return jfdDocumentHeader("PATIENT CARE REPORT")+card("Incident Information",common+jfdNerisSelect("rSecondaryIncidentType","Secondary Incident Type (optional)",NERIS_INCIDENT_TYPES,d?.secondary_incident_type||"","md:col-span-2")+'</div>');
   };function responseUi(iForResponse){
     const checks=apparatus.filter(a=>a.active!==false).sort((a,b)=>String(a.unit_number).localeCompare(String(b.unit_number))).map(a=>'<label class="flex items-center gap-2 border rounded-lg p-2 bg-white"><input type="checkbox" data-runit="'+Number(a.apparatus_id)+'" onchange="jfdSyncUnits()"> <b>'+esc(a.unit_number)+'</b><span class="text-xs text-slate-500">'+esc(a.apparatus_type||"")+'</span></label>').join("");
     const dispatch=card("Dispatch",'<p class="text-xs text-slate-500 mb-3">Dispatch/CAD information is kept separate from firefighter response information. CAD values are pre-populated when available and remain editable.</p><div class="grid md:grid-cols-2 lg:grid-cols-4 gap-3">'+
@@ -2203,7 +2236,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       let crew=[];
       try{crew=JSON.parse(row.dataset.crew||"[]")}catch{}
       return {apparatus_id:apId,unit_number:name,times,crew};
-    }).filter(x=>x.apparatus_id>0);
+    }).filter(x=>x.unit_number);
     data.additional_personnel=[...document.querySelectorAll("[data-report-person]:checked")].map(x=>Number(x.dataset.reportPerson));
     // Do not enforce conditional NERIS module fields while collecting the report.
     // The RMS preserves optional/departmental information, while the NERIS review/API
