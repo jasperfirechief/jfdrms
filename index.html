@@ -1579,7 +1579,7 @@ async function submitReportToNeris(data,incidentId,explicitAdminReview=false){
   if(ins.error)return {ok:false,error:"NERIS accepted the incident, but RMS could not save the submission record: "+ins.error.message,neris:body};
   return {ok:true,neris:body};
 }
-async function saveReportDraft(kind){
+async function saveReportDraft(kind,silent=false){
   const form=$("incidentReportForm");if(!form)return;
   const data=collectReportFormData(),m=$("reportModal"),incidentId=Number(m?.dataset.incidentId||0)||null;
     const reportType=kind==="fire"?"fire_neris_v2":"pcr_neris_v2";
@@ -1596,7 +1596,7 @@ async function saveReportDraft(kind){
   }else{
     const ins=await db.from("standalone_reports").insert({report_type:reportType,data,status:"draft",created_by:me?.id||null});if(ins.error)throw new Error(ins.error.message);
   }
-  alert(editingId?"Draft updated.":"Draft saved.");
+  if(!silent)alert(editingId?"Draft updated.":"Draft saved.");
   if(incidentId)await loadIncidents();
   return report;
 }
