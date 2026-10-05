@@ -1217,7 +1217,18 @@ async function startIncidentReport(kind){
   const cad=$("reportModal").dataset.cad;const id=Number($("reportModal").dataset.incidentId);
   const r=await db.from("incidents").select("*").eq("cad",cad).maybeSingle();if(r.error)return alert(r.error.message);if(!r.data)return alert("Incident not found.");
   const i=r.data;const dr=await db.from("incident_details").select("*").eq("incident_id",id).maybeSingle();if(dr.error)return alert(dr.error.message);
-  const d=dr.data||{};if(["awaiting_neris","complete"].includes(String(d.status||"")))return alert("This incident has been finished and can no longer be edited.");const ur=await db.from("incident_units").select("*").eq("incident_id",id).order("incident_unit_id");if(ur.error)return alert(ur.error.message);
+  const d=dr.data||{};if(["awaiting_neris","complete"].includes(String(d.status||"")))return alert("This incident has been finished and can no longer be edited.");
+  let reportId=String($("reportModal").dataset.reportId||"").trim();
+  let reportList=Array.isArray(i.reports)?i.reports:[];
+  if(!reportId){
+    reportId=crypto.randomUUID();
+    const draft={report_id:reportId,report_type:kind==="fire"?"fire_neris_v2":"pcr_neris_v2",status:"draft",data:{},updated_at:new Date().toISOString(),created_by:me?.id||null};
+    reportList=[draft,...reportList];
+    const saved=await db.from("incidents").update({reports:reportList,updated_at:new Date().toISOString()}).eq("cad",cad);
+    if(saved.error)return alert("Could not create the report draft: "+saved.error.message);
+    $("reportModal").dataset.reportId=reportId;
+  }
+  const ur=await db.from("incident_units").select("*").eq("incident_id",id).order("incident_unit_id");if(ur.error)return alert(ur.error.message);
   const unitRows=ur.data||[];let firstReport=null;
   const reportList=Array.isArray(i.reports)?i.reports:[];
   if(reportList.length) firstReport=reportList[0]?.data||reportList[0]||null;
@@ -1755,6 +1766,10 @@ function bindReportForm(kind){
   window.currentReportKind=kind;
   const form=$("incidentReportForm");if(!form)return;
   form.onsubmit=async e=>{e.preventDefault();await saveReportDraft(kind)};
+  let timer=null;
+  const autosave=()=>{clearTimeout(timer);timer=setTimeout(()=>saveReportDraft(kind,true).catch(e=>console.error("Report autosave failed:",e)),900)};
+  form.addEventListener("input",autosave);
+  form.addEventListener("change",autosave);
 }
 function toDateTimeLocal(v){if(!v)return "";const d=new Date(v);if(Number.isNaN(d.getTime()))return "";const p=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes());}
 async function loadIncidents(){
@@ -1778,7 +1793,7 @@ async function loadIncidents(){
     const reports=Array.isArray(i.reports)?i.reports:[];
     const reportCount=reports.length;
     const draftReports=reports.filter(x=>String(x?.status||"draft")==="draft");
-    const status=d.status||"draft";
+    const status=locked?"finished":(reportCount?"draft":"received");
     const locked=["awaiting_neris","complete"].includes(String(status));
     const statusClass=locked?"bg-red-100 text-red-800":"bg-emerald-100 text-emerald-800";
     const narrative=(d.narrative||"").replace(/(^|\\n)DATE:\\s*[^\\n]*(\\n|$)/i,"$1").replace(/(^|\\n)TIME:\\s*[^\\n]*(\\n|$)/i,"$1").trim();
