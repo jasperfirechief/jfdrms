@@ -1073,11 +1073,13 @@ async function refreshReportApparatusCrews(dateOverride){
   }
   rows.forEach(row=>{
     const apId=Number(row.dataset.apparatusId);
+    const fixed=JFD_FIXED_RESPONSE_UNITS.find(x=>Number(x.apparatus_id)===apId);
     const a=assignments.find(x=>Number(x.apparatus_id)===apId);
-    const crew=(a?.daily_personnel_assignments||[]).map(p=>({id:Number(p.personnel_id),name:(p.personnel?.first_name||"")+" "+(p.personnel?.last_name||""),role:p.assignment_role||p.personnel?.role||""}));
+    const crew=fixed?(fixed.crew||[]):(a?.daily_personnel_assignments||[]).map(p=>({id:Number(p.personnel_id),name:(p.personnel?.first_name||"")+" "+(p.personnel?.last_name||""),role:p.assignment_role||p.personnel?.role||""}));
     row.dataset.crew=JSON.stringify(crew);
+    const crewLabel=row.querySelector("[data-report-crew-label]");if(crewLabel)crewLabel.textContent=reportCrewLabel(crew);
     const station=(stations.find(s=>Number(s.station_id)===Number(a?.station_id))||{}).station_name||"";
-    const st=row.querySelector(".text-xs.text-slate-500");if(st)st.textContent=station;
+    const st=row.querySelector(".text-xs.text-slate-500");if(st&&!fixed&&!row.dataset.unassigned)st.textContent=station;
   });
   await refreshOffDutyPersonnel(date,assignments.flatMap(a=>a.daily_personnel_assignments||[]).map(p=>Number(p.personnel_id)));
 }
