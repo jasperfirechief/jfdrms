@@ -1372,7 +1372,7 @@ async function createIncidentReportByCad(cad){
   const m=ensureReportModal();m.dataset.incidentId=String(dr.data.incident_id);m.dataset.cad=String(r.data.cad||cad);m.dataset.standalone="";m.classList.remove("hiddenx");renderReportChooser(r.data,dr.data,ur.data||[]);
 }
 
-async function openIncidentReportForm(kind,i,d,unitRows=[]){window.currentReportKind=kind;const m=ensureReportModal();m.dataset.standalone="";$("reportChooser").classList.add("hiddenx");$("incidentReportForm").classList.remove("hiddenx");$("reportModalTitle").textContent=kind==="fire"?"Fire Incident Report":"Patient Care Report";$("reportModalSub").textContent="";$("reportModalChrome")?.classList.add("hiddenx");$("reportFormClose")?.classList.remove("hiddenx");$("reportIncidentBanner")?.classList.add("hiddenx");const stationNames=[...new Set((unitRows||[]).map(u=>u.station_snapshot).filter(Boolean))].join(", ");const meta={station:stationNames,officer:"",crew:"",units:(unitRows||[]).map(u=>u.unit_number_snapshot).filter(Boolean).join(", "),lat:i.latitude??"",lng:i.longitude??"",shift:$("staffShift")?.value||""};const reportList=Array.isArray(i.reports)?i.reports:[];const firstReport=reportList.length?(reportList[0]?.data||reportList[0]||null):null;$("incidentReportForm").innerHTML=kind==="fire"?window.fireReportForm(i,d,meta,unitRows):window.pcrReportForm(i,d,meta,unitRows);jfdSearchableSelects();if(firstReport)applyPreviousReportValues(firstReport);window.clearManualResponseSelection();bindReportForm(kind);try{await refreshReportApparatusCrews(iDateForReport(i.dispatch_time));}catch(e){console.error("Report apparatus refresh failed",e)}$("rDate")?.addEventListener("change",()=>refreshReportApparatusCrews($("rDate").value));}
+async function openIncidentReportForm(kind,i,d,unitRows=[]){window.currentReportKind=kind;const m=ensureReportModal();m.dataset.standalone="";$("reportChooser").classList.add("hiddenx");$("incidentReportForm").classList.remove("hiddenx");$("reportModalTitle").textContent=kind==="fire"?"Fire Incident Report":"Patient Care Report";$("reportModalSub").textContent="";$("reportModalChrome")?.classList.add("hiddenx");$("reportFormClose")?.classList.remove("hiddenx");$("reportIncidentBanner")?.classList.add("hiddenx");const stationNames=[...new Set((unitRows||[]).map(u=>u.station_snapshot).filter(Boolean))].join(", ");const meta={station:stationNames,officer:"",crew:"",units:(unitRows||[]).map(u=>u.unit_number_snapshot).filter(Boolean).join(", "),lat:i.latitude??"",lng:i.longitude??"",shift:$("staffShift")?.value||""};const reportList=Array.isArray(i.reports)?i.reports:[];const firstReport=reportList.length?(reportList[0]?.data||reportList[0]||null):null;$("incidentReportForm").innerHTML=kind==="fire"?window.fireReportForm(i,d,meta,unitRows):window.pcrReportForm(i,d,meta,unitRows);jfdSearchableSelects();if(firstReport)applyPreviousReportValues(firstReport);syncReportDispatchFromCad(i);window.clearManualResponseSelection();bindReportForm(kind);try{await refreshReportApparatusCrews(iDateForReport(i.dispatch_time));}catch(e){console.error("Report apparatus refresh failed",e)}$("rDate")?.addEventListener("change",()=>refreshReportApparatusCrews($("rDate").value));}
 
 function iDateForReport(v){if(!v)return today();const d=new Date(v);return Number.isNaN(d.getTime())?today():new Intl.DateTimeFormat("en-CA",{timeZone:"America/Chicago"}).format(d)}
 async function startIncidentReport(kind){
@@ -1646,6 +1646,21 @@ async function adminDeleteReportFromButton(btn){
   alert("Report deleted.");
   await renderReports();
   await loadIncidents();
+}
+function syncReportDispatchFromCad(incident){
+  const cadDispatch=incident?.dispatch_time;
+  if(!cadDispatch)return;
+  const value=localDateTime(cadDispatch);
+  const dispatch=$("rDispatch");
+  if(dispatch){dispatch.value=value;dispatch.dispatchEvent(new Event("change",{bubbles:true}));}
+  const date=(String(value).match(/^(\\d{4}-\\d{2}-\\d{2})/)||[])[1]||"";
+  const time=(String(value).match(/T(\\d{2}:\\d{2})/)||[])[1]||"";
+  document.querySelectorAll("[data-report-unit-date='dispatch']").forEach(el=>{if(date)el.value=date;});
+  document.querySelectorAll("[data-report-unit-time='dispatch']").forEach(el=>{if(time)el.value=time;});
+  document.querySelectorAll(".report-response-unit").forEach(row=>{
+    const hidden=row.querySelector("[data-report-unit-hidden='dispatch']");
+    if(hidden){hidden.value=value;hidden.dispatchEvent(new Event("change",{bubbles:true}));}
+  });
 }
 function applyPreviousReportValues(data){
   if(!data||typeof data!=="object")return;
