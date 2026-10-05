@@ -645,18 +645,22 @@ function renderHome(){const cards=[["staffing","Daily Staffing","Assign apparatu
   }
   return {data:ins.data};
 }
-async function loadStaffing(){
+async function loadStaffing(preferred={}){
   if(!canStaff())return;
   window.jfdStaffingLoadToken=(window.jfdStaffingLoadToken||0)+1;
   const loadToken=window.jfdStaffingLoadToken;
   const storedDate=localStorage.getItem("jfd_staff_date")||"";
   const storedShift=localStorage.getItem("jfd_staff_shift")||"";
-  const date=$("staffDate").value||storedDate||today(),shift=$("staffShift").value||storedShift||"A";
-  localStorage.setItem("jfd_staff_date",date);localStorage.setItem("jfd_staff_shift",shift);
-  $("staffDate").value=date;$("staffShift").value=shift;
+  const date=preferred.date||$("staffDate").value||storedDate||today();
+  const shift=preferred.shift||window.jfdSelectedStaffShift||storedShift||"A";
+  window.jfdSelectedStaffShift=shift;
+  localStorage.setItem("jfd_staff_date",date);
+  localStorage.setItem("jfd_staff_shift",shift);
+  $("staffDate").value=date;
+  $("staffShift").value=shift;
   const r=await getOrCreateStaffing(date,shift);if(r.error)return alert(r.error.message);
   if(loadToken!==window.jfdStaffingLoadToken)return;
-  if($("staffDate").value!==date||$("staffShift").value!==shift)return;
+  if($("staffDate").value!==date||$("staffShift").value!==shift||window.jfdSelectedStaffShift!==shift)return;
   const sid=r.data.staffing_id;
   const a=await db.from("daily_app_assignments").select("assignment_id,station_id,apparatus_id,daily_personnel_assignments(assignment_id,personnel_id,assignment_role,personnel(id,first_name,last_name,shift))").eq("staffing_id",sid);
   if(a.error)return alert(a.error.message);
@@ -928,9 +932,17 @@ function addNerisTypeField(){
   const wrap=anchor.parentElement?.parentElement; if(!wrap)return;
 }
 function bindStaffingControls(){
-  $("staffDate")?.addEventListener("change",()=>{const v=$("staffDate").value||today();localStorage.setItem("jfd_staff_date",v);loadStaffing()});
-  $("staffShift")?.addEventListener("change",()=>{const v=$("staffShift").value||"A";localStorage.setItem("jfd_staff_shift",v);loadStaffing()});
+  window.jfdSelectedStaffShift=localStorage.getItem("jfd_staff_shift")||"A";
+  $("staffDate")?.addEventListener("change",()=>{const v=$("staffDate").value||today();localStorage.setItem("jfd_staff_date",v);loadStaffing({date:v,shift:window.jfdSelectedStaffShift||"A"})});
+  $("staffShift")?.addEventListener("change",()=>{
+    const v=$("staffShift").value||"A";
+    window.jfdSelectedStaffShift=v;
+    localStorage.setItem("jfd_staff_shift",v);
+    $("staffShift").value=v;
+    loadStaffing({date:$("staffDate").value||today(),shift:v});
+  });
 }
+
 bindStaffingControls();
 function incidentDate(v){if(!v)return "";const d=new Date(v);return Number.isNaN(d.getTime())?"":d.toLocaleDateString("en-US",{timeZone:JFD_TIME_ZONE,month:"2-digit",day:"2-digit",year:"numeric"})}function incidentTime(v){if(!v)return "";const d=new Date(v);return Number.isNaN(d.getTime())?"":d.toLocaleTimeString("en-US",{timeZone:JFD_TIME_ZONE,hour:"numeric",minute:"2-digit"})}function mapIncident(id){const el=document.querySelector("[data-incident-id=\""+Number(id)+"\"]");const q=el?.dataset.location||"";const lat=el?.dataset.lat||"";const lng=el?.dataset.lng||"";if(!q&&!lat&&!lng)return alert("No incident location is available.");const url=(lat&&lng)?"https://www.google.com/maps/@?api=1&map_action=map&center="+encodeURIComponent(lat+","+lng)+"&zoom=18":"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(q);window.open(url,"_blank","noopener");}
 function ensureReportModal(){
@@ -2017,19 +2029,28 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   }
   const baseCollect=window.collectReportFormData;
   window.collectReportFormData=function(){
-    const data={};
-    $("incidentReportForm")?.querySelectorAll("input,select,textarea").forEach(el=>{
-      if(!el.id||el.type==="checkbox"||el.matches("[data-runit]")||el.closest("[data-unit-row]"))return;
-      data[el.id]=el.value;
+    const data=baseCollect?baseCollect():{};
+    const form=$("incidentReportForm");
+    form?.querySelectorAll("input,select,textarea").forEach(el=>{
+      if(!el.id||el.type==="checkbox"||el.matches("[data-report-unit-time],[data-report-person],[data-runit]")||el.closest("[data-unit-row]"))return;
+      data[el.id]=el.multiple?[...el.selectedOptions].map(o=>o.value):el.value;
     });
     data.rDispatchIncidentNumber=data.rDispatchIncidentNumber||data.rCad||$("reportModal")?.dataset.cad||"";
-    const reportRoot=$("incidentReportForm")||$("reportModal")||document;const responseRows=[...reportRoot.querySelectorAll(".report-response-unit,[data-unit-row]")];
+    const reportRoot=$("incidentReportForm")||$("reportModal")||document;
+    const responseRows=[...reportRoot.querySelectorAll(".report-response-unit,[data-unit-row]")];
     data.responding_apparatus=responseRows.map(row=>{
-      const apId=Number(row.dataset.apparatusId||row.dataset.unitRow||0),name=row.querySelector("b")?.textContent?.trim()||"";
-      const keys=["dispatch","enroute","on_scene","cancelled","in_service","clear"];
+      const apId=Number(row.dataset.apparatusId||row.dataset.unitRow||0);
+      const name=row.querySelector("[data-report-unit-number]")?.value||row.querySelector("b")?.textContent?.trim()||"";
       const times={};
-      keys.forEach(k=>{const date=row.querySelector('[data-report-unit-date="'+k+'"]')?.value||"",raw=row.querySelector('[data-report-unit-time="'+k+'"]')?.value||"",time=jfdParseTime24(raw);if(date&&time)times[k==="clear"?"clear":k]=date+"T"+time;});
-      return {apparatus_id:apId,unit_number:name,times,crew:JSON.parse(row.dataset.crew||"[]")};
+      ["dispatch","enroute","on_scene","cancelled","in_service","clear"].forEach(k=>{
+        const date=row.querySelector('[data-report-unit-date="'+k+'"]')?.value||"";
+        const raw=row.querySelector('[data-report-unit-time="'+k+'"]')?.value||"";
+        const time=jfdParseTime24(raw);
+        if(time) times[k==="clear"?"clear":k]=date?date+"T"+time:time;
+      });
+      let crew=[];
+      try{crew=JSON.parse(row.dataset.crew||"[]")}catch{}
+      return {apparatus_id:apId,unit_number:name,times,crew};
     }).filter(x=>x.apparatus_id||x.unit_number);
     data.additional_personnel=[...document.querySelectorAll("[data-report-person]:checked")].map(x=>Number(x.dataset.reportPerson));
     // Do not enforce conditional NERIS module fields while collecting the report.
