@@ -1551,7 +1551,8 @@ async function saveReportDraft(kind){
   const form=$("incidentReportForm");if(!form)return;
   const data=collectReportFormData(),m=$("reportModal"),incidentId=Number(m?.dataset.incidentId||0)||null;
     const responseErrors=[];
-    (data.responding_apparatus||[]).forEach((u,n)=>{
+    const selectedIds=new Set((data.responding_apparatus||[]).map(u=>Number(u.apparatus_id)).filter(Boolean));
+    (data.responding_apparatus||[]).filter(u=>selectedIds.has(Number(u.apparatus_id))).forEach((u,n)=>{
       const raw=u.times||{};
       const parse=(value)=>{
         const s=String(value??"").trim();
@@ -1597,7 +1598,7 @@ async function validateAndFinishReport(kind){
   try{
     const data=collectReportFormData(),m=$("reportModal"),incidentId=Number(m?.dataset.incidentId||0)||null;
     if(!incidentId)return alert("Standalone reports can be saved as drafts, but must be attached to an incident before NERIS review.");
-    const apparatus=Array.isArray(data.responding_apparatus)?data.responding_apparatus:[];
+    const apparatus=Array.isArray(data.responding_apparatus)?data.responding_apparatus.filter(u=>Number(u.apparatus_id)>0):[];
     for(const u of apparatus){
       const raw=u.times||{};
       const norm=v=>{
@@ -2037,7 +2038,8 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     });
     data.rDispatchIncidentNumber=data.rDispatchIncidentNumber||data.rCad||$("reportModal")?.dataset.cad||"";
     const reportRoot=$("incidentReportForm")||$("reportModal")||document;
-    const responseRows=[...reportRoot.querySelectorAll(".report-response-unit")];
+    const selectedApparatusIds=new Set([...reportRoot.querySelectorAll("[data-report-apparatus-check]:checked")].map(el=>Number(el.dataset.reportApparatusCheck)).filter(Boolean));
+    const responseRows=[...reportRoot.querySelectorAll(".report-response-unit")].filter(row=>selectedApparatusIds.has(Number(row.dataset.apparatusId)));
     data.responding_apparatus=responseRows.map(row=>{
       const apId=Number(row.dataset.apparatusId||row.dataset.unitRow||0);
       const name=row.querySelector("[data-report-unit-number]")?.value||row.querySelector("b")?.textContent?.trim()||"";
