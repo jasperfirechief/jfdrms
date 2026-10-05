@@ -1279,7 +1279,6 @@ async function startIncidentReport(kind){
   $("reportModalTitle").textContent=kind==="fire"?"Fire Incident Report":"Patient Care Report";
   $("reportModalSub").textContent="";$("reportModalChrome")?.classList.add("hiddenx");$("reportFormClose")?.classList.remove("hiddenx");$("reportIncidentBanner")?.classList.add("hiddenx");
   $("incidentReportForm").innerHTML=kind==="fire"?window.fireReportForm(i,d,meta,unitRows):window.pcrReportForm(i,d,meta,unitRows);
-  jfdSearchableSelects();
   if(firstReport) applyPreviousReportValues(firstReport);
   if(pendingAdditionalType && $("rPrimaryIncidentType")) $("rPrimaryIncidentType").value=pendingAdditionalType;
   if(String($("reportModal").dataset.requireAdditionalType||"")==="1" && $("rPrimaryIncidentType")){
@@ -1287,6 +1286,7 @@ async function startIncidentReport(kind){
     if(label) label.innerHTML='Additional incident type / reason for this report <span class="jfd-required-badge ml-2 text-[10px] font-black uppercase text-red-700">NERIS REQUIRED</span>';
     [...primary.options].forEach(o=>{ if(o.value && usedReportIncidentTypes.includes(String(o.value))) o.remove(); });
   }
+  jfdSearchableSelects();
   $("reportModal").dataset.pendingAdditionalIncidentType="";
   jfdUpdateNerisRequirements?.(); jfdUpdateConditionalReportSections?.();
   bindReportForm(kind); try{await refreshReportApparatusCrews(iDateForReport(i.dispatch_time));}catch(e){console.error("Report apparatus refresh failed",e);}
