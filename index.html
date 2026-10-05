@@ -418,6 +418,9 @@ function jfdEscapeHtml(value){
     if(input&&input._jfdSelect)openFor(input._jfdSelect,input);
   });
 
+  // Expose the scanner so dynamically opened/saved report forms can initialize their searchable selects.
+  window.jfdSearchableSelects=scan;
+
   // Mark the visible inputs so outside-click handling can distinguish them.
   const observer=new MutationObserver(scan);
   document.addEventListener("DOMContentLoaded",()=>{
