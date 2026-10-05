@@ -1230,7 +1230,6 @@ async function startIncidentReport(kind){
   }
   const ur=await db.from("incident_units").select("*").eq("incident_id",id).order("incident_unit_id");if(ur.error)return alert(ur.error.message);
   const unitRows=ur.data||[];let firstReport=null;
-  const reportList=Array.isArray(i.reports)?i.reports:[];
   if(reportList.length) firstReport=reportList[0]?.data||reportList[0]||null;
   const units=unitRows.map(u=>u.unit_number_snapshot).filter(Boolean).join(", "),stationNames=[...new Set(unitRows.map(u=>u.station_snapshot).filter(Boolean))].join(", ");
   const meta={station:stationNames,officer:"",crew:"",units,lat:i.latitude??"",lng:i.longitude??"",shift:$("staffShift")?.value||""};
