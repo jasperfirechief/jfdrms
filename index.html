@@ -1562,7 +1562,7 @@ async function openSavedReport(cad,reportId){
     const kind=String(rep.report_type||"").startsWith("pcr_")?"pcr":"fire",title=kind==="pcr"?"Patient Care Report":"Fire Incident Report",statusLabel={draft:"Draft",complete:"Completed",ready_for_neris:"Awaiting NERIS Review",submitted_to_neris:"Submitted to NERIS"}[rep.status]||humanReportKey(rep.status||"Saved"),m=ensureSavedReportViewer(),d=rep.data||{};
     $("savedReportViewerTitle").textContent=title;$("savedReportViewerSub").textContent="CAD "+(i.cad||"")+" · "+(i.location||"Location not provided");
     const canEdit=rep.status==="draft",isAdmin=profile?.app_role==="admin",reviewIndex=reports.findIndex(x=>String(x?.report_id||"")===String(reportId||"")),actions=$("savedReportViewerActions");
-    actions.innerHTML='<span class="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 font-bold text-sm">'+esc(statusLabel)+'</span>'+(canEdit?'<button type="button" data-edit-cad="'+esc(cad)+'" data-edit-report-id="'+esc(reportId)+'" onclick="editSavedReport(this.dataset.editCad,this.dataset.editReportId)" class="bg-slate-950 text-white px-4 py-2 rounded-lg font-bold">Edit Report</button>':"")+(isAdmin&&rep.status==="ready_for_neris"?'<button type="button" onclick="adminSubmitReport('+JSON.stringify(cad)+',reviewIndex)" class="bg-amber-600 text-white px-4 py-2 rounded-lg font-bold">Submit to NERIS</button>':"")+(isAdmin?'<button type="button" onclick="downloadIncidentPdf('+JSON.stringify(cad)+','+JSON.stringify(reportId)+')" class="bg-blue-700 text-white px-4 py-2 rounded-lg font-bold">Download PDF</button><button type="button" onclick="emailIncidentPdf('+JSON.stringify(cad)+','+JSON.stringify(reportId)+')" class="bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold">Email PDF</button><button type="button" onclick="adminDeleteReportFromButton({dataset:{cad:'+JSON.stringify(cad)+',reportId:'+JSON.stringify(reportId)+'}})" class="bg-red-600 text-white px-4 py-2 rounded-lg font-bold">Delete</button>':"")+'<button type="button" onclick="closeSavedReportViewer()" class="border px-4 py-2 rounded-lg font-bold">Close</button>';
+    actions.innerHTML='<span class="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 font-bold text-sm">'+esc(statusLabel)+'</span>'+(canEdit?'<button type="button" data-edit-cad="'+esc(cad)+'" data-edit-report-id="'+esc(reportId)+'" onclick="editSavedReport(this.dataset.editCad,this.dataset.editReportId)" class="bg-slate-950 text-white px-4 py-2 rounded-lg font-bold">Edit Report</button>':"")+(isAdmin&&rep.status==="ready_for_neris"?'<button type="button" onclick="adminSubmitReport('+JSON.stringify(cad)+','+JSON.stringify(reviewIndex)+')" class="bg-amber-600 text-white px-4 py-2 rounded-lg font-bold">Submit to NERIS</button>':"")+(isAdmin?'<button type="button" onclick="downloadIncidentPdf('+JSON.stringify(cad)+','+JSON.stringify(reportId)+')" class="bg-blue-700 text-white px-4 py-2 rounded-lg font-bold">Download PDF</button><button type="button" onclick="emailIncidentPdf('+JSON.stringify(cad)+','+JSON.stringify(reportId)+')" class="bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold">Email PDF</button><button type="button" onclick="adminDeleteReportFromButton({dataset:{cad:'+JSON.stringify(cad)+',reportId:'+JSON.stringify(reportId)+'}})" class="bg-red-600 text-white px-4 py-2 rounded-lg font-bold">Delete</button>':"")+'<button type="button" onclick="closeSavedReportViewer()" class="border px-4 py-2 rounded-lg font-bold">Close</button>';
     const incidentBody='<div class="grid md:grid-cols-2 gap-x-8">'+reportViewerField("CAD / Incident Number",i.cad||d.rCad||"Not entered")+reportViewerField("Incident Date",d.rDate||"Not entered")+reportViewerField("Primary Incident Type",d.rPrimaryIncidentType||d.rNerisType||d.rIncidentType||i.type||"Not entered")+reportViewerField("Location",d.rLocation||i.location||"Not entered")+reportViewerField("Location Type",d.rLocationType||"Not entered")+reportViewerField("Shift",d.rShift||"Not entered")+reportViewerField("Call Type",d.rCallType||d.rCall||i.type||"Not entered")+reportViewerField("Completed By",d.rCompletedBy||d.completedBy||d.report_completed_by||"Not entered")+'</div>';
     const narrative=d.rNarrative||d.narrative||"";
     const response=Array.isArray(d.responding_apparatus)?d.responding_apparatus:[],responseBody=response.length?'<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-xs uppercase tracking-wide text-slate-500 border-b"><th class="py-2 pr-3">Unit</th><th class="py-2 pr-3">Station</th><th class="py-2 pr-3">Crew</th><th class="py-2">Times</th></tr></thead><tbody>'+response.map(u=>'<tr class="border-b align-top"><td class="py-3 pr-3 font-bold">'+esc(u.unit_number||"")+'</td><td class="py-3 pr-3">'+esc(u.station||"")+'</td><td class="py-3 pr-3">'+(u.crew?.length?reportViewerValue(u.crew):'<span class="text-slate-400">None recorded</span>')+'</td><td class="py-3">'+reportViewerValue(u.times||{})+'</td></tr>').join("")+'</tbody></table></div>':'<div class="text-sm text-slate-500">No responding apparatus recorded.</div>';
@@ -1977,6 +1977,54 @@ async function finishIncidentWorkflow(){
   if(packageEmail?.ok) alert("Incident finished. The complete incident package was emailed successfully, and all reports are now in the NERIS review queue.");
   else alert("Incident finished and all reports are in the NERIS review queue, but the incident package email could not be sent. An administrator can email the complete package from Reports.");
  }catch(e){alert(e?.message||String(e))}
+}
+async function getIncidentReportForPdf(cad,reportId){
+  if(profile?.app_role!=="admin")throw new Error("Administrator access required.");
+  const r=await db.from("incidents").select("*").eq("cad",cad).maybeSingle();
+  if(r.error||!r.data)throw new Error(r.error?.message||"Incident not found.");
+  const reports=Array.isArray(r.data.reports)?r.data.reports:[];
+  const rep=reports.find(x=>String(x?.report_id||"")===String(reportId||""));
+  if(!rep)throw new Error("Saved report not found.");
+  return {incident:r.data,report:rep};
+}
+async function downloadIncidentPdf(cad,reportId){
+  try{
+    const {incident,report}=await getIncidentReportForPdf(cad,reportId);
+    const session=(await db.auth.getSession()).data?.session;if(!session)throw new Error("Authentication required.");
+    const resp=await fetch("/api/report-pdf",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({action:"download",incident,reports:[report]})});
+    if(!resp.ok){let b={};try{b=await resp.json()}catch{}throw new Error(b.error||"PDF generation failed.");}
+    const blob=await resp.blob(),url=URL.createObjectURL(blob),a=document.createElement("a"),kind=String(report.report_type||"").startsWith("pcr_")?"Patient Care Report":"Fire Incident Report";
+    a.href=url;a.download=String(cad||"incident")+" - "+kind+".pdf";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);return {ok:true};
+  }catch(e){console.error("downloadIncidentPdf failed:",e);alert("Unable to download PDF: "+(e?.message||String(e)));return {ok:false,error:e?.message||String(e)}}
+}
+async function emailIncidentPdf(cad,reportId){
+  try{
+    const {incident,report}=await getIncidentReportForPdf(cad,reportId);
+    const session=(await db.auth.getSession()).data?.session;if(!session)throw new Error("Authentication required.");
+    const resp=await fetch("/api/report-pdf",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({action:"email",incident,reports:[report]})});
+    let b={};try{b=await resp.json()}catch{}if(!resp.ok||!b.ok)throw new Error(b.error||"PDF email failed.");
+    alert("PDF emailed successfully.");return b;
+  }catch(e){console.error("emailIncidentPdf failed:",e);alert("Unable to email PDF: "+(e?.message||String(e)));return {ok:false,error:e?.message||String(e)}}
+}
+async function generateIncidentPdf(cad,reportId){
+  try{
+    const {incident,report}=await getIncidentReportForPdf(cad,reportId);
+    const session=(await db.auth.getSession()).data?.session;if(!session)throw new Error("Authentication required.");
+    const resp=await fetch("/api/report-pdf",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({action:"download",incident,reports:[report]})});
+    if(!resp.ok){let b={};try{b=await resp.json()}catch{}throw new Error(b.error||"PDF generation failed.");}
+    const blob=await resp.blob(),url=URL.createObjectURL(blob);window.open(url,"_blank","noopener");setTimeout(()=>URL.revokeObjectURL(url),60000);return {ok:true};
+  }catch(e){console.error("generateIncidentPdf failed:",e);alert("Unable to open PDF: "+(e?.message||String(e)));return {ok:false,error:e?.message||String(e)}}
+}
+window.emailAllIncidentPdfs=async function(cad){
+  try{
+    if(profile?.app_role!=="admin"&&profile?.app_role!=="officer")throw new Error("Administrator or on-duty officer access required.");
+    const r=await db.from("incidents").select("*,incident_details(*)").eq("cad",cad).maybeSingle();
+    if(r.error||!r.data)throw new Error(r.error?.message||"Incident not found.");
+    const session=(await db.auth.getSession()).data?.session;if(!session)throw new Error("Authentication required.");
+    const resp=await fetch("/api/report-pdf",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({action:"email_all",incident:r.data,reports:Array.isArray(r.data.reports)?r.data.reports:[]})});
+    let b={};try{b=await resp.json()}catch{}if(!resp.ok||!b.ok)throw new Error(b.error||"Incident package email failed.");
+    return b;
+  }catch(e){console.error("emailAllIncidentPdfs failed:",e);return {ok:false,error:e?.message||String(e)}}
 }
 async function addAnotherReportToIncident(kind){
   try{
