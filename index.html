@@ -848,6 +848,7 @@ window.adminSubmitReport=async function(cad,idx){
   const incident=await db.from("incidents").select("*").eq("cad",cad).maybeSingle();
   if(incident.error||!incident.data)return alert(incident.error?.message||"Incident not found.");
   const reports=Array.isArray(incident.data.reports)?incident.data.reports:[],rep=reports[idx];if(!rep)return alert("Report not found.");
+  if(rep.status!=="ready_for_neris")return alert("This report is not awaiting NERIS review. It cannot be submitted from this action.");
   const details=await db.from("incident_details").select("*").eq("cad",cad).maybeSingle();
   if(details.error)return alert(details.error.message);
   const incidentId=Number(details.data?.incident_id||0)||null;
@@ -860,7 +861,8 @@ window.adminSubmitReport=async function(cad,idx){
   const merged={...Object.assign({},...allReportData),...(details.data||{}),...rep.data,rCad:cad,patients:allReportData.flatMap(x=>Array.isArray(x.patients)?x.patients:[]),responding_apparatus:allReportData.flatMap(x=>Array.isArray(x.responding_apparatus)?x.responding_apparatus:[])};
   const apiValidation=await validateNerisPayloadWithApi(merged);
   if(!apiValidation.ok)return alert("NERIS API validation failed:\n\n"+apiValidation.errors.join("\n"));
-  const result=await submitReportToNeris(merged,details.data?.incident_id||null);
+  // This is the only client path authorized to submit to live NERIS.
+  const result=await submitReportToNeris(merged,details.data?.incident_id||null,true);
   if(!result.ok)return alert(result.error);
   reports[idx]={...rep,status:"submitted_to_neris",neris:result.neris,updated_at:new Date().toISOString(),email_status:"pending"};
   const u=await db.from("incidents").update({reports,updated_at:new Date().toISOString()}).eq("cad",cad);
@@ -1559,7 +1561,12 @@ function buildNerisPayload(data){
   if(nonfd.length)payload.nonfd_aids=nonfd;
   return payload;
 }
-async function submitReportToNeris(data,incidentId){
+async function submitReportToNeris(data,incidentId,explicitAdminReview=false){
+  // NERIS submission is a privileged review action. Finishing a report must
+  // never be able to reach the live NERIS submit endpoint, even if another
+  // client workflow accidentally calls this helper.
+  if(!explicitAdminReview)return {ok:false,error:"NERIS submission requires an explicit administrator review/submit action."};
+  if(profile?.app_role!=="admin")return {ok:false,error:"Administrator access required for NERIS submission."};
   if(!incidentId)return {ok:false,error:"NERIS submission requires an incident record."};
   if(!data.rLocation)return {ok:false,error:"Incident location is required before NERIS submission."};
   const payload=buildNerisPayload(data);
