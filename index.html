@@ -505,7 +505,17 @@ async function savePersonnel(){
   const personnelId=Number(r.data?.id||id);
   if(!personnelId)return alert("Personnel was saved, but the login could not be linked.");
   if(password||data.role==="admin"||!id){
-    const login=await db.functions.invoke("provision-personnel-login",{body:{personnel_id:personnelId,email:data.email,password,role:data.role}});
+    let authSession=null;
+    const currentSession=await db.auth.getSession();
+    authSession=currentSession.data?.session||null;
+    if(!authSession){
+      const refreshed=await db.auth.refreshSession();
+      if(refreshed.error||!refreshed.data?.session){
+        return alert("Personnel was saved, but your administrator login session has expired. Please sign out and sign back in, then try again.");
+      }
+      authSession=refreshed.data.session;
+    }
+    const login=await db.functions.invoke("provision-personnel-login",{body:{personnel_id:personnelId,email:data.email,password,role:data.role},headers:{Authorization:"Bearer "+authSession.access_token}});
     if(login.error||login.data?.error){
       let loginError=login.data?.error||"";
       if(!loginError && login.error?.context){
