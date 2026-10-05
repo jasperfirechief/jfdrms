@@ -647,9 +647,16 @@ function renderHome(){const cards=[["staffing","Daily Staffing","Assign apparatu
 }
 async function loadStaffing(){
   if(!canStaff())return;
-  const date=$("staffDate").value||today(),shift=$("staffShift").value||"A";
+  window.jfdStaffingLoadToken=(window.jfdStaffingLoadToken||0)+1;
+  const loadToken=window.jfdStaffingLoadToken;
+  const storedDate=localStorage.getItem("jfd_staff_date")||"";
+  const storedShift=localStorage.getItem("jfd_staff_shift")||"";
+  const date=$("staffDate").value||storedDate||today(),shift=$("staffShift").value||storedShift||"A";
+  localStorage.setItem("jfd_staff_date",date);localStorage.setItem("jfd_staff_shift",shift);
   $("staffDate").value=date;$("staffShift").value=shift;
   const r=await getOrCreateStaffing(date,shift);if(r.error)return alert(r.error.message);
+  if(loadToken!==window.jfdStaffingLoadToken)return;
+  if($("staffDate").value!==date||$("staffShift").value!==shift)return;
   const sid=r.data.staffing_id;
   const a=await db.from("daily_app_assignments").select("assignment_id,station_id,apparatus_id,daily_personnel_assignments(assignment_id,personnel_id,assignment_role,personnel(id,first_name,last_name,shift))").eq("staffing_id",sid);
   if(a.error)return alert(a.error.message);
@@ -921,7 +928,8 @@ function addNerisTypeField(){
   const wrap=anchor.parentElement?.parentElement; if(!wrap)return;
 }
 function bindStaffingControls(){
-  $("staffDate")?.addEventListener("change",loadStaffing);$("staffShift")?.addEventListener("change",loadStaffing);
+  $("staffDate")?.addEventListener("change",()=>{const v=$("staffDate").value||today();localStorage.setItem("jfd_staff_date",v);loadStaffing()});
+  $("staffShift")?.addEventListener("change",()=>{const v=$("staffShift").value||"A";localStorage.setItem("jfd_staff_shift",v);loadStaffing()});
 }
 bindStaffingControls();
 function incidentDate(v){if(!v)return "";const d=new Date(v);return Number.isNaN(d.getTime())?"":d.toLocaleDateString("en-US",{timeZone:JFD_TIME_ZONE,month:"2-digit",day:"2-digit",year:"numeric"})}function incidentTime(v){if(!v)return "";const d=new Date(v);return Number.isNaN(d.getTime())?"":d.toLocaleTimeString("en-US",{timeZone:JFD_TIME_ZONE,hour:"numeric",minute:"2-digit"})}function mapIncident(id){const el=document.querySelector("[data-incident-id=\""+Number(id)+"\"]");const q=el?.dataset.location||"";const lat=el?.dataset.lat||"";const lng=el?.dataset.lng||"";if(!q&&!lat&&!lng)return alert("No incident location is available.");const url=(lat&&lng)?"https://www.google.com/maps/@?api=1&map_action=map&center="+encodeURIComponent(lat+","+lng)+"&zoom=18":"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(q);window.open(url,"_blank","noopener");}
