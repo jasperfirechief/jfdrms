@@ -975,7 +975,7 @@ function reportResponseUnitRow(u){
   const di=split(u.dispatch_time||u.dispatch_at||$("rDispatch")?.value);
   const en=split(u.enroute_time),on=split(u.on_scene_time),ca=split(u.cancelled_time),cl=split(u.in_service_time);
   const event=(label,key,p,required)=>'<label class="text-xs font-bold">'+label+(required?' <span class="text-red-700">Required</span>':'')+'<div class="grid grid-cols-2 gap-2 mt-1"><input data-report-unit-date="'+key+'" type="date" value="'+esc(p.date||incidentDate)+'" class="w-full border rounded p-2 font-normal"><input data-report-unit-time="'+key+'" type="text" inputmode="numeric" placeholder="HH:MM" value="'+esc(p.time||"")+'" class="w-full border rounded p-2 font-normal" '+(required?'required':'')+'></div></label>';
-  return '<div class="report-response-unit border rounded-xl p-3 bg-white" data-apparatus-id="'+apId+'" data-crew="'+esc(JSON.stringify(crew))+'"><div class="flex justify-between gap-3 items-start"><div><b>'+esc(u.unit_number_snapshot||ap?.unit_number||"Unit")+'</b><div class="text-xs text-slate-500">'+esc(u.station_snapshot||"")+'</div></div><button type="button" onclick="removeReportApparatus('+apId+')" class="text-red-600 font-bold text-sm">Remove</button></div><p class="text-xs font-bold text-red-700 mt-3">Military time required. Enter times as HH:MM (0000-2359).</p><div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-2">'+event("Dispatch","dispatch",di,true)+event("En Route","enroute",en,false)+event("On Scene","on_scene",on,false)+event("Cancelled","cancelled",ca,false)+event("In Service","in_service",cl,false)+'</div></div>';
+  return '<div class="report-response-unit border rounded-xl p-3 bg-white" data-report-response-selected="true" data-apparatus-id="'+apId+'" data-crew="'+esc(JSON.stringify(crew))+'"><div class="flex justify-between gap-3 items-start"><div><b>'+esc(u.unit_number_snapshot||ap?.unit_number||"Unit")+'</b><div class="text-xs text-slate-500">'+esc(u.station_snapshot||"")+'</div></div><button type="button" onclick="removeReportApparatus('+apId+')" class="text-red-600 font-bold text-sm">Remove</button></div><p class="text-xs font-bold text-red-700 mt-3">Military time required. Enter times as HH:MM (0000-2359).</p><div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-2">'+event("Dispatch","dispatch",di,true)+event("En Route","enroute",en,false)+event("On Scene","on_scene",on,false)+event("Cancelled","cancelled",ca,false)+event("In Service","in_service",cl,false)+'</div></div>';
 }
 function syncReportUnitTimes(row){
   if(!row)return;
@@ -1567,7 +1567,7 @@ async function saveReportDraft(kind){
       const d=t.dispatch,e=t.enroute,o=t.on_scene,c=t.cancelled,v=t.in_service;
       if(d===null||e===null||o===null||c===null||v===null){responseErrors.push("Unit "+(u.unit_number||n+1)+": enter valid 24-hour times (HH:MM).");return;}
       if(!d)responseErrors.push("Unit "+(u.unit_number||n+1)+": Dispatch time is required.");
-      if(!c&&(!e||!o||!v))responseErrors.push("Unit "+(u.unit_number||n+1)+": En Route, On Scene, and In Service are required unless Cancelled is entered.");
+      if(!c&&!v)responseErrors.push("Unit "+(u.unit_number||n+1)+": either Cancelled or In Service is required.");
       if(c&&v&&c!==v)responseErrors.push("Unit "+(u.unit_number||n+1)+": Cancelled and In Service must match if both are entered.");
       const seq=[d,e,o].filter(Boolean);if(seq.some((x,i)=>i&&x<seq[i-1]))responseErrors.push("Unit "+(u.unit_number||n+1)+": response times must be chronological.");
       if(v&&o&&v<o)responseErrors.push("Unit "+(u.unit_number||n+1)+": In Service cannot be before On Scene.");
@@ -2037,23 +2037,25 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       data[el.id]=el.multiple?[...el.selectedOptions].map(o=>o.value):el.value;
     });
     data.rDispatchIncidentNumber=data.rDispatchIncidentNumber||data.rCad||$("reportModal")?.dataset.cad||"";
-    const reportRoot=$("incidentReportForm")||$("reportModal")||document;
-    const selectedApparatusIds=new Set([...reportRoot.querySelectorAll("[data-report-apparatus-check]:checked")].map(el=>Number(el.dataset.reportApparatusCheck)).filter(Boolean));
-    const responseRows=[...reportRoot.querySelectorAll(".report-response-unit")].filter(row=>selectedApparatusIds.has(Number(row.dataset.apparatusId)));
+    // The response-unit rows are the authoritative selection state. A row is created only
+    // when an apparatus checkbox is selected and is removed when it is unselected.
+    // Do NOT use generic CAD/Active911 unit rows or a page-wide checkbox query here.
+    const responseRows=[...($("reportResponseUnits")?.querySelectorAll(".report-response-unit[data-report-response-selected='true']")||[])];
     data.responding_apparatus=responseRows.map(row=>{
-      const apId=Number(row.dataset.apparatusId||row.dataset.unitRow||0);
+      const apId=Number(row.dataset.apparatusId||0);
       const name=row.querySelector("[data-report-unit-number]")?.value||row.querySelector("b")?.textContent?.trim()||"";
       const times={};
-      ["dispatch","enroute","on_scene","cancelled","in_service","clear"].forEach(k=>{
+      ["dispatch","enroute","on_scene","cancelled","in_service"].forEach(k=>{
         const date=row.querySelector('[data-report-unit-date="'+k+'"]')?.value||"";
-        const raw=row.querySelector('[data-report-unit-time="'+k+'"]')?.value||"";
+        const input=row.querySelector('[data-report-unit-time="'+k+'"]');
+        const raw=input?.value||"";
         const time=jfdParseTime24(raw);
-        if(time) times[k==="clear"?"clear":k]=date?date+"T"+time:time;
+        if(time) times[k]=date?date+"T"+time:time;
       });
       let crew=[];
       try{crew=JSON.parse(row.dataset.crew||"[]")}catch{}
       return {apparatus_id:apId,unit_number:name,times,crew};
-    }).filter(x=>x.apparatus_id||x.unit_number);
+    }).filter(x=>x.apparatus_id>0);
     data.additional_personnel=[...document.querySelectorAll("[data-report-person]:checked")].map(x=>Number(x.dataset.reportPerson));
     // Do not enforce conditional NERIS module fields while collecting the report.
     // The RMS preserves optional/departmental information, while the NERIS review/API
