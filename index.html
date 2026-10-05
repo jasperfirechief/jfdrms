@@ -1963,7 +1963,11 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   };
   window.jfdClearSignature=function(id){const c=$(id);if(c)c.getContext("2d").clearRect(0,0,c.width,c.height)};
   window.jfdSyncPatientWorkflow=function(id){
-    const care=$(id+"_careProvidedYes")?.checked?"yes":($(id+"_careProvidedNo")?.checked?"no":"");
+    const yes=$(id+"_careProvidedYes"), no=$(id+"_careProvidedNo");
+    if(yes?.checked && no?.checked){
+      if(document.activeElement===yes) no.checked=false; else yes.checked=false;
+    }
+    const care=yes?.checked?"yes":(no?.checked?"no":"");
     const disposition=$(id+"_transportDisposition")?.value||"";
     const shouldCare=care==="yes";
     const shouldTransport=disposition==="Transport by EMS Unit"||disposition==="Transport by Other Agency";
