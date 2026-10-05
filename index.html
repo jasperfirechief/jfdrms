@@ -2037,13 +2037,13 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
         b.textContent="NERIS REQUIRED";
         lab.appendChild(b);
       }
-      if(el.tagName==="INPUT"||el.tagName==="SELECT"||el.tagName==="TEXTAREA")el.required=true;
+      if(el.tagName==="INPUT"||el.tagName==="SELECT"||el.tagName==="TEXTAREA"){ if(el.required)el.dataset.jfdBaseRequired="1"; el.required=true; }
       el.dataset.jfdNerisRequired="1";
     });
   }
   function jfdClearNerisRequired(){
     document.querySelectorAll("[data-jfd-neris-required='1']").forEach(el=>{
-      el.required=false; delete el.dataset.jfdNerisRequired;
+      el.required=el.dataset.jfdBaseRequired==="1"; delete el.dataset.jfdNerisRequired;
       el.closest("label")?.querySelector(".jfd-required-badge")?.remove();
     });
   }
