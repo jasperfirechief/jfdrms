@@ -9,19 +9,28 @@ async function requireAdmin(req){
  const rows=await pr.json();if(rows?.[0]?.active!==true||rows?.[0]?.app_role!=="admin")throw new Error("Administrator access required for PDF reports.");return u;
 }
 async function requirePdfAccess(req,body){
- try{return await requireAdmin(req)}catch(adminErr){
-   if(body?.action!=="email_all"||!body?.incident?.incident_id)throw adminErr;
-   const auth=req.headers.authorization||"";
-   const ur=await fetch(SUPABASE_URL+"/auth/v1/user",{headers:{apikey:SUPABASE_KEY,Authorization:auth}});
-   if(!ur.ok)throw adminErr;
-   const user=await ur.json();
-   const url=SUPABASE_URL+"/rest/v1/incident_details?select=status,report_by&incident_id=eq."+encodeURIComponent(body.incident.incident_id);
-   const q=await fetch(url,{headers:{apikey:SUPABASE_KEY,Authorization:auth}});
-   if(!q.ok)throw adminErr;
-   const rows=await q.json(),d=rows?.[0];
-   if(String(d?.status||"")!=="awaiting_neris"||String(d?.report_by||"")!==String(user.id))throw adminErr;
-   return user;
- }
+  const auth=req.headers.authorization||"";
+  if(body?.action==="email_all"&&body?.incident?.incident_id){
+    if(!auth.startsWith("Bearer "))throw new Error("Authentication required.");
+    const userCtl=new AbortController(),userTimer=setTimeout(()=>userCtl.abort(),8000);
+    let ur;
+    try{ur=await fetch(SUPABASE_URL+"/auth/v1/user",{headers:{apikey:SUPABASE_KEY,Authorization:auth},signal:userCtl.signal})}
+    finally{clearTimeout(userTimer)}
+    if(!ur.ok)throw new Error("Invalid or expired session.");
+    const user=await ur.json();
+    const url=SUPABASE_URL+"/rest/v1/incident_details?select=status,report_by&incident_id=eq."+encodeURIComponent(body.incident.incident_id);
+    const qCtl=new AbortController(),qTimer=setTimeout(()=>qCtl.abort(),8000);
+    let q;
+    try{q=await fetch(url,{headers:{apikey:SUPABASE_KEY,Authorization:auth},signal:qCtl.signal})}
+    finally{clearTimeout(qTimer)}
+    if(!q.ok)throw new Error("Unable to verify incident completion.");
+    const rows=await q.json(),d=rows?.[0];
+    if(String(d?.status||"")!=="awaiting_neris"||String(d?.report_by||"")!==String(user.id)){
+      throw new Error("This completed incident package is not authorized for the current user.");
+    }
+    return user;
+  }
+  return await requireAdmin(req);
 }
 
 const t=v=>String(v??"").replace(/\s+/g," ").trim();
@@ -379,8 +388,8 @@ export default async function handler(req,res){
     const to=Array.isArray(body.to)?body.to.filter(Boolean):body.to?[body.to]:["firechief@jaspercity.com"];
     if(!key||!from)return res.status(503).json({ok:false,error:"Report email is not configured in Vercel."});
     const attachments=generated.map(x=>({content:Buffer.from(x.pdf).toString("base64"),name:x.name}));
-    const emailCtl=new AbortController(),emailTimer=setTimeout(()=>emailCtl.abort(),20000);let er;
-    try{er=await fetch("https://api.brevo.com/v3/smtp/email",{method:"POST",headers:{"api-key":key,"Content-Type":"application/json","accept":"application/json"},body:JSON.stringify({sender:{email:from,name:"Jasper Fire Department"},to:to.map(email=>({email})),subject:"Jasper Fire Department Incident Reports"+(incident.cad?" - "+incident.cad:""),textContent:"Attached are all Jasper Fire Department report PDFs for this incident. Each report is attached as a separate PDF.",attachment:attachments}),signal:emailCtl.signal})}finally{clearTimeout(emailTimer)}
+    const emailCtl=new AbortController(),emailTimer=setTimeout(()=>emailCtl.abort(),8000);let er;
+    try{er=await fetch("https://api.brevo.com/v3/smtp/email",{method:"POST",headers:{"api-key":key,"Content-Type":"application/json","accept":"application/json"},body:JSON.stringify({sender:{email:from,name:"Jasper Fire Department"},to:to.map(email=>({email})),subject:"Jasper Fire Department Incident Reports"+(incident.cad?" - "+incident.cad:""),textContent:"Attached are all Jasper Fire Department report PDFs for this incident. Each report is attached as a separate PDF.",attachment:attachments}),signal:emailCtl.signal})}catch(e){return res.status(502).json({ok:false,error:"Report email request failed.",details:e?.message||String(e)})}finally{clearTimeout(emailTimer)}
     const et=await er.text();let ed;try{ed=JSON.parse(et)}catch{ed={raw:et}};if(!er.ok)return res.status(502).json({ok:false,error:"Report email failed.",details:ed});
     return res.status(200).json({ok:true,email_id:ed?.messageId||null});
   }
