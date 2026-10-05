@@ -1253,10 +1253,11 @@ async function startIncidentReport(kind){
   const i=r.data;const dr=await db.from("incident_details").select("*").eq("incident_id",id).maybeSingle();if(dr.error)return alert(dr.error.message);
   const d=dr.data||{};if(["awaiting_neris","complete"].includes(String(d.status||"")))return alert("This incident has been finished and can no longer be edited.");
   let reportId=String($("reportModal").dataset.reportId||"").trim();
+  const pendingAdditionalType=String($("reportModal").dataset.pendingAdditionalIncidentType||"").trim();
   let reportList=Array.isArray(i.reports)?i.reports:[];
   if(!reportId){
     reportId=crypto.randomUUID();
-    const draft={report_id:reportId,report_type:kind==="fire"?"fire_neris_v2":"pcr_neris_v2",status:"draft",data:{},updated_at:new Date().toISOString(),created_by:me?.id||null};
+    const draft={report_id:reportId,report_type:kind==="fire"?"fire_neris_v2":"pcr_neris_v2",status:"draft",data:pendingAdditionalType?{rPrimaryIncidentType:pendingAdditionalType}: {},updated_at:new Date().toISOString(),created_by:me?.id||null};
     reportList=[draft,...reportList];
     const saved=await db.from("incidents").update({reports:reportList,updated_at:new Date().toISOString()}).eq("cad",cad);
     if(saved.error)return alert("Could not create the report draft: "+saved.error.message);
@@ -1264,7 +1265,8 @@ async function startIncidentReport(kind){
   }
   const ur=await db.from("incident_units").select("*").eq("incident_id",id).order("incident_unit_id");if(ur.error)return alert(ur.error.message);
   const unitRows=ur.data||[];let firstReport=null;
-  if(reportList.length) firstReport=reportList[0]?.data||reportList[0]||null;
+  const previousReports=reportList.filter(x=>x?.report_id!==reportId&&x?.data&&typeof x.data==="object"&&Object.keys(x.data).length);
+  if(previousReports.length) firstReport=previousReports[0]?.data||null;
   const units=unitRows.map(u=>u.unit_number_snapshot).filter(Boolean).join(", "),stationNames=[...new Set(unitRows.map(u=>u.station_snapshot).filter(Boolean))].join(", ");
   const meta={station:stationNames,officer:"",crew:"",units,lat:i.latitude??"",lng:i.longitude??"",shift:$("staffShift")?.value||""};
   $("reportChooser").classList.add("hiddenx");$("incidentReportForm").classList.remove("hiddenx");
@@ -1273,6 +1275,9 @@ async function startIncidentReport(kind){
   $("incidentReportForm").innerHTML=kind==="fire"?window.fireReportForm(i,d,meta,unitRows):window.pcrReportForm(i,d,meta,unitRows);
   jfdSearchableSelects();
   if(firstReport) applyPreviousReportValues(firstReport);
+  if(pendingAdditionalType && $("rPrimaryIncidentType")) $("rPrimaryIncidentType").value=pendingAdditionalType;
+  $("reportModal").dataset.pendingAdditionalIncidentType="";
+  jfdUpdateNerisRequirements?.(); jfdUpdateConditionalReportSections?.();
   bindReportForm(kind); try{await refreshReportApparatusCrews(iDateForReport(i.dispatch_time));}catch(e){console.error("Report apparatus refresh failed",e);}
   if(firstReport?.additional_personnel?.length){
     const ids=new Set(firstReport.additional_personnel.map(Number));
@@ -1804,6 +1809,8 @@ function bindReportForm(kind){
   const autosave=()=>{clearTimeout(timer);timer=setTimeout(()=>saveReportDraft(kind,true).catch(e=>console.error("Report autosave failed:",e)),900)};
   form.addEventListener("input",autosave);
   form.addEventListener("change",autosave);
+  form.addEventListener("input",()=>{jfdUpdateNerisRequirements?.();jfdUpdateConditionalReportSections?.()});
+  form.addEventListener("change",()=>{jfdUpdateNerisRequirements?.();jfdUpdateConditionalReportSections?.()});
 }
 function toDateTimeLocal(v){if(!v)return "";const d=new Date(v);if(Number.isNaN(d.getTime()))return "";const p=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes());}
 async function loadIncidents(){
@@ -2010,30 +2017,39 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   function jfdNerisBadge(label){return '<span class="ml-2 inline-flex items-center rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide">NERIS Required</span>';}
   function jfdMarkNerisRequired(ids){
     (ids||[]).forEach(id=>{
-      const el=$(id),lab=el?.closest("label");
-      if(lab&&!lab.querySelector(".jfd-required-badge")){
-        const b=document.createElement("span");b.className="jfd-required-badge ml-2 text-[10px] font-black uppercase text-red-700";b.textContent="Required";lab.appendChild(b);
-        if(el.tagName==="INPUT"||el.tagName==="SELECT"||el.tagName==="TEXTAREA")el.required=true;
+      const el=$(id),lab=el?.closest("label"); if(!el||!lab)return;
+      if(!lab.querySelector(".jfd-required-badge")){
+        const b=document.createElement("span");
+        b.className="jfd-required-badge ml-2 text-[10px] font-black uppercase text-red-700";
+        b.textContent="NERIS REQUIRED";
+        lab.appendChild(b);
       }
+      if(el.tagName==="INPUT"||el.tagName==="SELECT"||el.tagName==="TEXTAREA")el.required=true;
+      el.dataset.jfdNerisRequired="1";
     });
   }
-  function jfdNerisRequirementPanel(){
-    return '<div id="jfdNerisRequirements" class="md:col-span-2 border-2 border-red-200 bg-red-50 rounded-xl p-4"><div class="flex items-center gap-2"><b class="text-red-800">NERIS Required Fields</b><span class="text-[10px] font-black uppercase bg-red-100 text-red-700 rounded-full px-2 py-0.5">Dynamic</span></div><p class="text-xs text-red-800 mt-1">Required fields change with the selected incident type(s). Fields marked below are required for NERIS submission; conditional fields are shown when their incident type applies.</p><div id="jfdNerisRequirementList" class="mt-3 grid md:grid-cols-2 gap-2"></div></div>';
+  function jfdClearNerisRequired(){
+    document.querySelectorAll("[data-jfd-neris-required='1']").forEach(el=>{
+      el.required=false; delete el.dataset.jfdNerisRequired;
+      el.closest("label")?.querySelector(".jfd-required-badge")?.remove();
+    });
   }
+  function jfdNerisRequirementPanel(){ return ""; }
   function jfdUpdateNerisRequirements(){
-    const box=$("jfdNerisRequirementList"); if(!box)return;
+    jfdClearNerisRequired();
     const types=[$("rPrimaryIncidentType")?.value,...[...document.querySelectorAll("[id^='rIncidentType_']")].map(x=>x.value)].filter(Boolean);
     const upper=types.join(" ").toUpperCase();
     const rows=[
       ["rCad","Incident / CAD number"],
       ["rDispatchIncidentNumber","Dispatch incident number"],
       ["rLocation","Incident location"],
+      ["rDispatch","Dispatch time"],
       ["rCallArrival","Call Arrival time"],
       ["rCallAnswered","Call Answered time"],
       ["rCallCreate","Call Create time"],
       ["rPrimaryIncidentType","Primary incident type"]
     ];
-    const structure=types.some(x=>/^FIRE\|\|STRUCTURE_FIRE/.test(String(x)));
+    const structure=types.some(x=>/^FIRE\|\|STRUCTURE_FIRE/.test(String(x))) || /STRUCTURE_FIRE|STRUCTURE/.test(upper);
     const confinedCooking=types.some(x=>/CONFINED_COOKING_APPLIANCE_FIRE/.test(String(x)));
     if(structure){
       rows.push(
@@ -2044,12 +2060,25 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       );
       if(confinedCooking)rows.push(["rCookingSuppression","Cooking fire suppression"]);
     }
-    if(!types.length){
-      box.innerHTML='<div class="text-sm text-red-800 md:col-span-2">Select a NERIS incident type to display the fields NERIS requires for this incident.</div>';
-      return;
-    }
-    box.innerHTML=rows.map(([id,label])=>'<div class="bg-white border border-red-100 rounded-lg px-3 py-2 text-sm"><b>'+esc(label)+'</b><span class="text-red-700 text-xs ml-2">NERIS Required</span></div>').join("");
     jfdMarkNerisRequired(rows.map(x=>x[0]));
+    document.querySelectorAll(".report-response-unit").forEach(row=>{
+      const dispatch=row.querySelector('[data-report-unit-time="dispatch"]');
+      const cancel=row.querySelector('[data-report-unit-time="cancelled"]');
+      const service=row.querySelector('[data-report-unit-time="in_service"]');
+      [dispatch,cancel,service].forEach(el=>{ if(!el)return; const lab=el.closest("label"); lab?.querySelector(".jfd-required-badge")?.remove(); });
+      if(dispatch){
+        dispatch.required=true; dispatch.dataset.jfdNerisRequired="1";
+        dispatch.closest("label")?.insertAdjacentHTML("afterbegin",'');
+        const lab=dispatch.closest("label"); if(lab&&!lab.querySelector(".jfd-required-badge"))lab.insertAdjacentHTML("afterbegin",'<span class="jfd-required-badge ml-2 text-[10px] font-black uppercase text-red-700">NERIS REQUIRED</span>');
+      }
+      if(cancel||service){
+        [cancel,service].forEach(el=>{
+          if(!el)return;
+          const lab=el.closest("label");
+          if(lab&&!lab.querySelector(".jfd-required-badge"))lab.insertAdjacentHTML("afterbegin",'<span class="jfd-required-badge ml-2 text-[10px] font-black uppercase text-red-700">NERIS REQUIRED</span>');
+        });
+      }
+    });
   }
   function fireDetails(i,d){
     return card("Fire Details",'<div class="grid md:grid-cols-2 gap-3">'+
@@ -2153,7 +2182,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       '</div>');
     window.jfdIncidentTypes=(d?.incident_types||[]).filter(Boolean);
     if(!window.jfdIncidentTypes.length&&d?.secondary_incident_type)window.jfdIncidentTypes=[d.secondary_incident_type];
-    h+=jfdNerisRequirementPanel();
+    
     h+=card("Actions Taken",'<div class="space-y-3">'+
       '<div class="flex flex-wrap gap-5">'+
       '<label class="flex items-center gap-2 text-sm font-semibold"><input id="rActionTaken" type="checkbox" '+(d?.action_taken?"checked":"")+' onchange="jfdRenderActionControls()"> Action Taken</label>'+
@@ -2201,7 +2230,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   function pcrFormNew(i,d,m,unitRows){
     const saved=d?.patients||d?.pcr?.patients||[];
     let h=pcrIncidentHeader(i,d,m);
-    h+=jfdNerisRequirementPanel();
+    
     const addPatientButton=btn("+ Add Patient","jfdAddPatient({})","primary");
     h+=card("PATIENTS",'<div id="jfdPatients"></div><div class="mt-3 flex flex-wrap gap-2">'+addPatientButton+'</div>');
     h+=reportResponseSection({dispatch_incident_number:d?.rDispatchIncidentNumber||d?.dispatch_incident_number||i.cad||"",call_arrival:d?.rCallArrival||d?.call_arrival||i.dispatch_time,call_answered:d?.rCallAnswered||d?.call_answered||i.dispatch_time,call_create:d?.rCallCreate||d?.call_create||i.dispatch_time,dispatch_time:d?.rDispatch||d?.dispatch_time||i.dispatch_time});
