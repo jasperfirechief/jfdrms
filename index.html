@@ -495,10 +495,22 @@ function closePersonnelForm(){$("personnelFormModal")?.classList.add("hiddenx")}
 function syncInspectorField(){}
 async function savePersonnel(){
   const data={first_name:$("pfFirst").value.trim(),last_name:$("pfLast").value.trim(),email:$("pfEmail").value.trim(),role:$("pfRole").value,shift:$("pfShift").value,is_inspector:$("pfInspector").checked,active:true};
+  const password=$("pfPassword").value||"";
   if(!data.first_name||!data.last_name||!data.email)return alert("First name, last name, and email are required.");
-  const id=Number($("pfId").value||0);let r;
-  if(id)r=await db.from("personnel").update(data).eq("id",id);else r=await db.from("personnel").insert(data);
-  if(r.error)return alert(r.error.message);closePersonnelForm();await loadAdminData();renderAdmin();
+  const id=Number($("pfId").value||0);
+  let r;
+  if(id)r=await db.from("personnel").update(data).eq("id",id).select("id").single();
+  else r=await db.from("personnel").insert(data).select("id").single();
+  if(r.error)return alert(r.error.message);
+  const personnelId=Number(r.data?.id||id);
+  if(!personnelId)return alert("Personnel was saved, but the login could not be linked.");
+  if(password||data.role==="admin"||!id){
+    const login=await db.functions.invoke("provision-personnel-login",{body:{personnel_id:personnelId,email:data.email,password,role:data.role}});
+    if(login.error||login.data?.error){
+      return alert("Personnel was saved, but the login could not be created/updated: "+(login.data?.error||login.error?.message||"Unknown error"));
+    }
+  }
+  closePersonnelForm();await loadAdminData();renderAdmin();
 }
 async function openChecklistManager(){
   const m=$("checklistManagerModal");if(!m)return alert("Checklist manager is not available.");
@@ -1027,8 +1039,31 @@ function bindUnassignedCrew(el){
   const sel=el?.querySelector("[data-unassigned-crew]");if(!sel||sel.dataset.bound==="1")return;
   sel.dataset.bound="1";
   sel.addEventListener("change",e=>{
-    const crew=[...e.target.selectedOptions].map(o=>{const p=personnel.find(x=>Number(x.id)===Number(o.value));return p?{id:Number(p.id),name:(p.first_name||"")+" "+(p.last_name||""),role:p.role||""}:null}).filter(Boolean);
+    const chosenIds=[...e.target.selectedOptions].map(o=>Number(o.value));
+    const crew=chosenIds.map(id=>{const p=personnel.find(x=>Number(x.id)===id);return p?{id,name:(p.first_name||"")+" "+(p.last_name||""),role:p.role||""}:null}).filter(Boolean);
     el.dataset.crew=JSON.stringify(crew);
+    // An on-duty member can temporarily move to this apparatus for this incident.
+    // Remove selected members from every other responding apparatus in this report,
+    // while leaving their daily staffing assignment unchanged.
+    document.querySelectorAll(".report-response-unit").forEach(other=>{
+      if(other===el)return;
+      const otherCrew=JSON.parse(other.dataset.crew||"[]");
+      const original=JSON.parse(other.dataset.originalCrew||other.dataset.crew||"[]");
+      const filtered=otherCrew.filter(x=>!chosenIds.includes(Number(x.id)));
+      other.dataset.crew=JSON.stringify(filtered);
+      const label=other.querySelector("[data-report-crew-label]");if(label)label.textContent=reportCrewLabel(filtered);
+      const otherSel=other.querySelector("[data-unassigned-crew]");
+      if(otherSel) [...otherSel.options].forEach(o=>{if(chosenIds.includes(Number(o.value)))o.selected=false});
+      if(!other.dataset.unassigned)other.dataset.crewOriginal=JSON.stringify(original);
+    });
+    // A person may temporarily crew only one unassigned apparatus in this incident.
+    document.querySelectorAll(".report-response-unit[data-unassigned='true']").forEach(other=>{
+      if(other===el)return;
+      const os=other.querySelector("[data-unassigned-crew]");
+      if(os)[...os.options].forEach(o=>{if(chosenIds.includes(Number(o.value)))o.selected=false});
+      const oc=[...(os?.selectedOptions||[])].map(o=>{const p=personnel.find(x=>Number(x.id)===Number(o.value));return p?{id:Number(p.id),name:(p.first_name||"")+" "+(p.last_name||""),role:p.role||""}:null}).filter(Boolean);
+      other.dataset.crew=JSON.stringify(oc);
+    });
   });
 }
 function toggleUnassignedReportApparatus(id,checked){
@@ -1129,7 +1164,7 @@ async function refreshReportApparatusCrews(dateOverride){
     const fixed=JFD_FIXED_RESPONSE_UNITS.find(x=>Number(x.apparatus_id)===apId);
     const a=assignments.find(x=>Number(x.apparatus_id)===apId);
     const crew=fixed?(fixed.crew||[]):(a?.daily_personnel_assignments||[]).map(p=>({id:Number(p.personnel_id),name:(p.personnel?.first_name||"")+" "+(p.personnel?.last_name||""),role:p.assignment_role||p.personnel?.role||""}));
-    row.dataset.crew=JSON.stringify(crew);
+    row.dataset.crew=JSON.stringify(crew);row.dataset.originalCrew=JSON.stringify(crew);
     const crewLabel=row.querySelector("[data-report-crew-label]");if(crewLabel)crewLabel.textContent=reportCrewLabel(crew);
     const station=(stations.find(s=>Number(s.station_id)===Number(a?.station_id))||{}).station_name||"";
     const st=row.querySelector(".text-xs.text-slate-500");if(st&&!fixed&&!row.dataset.unassigned)st.textContent=station;
