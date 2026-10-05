@@ -1796,7 +1796,11 @@ async function finishIncidentWorkflow(){
   for(const rep of reports){const kind=String(rep.report_type||"").startsWith("pcr_")?"pcr":"fire",data=rep.data||{},validation=await validateIncidentForNeris(kind,data,incidentId,cad);if(!validation.ok)throw new Error(reportTypeLabel(rep)+" is not ready:\n\n"+validation.errors.join("\n"));const nc=await validateNerisPayloadWithApi(data);if(!nc.ok)throw new Error(reportTypeLabel(rep)+" has NERIS validation errors:\n\n"+nc.errors.join("\n"));finalReports.push({...rep,status:"ready_for_neris",updated_at:new Date().toISOString(),validation});}
   const upd=await db.from("incidents").update({reports:finalReports,updated_at:new Date().toISOString()}).eq("cad",cad);if(upd.error)throw new Error(upd.error.message);
   const st=await db.from("incident_details").update({status:"awaiting_neris",completed_at:new Date().toISOString(),report_by:me?.id||null}).eq("incident_id",incidentId);if(st.error)throw new Error(st.error.message);
-  alert("Incident finished. All reports are now in the NERIS review queue.");closeReportModal();await loadIncidents();await renderReports();
+  let packageEmail={ok:false};
+  try{packageEmail=await window.emailAllIncidentPdfs(cad);}catch(e){packageEmail={ok:false,error:e?.message||String(e)}}
+  closeReportModal();await loadIncidents();await renderReports();
+  if(packageEmail?.ok) alert("Incident finished. The complete incident package was emailed successfully, and all reports are now in the NERIS review queue.");
+  else alert("Incident finished and all reports are in the NERIS review queue, but the incident package email could not be sent. An administrator can email the complete package from Reports.");
  }catch(e){alert(e?.message||String(e))}
 }
 async function addAnotherReportToIncident(kind){
