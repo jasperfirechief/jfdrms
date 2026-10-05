@@ -123,7 +123,7 @@ export async function makePdf(incident={},reports=[]){
    ensure(34);page.drawRectangle({x:m,y:y-22,width:usable,height:22,color:NAVY});
    labels.forEach((s,i)=>page.drawText(s,{x:xs[i]+5,y:y-14,font:F.bold,size:6.8,color:WHITE}));y-=22;
    for(const u of units){
-     const z=u.times||{},crew=Array.isArray(u.crew)?u.crew.map(x=>typeof x==="object"?x.name||x.full_name||"":x).filter(Boolean).join(", "):u.crew;
+     const z=u.times||{},crew=Array.isArray(u.crew)?u.crew.map(x=>{if(typeof x!=="object")return x;const role=String(x.role||"").toLowerCase();const tag=role==="driver"?"Driver":role==="officer"?"Officer":(x.role||"");return (x.name||x.full_name||"")+(tag?" ("+tag+")":"");}).filter(Boolean).join(", "):u.crew;
      const dispatch=z.dispatch&&timeText(z.dispatch);
      const response=[z.enroute&&("En route "+timeText(z.enroute)),z.on_scene&&("On scene "+timeText(z.on_scene))].filter(Boolean).join(" • ");
      const disp=[z.cancelled&&("Cancelled "+timeText(z.cancelled)),(z.in_service||z.clear)&&("In service "+timeText(z.in_service||z.clear))].filter(Boolean).join(" • ");
@@ -138,7 +138,20 @@ export async function makePdf(incident={},reports=[]){
  const pcr=(reports||[]).filter(r=>String(r?.report_type||"").startsWith("pcr_"));
  const fd=fire[0]?.data||{};
  const patients=pcr.flatMap(r=>Array.isArray(r?.data?.patients)?r.data.patients:[]);
- const units=Array.isArray(fd.responding_apparatus)?fd.responding_apparatus:[];
+ const unitMap=new Map();
+  for(const r of (reports||[])){
+    const arr=Array.isArray(r?.data?.responding_apparatus)?r.data.responding_apparatus:[];
+    for(const u of arr){
+      const key=String(u?.apparatus_id??u?.unit_number??u?.unit_number_snapshot??"");
+      if(!key)continue;
+      const prev=unitMap.get(key);
+      if(!prev){unitMap.set(key,{...u,crew:Array.isArray(u.crew)?u.crew.slice():u.crew});continue;}
+      if((!prev.crew||!prev.crew.length)&&Array.isArray(u.crew))prev.crew=u.crew.slice();
+      prev.times={...(prev.times||{}),...(u.times||{})};
+      if(u.station&&!prev.station)prev.station=u.station;
+    }
+  }
+  const units=[...unitMap.values()];
  
  currentTitle="FIRE INCIDENT REPORT";newPage(currentTitle);
  section("Incident Summary");
