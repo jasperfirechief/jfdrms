@@ -2037,7 +2037,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     });
     data.rDispatchIncidentNumber=data.rDispatchIncidentNumber||data.rCad||$("reportModal")?.dataset.cad||"";
     const reportRoot=$("incidentReportForm")||$("reportModal")||document;
-    const responseRows=[...reportRoot.querySelectorAll(".report-response-unit,[data-unit-row]")];
+    const responseRows=[...reportRoot.querySelectorAll(".report-response-unit")];
     data.responding_apparatus=responseRows.map(row=>{
       const apId=Number(row.dataset.apparatusId||row.dataset.unitRow||0);
       const name=row.querySelector("[data-report-unit-number]")?.value||row.querySelector("b")?.textContent?.trim()||"";
