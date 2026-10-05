@@ -1859,7 +1859,14 @@ async function saveReportDraft(kind,silent=false){
     const upd=await db.from("incidents").update({reports,updated_at:new Date().toISOString()}).eq("cad",m.dataset.cad||"");if(upd.error)throw new Error(upd.error.message);
     m.dataset.reportId=report.report_id;
   }else{
-    const ins=await db.from("standalone_reports").insert({report_type:reportType,data,status:"draft",created_by:me?.id||null});if(ins.error)throw new Error(ins.error.message);
+    if(editingId){
+      const upd=await db.from("standalone_reports").update({report_type:reportType,data,status:"draft",updated_at:new Date().toISOString()}).eq("report_id",editingId);
+      if(upd.error)throw new Error(upd.error.message);
+    }else{
+      const ins=await db.from("standalone_reports").insert({report_type:reportType,data,status:"draft",created_by:me?.id||null}).select("report_id").maybeSingle();
+      if(ins.error)throw new Error(ins.error.message);
+      if(ins.data?.report_id)m.dataset.reportId=String(ins.data.report_id);
+    }
   }
   if(!silent)alert(editingId?"Draft updated.":"Draft saved.");
   if(incidentId)await loadIncidents();
