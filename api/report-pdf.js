@@ -8,6 +8,21 @@ async function requireAdmin(req){
  const u=await ur.json();const permCtl=new AbortController();const permTimer=setTimeout(()=>permCtl.abort(),10000);let pr;try{pr=await fetch(SUPABASE_URL+"/rest/v1/users?select=app_role,active&user_id=eq."+encodeURIComponent(u.id),{headers:{apikey:SUPABASE_KEY,Authorization:auth},signal:permCtl.signal})}finally{clearTimeout(permTimer)}if(!pr.ok)throw new Error("Unable to verify RMS permissions.");
  const rows=await pr.json();if(rows?.[0]?.active!==true||rows?.[0]?.app_role!=="admin")throw new Error("Administrator access required for PDF reports.");return u;
 }
+async function requirePdfAccess(req,body){
+ try{return await requireAdmin(req)}catch(adminErr){
+   if(body?.action!=="email_all"||!body?.incident?.incident_id)throw adminErr;
+   const auth=req.headers.authorization||"";
+   const ur=await fetch(SUPABASE_URL+"/auth/v1/user",{headers:{apikey:SUPABASE_KEY,Authorization:auth}});
+   if(!ur.ok)throw adminErr;
+   const user=await ur.json();
+   const url=SUPABASE_URL+"/rest/v1/incident_details?select=status,report_by&incident_id=eq."+encodeURIComponent(body.incident.incident_id);
+   const q=await fetch(url,{headers:{apikey:SUPABASE_KEY,Authorization:auth}});
+   if(!q.ok)throw adminErr;
+   const rows=await q.json(),d=rows?.[0];
+   if(String(d?.status||"")!=="awaiting_neris"||String(d?.report_by||"")!==String(user.id))throw adminErr;
+   return user;
+ }
+}
 
 const t=v=>String(v??"").replace(/\s+/g," ").trim();
 const val=v=>t(v)||"—";
@@ -325,7 +340,7 @@ export default async function handler(req,res){
  if(req.method!=="POST")return res.status(405).json({ok:false,error:"Method not allowed"});
  try{
   const body=typeof req.body==="string"?JSON.parse(req.body):req.body||{};
-  await requireAdmin(req);
+  await requirePdfAccess(req,body);
   if(body.archiveType){
     const pdf=await makeArchivePdf(body.archiveType,body.archiveData||{});
     if(body.action==="email"){
