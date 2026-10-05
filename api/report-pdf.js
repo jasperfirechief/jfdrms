@@ -126,26 +126,27 @@ export async function makePdf(incident={},reports=[]){
  const units=Array.isArray(fd.responding_apparatus)?fd.responding_apparatus:[];
  
  currentTitle="FIRE INCIDENT REPORT";newPage(currentTitle);
- section("Incident Identification");
- twoCol(["CAD / Incident Number",incident.cad||fd.rCad],["Incident Date",dateText(fd.rDate||incident.dispatch_time)]);
- twoCol(["Call Type",fd.rCall||fd.rCallType||incident.type],["Shift",fd.rShift]);
- field("Primary Incident Type",fd.rPrimaryIncidentType||incident.type);
- field("Secondary Incident Type",fd.rSecondaryIncidentType);
- 
- section("Location & Occupancy");
+ section("Incident Summary");
+ twoCol(["Incident / CAD Number",incident.cad||fd.rCad],["Incident Date",dateText(fd.rDate||incident.dispatch_time)]);
  field("Incident Location",fd.rLocation||incident.location);
- twoCol(["Location Type",fd.rLocationType],["Property Use / Occupancy",fd.rPrimaryUse||fd.rOccupancy]);
- twoCol(["Location In Use",fd.rLocationInUse],["Used As Intended",fd.rUsedAsIntended]);
- twoCol(["People Present",fd.rPeoplePresent],["Vacancy",fd.rVacancy]);
- twoCol(["Latitude",fd.rLatitude],["Longitude",fd.rLongitude]);
- 
+ twoCol(["Call Type",fd.rCall||fd.rCallType||incident.type],["Location Type",fd.rLocationType]);
+ field("Property Use / Occupancy",fd.rPrimaryUse||fd.rOccupancy);
+
  section("Owner / Occupant Information");
  twoCol(["Owner Name",fd.rOwnerName||fd.owner_name],["Owner Phone",fd.rOwnerPhone||fd.owner_phone]);
  field("Owner Address",fd.rOwnerAddress||fd.owner_address);
  twoCol(["Occupant Name",fd.rOccupantName||fd.rOccName||fd.occupant_name],["Occupant Phone",fd.rOccPhone||fd.occupant_phone]);
  field("Occupant Address",fd.rOccupantAddress||fd.occupant_address);
+
+ section("Fire Department Report");
+ field("Date of Incident",dateText(fd.rDate||incident.dispatch_time));
+ field("Type of Response",fd.rCall||fd.rCallType||incident.type);
+ field("Department Contact","Jasper Fire Department • 10 18th Street East • Jasper, Alabama 35501 • 205-221-8509");
+ fullText("General Incident Description","This page provides the basic incident and property information for the owner or occupant. Detailed operational, apparatus, NERIS, investigative, and other department-use information is provided on subsequent pages.");
  
- section("Response / Apparatus");
+ currentTitle="FIRE INCIDENT REPORT";newPage(currentTitle);
+ section("Department Technical Record");
+
  const dispatchTimes=[["Dispatch",fd.rDispatch],["En Route",fd.rEnRoute],["On Scene",fd.rOnScene],["Cancelled",fd.rCancelled],["In Service",fd.rInService]];
  const activeTimes=dispatchTimes.filter(x=>x[1]);
  if(activeTimes.length){
