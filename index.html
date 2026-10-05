@@ -1129,18 +1129,30 @@ function commonReportFields(i,d,m,unitRows=[]){
   );
 }
 function setReportIncidentContext(i,d){const m=$("reportModal");if(!m)return;const attached=!!(m.dataset.incidentId&&m.dataset.cad);const banner=$("reportIncidentBanner");if(!banner)return;if(attached){banner.classList.remove("hiddenx");banner.innerHTML='<div class="font-semibold text-slate-800">'+esc(i.type||"Incident")+": "+esc(i.location||"Location not provided")+"</div><div class=\"mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500\"><span>CAD <b class=\"text-slate-700\">"+esc(i.cad||"")+"</b></span><span>"+esc(i.dispatch_time?incidentDate(i.dispatch_time)+" "+incidentTime(i.dispatch_time):"Time not available")+"</span><span>Attached to incident</span></div>";banner.dataset.lat=i.latitude??"";banner.dataset.lng=i.longitude??"";banner.dataset.location=i.location||"";}else{banner.classList.add("hiddenx");banner.innerHTML="";}}function openReportIncidentMap(){const b=$("reportIncidentBanner");if(b)openIncidentMap({location:b.dataset.location||"",lat:b.dataset.lat||"",lng:b.dataset.lng||""});}function renderReportChooser(i,d,units){
-  const modal=$("reportModal");if(modal)modal.dataset.reportId="";$("reportModalChrome")?.classList.remove("hiddenx");$("reportFormClose")?.classList.add("hiddenx");
+  const modal=$("reportModal");if(modal)modal.dataset.reportId="";
+  $("reportModalChrome")?.classList.remove("hiddenx");$("reportFormClose")?.classList.add("hiddenx");
   setReportIncidentContext(i,d);
-  $("reportModalTitle").textContent="Create Report";
-  $("reportModalSub").textContent="Select a report type. CAD and incident details are shown below.";
+  const additional=modal?.dataset.requireAdditionalType==="1";
+  const reports=Array.isArray(i?.reports)?i.reports:[];
+  const used=new Set(reports.flatMap(rep=>[rep?.data?.rPrimaryIncidentType,rep?.data?.rSecondaryIncidentType,...(Array.isArray(rep?.data?.incident_types)?rep.data.incident_types:[])].filter(Boolean).map(String)));
+  const options=(NERIS_INCIDENT_TYPES||[]).filter(o=>!additional||!used.has(String(o.value)));
+  const typeChooser=additional?'<div class="mb-5"><label class="block text-sm font-bold">Additional incident type / reason for this report <span class="text-red-700">NERIS REQUIRED</span><select id="additionalReportIncidentType" class="w-full border rounded-lg p-3 mt-1 bg-white"><option value="">Choose incident type...</option>'+options.map(o=>'<option value="'+esc(o.value)+'">'+esc(o.label)+'</option>').join("")+'</select><p class="text-xs text-slate-500 mt-1">Each additional report must be tied to an additional incident type. Shared incident information will carry forward and remain editable.</p></label></div>':"";
+  $("reportModalTitle").textContent=additional?"Add Report to Incident":"Create Report";
+  $("reportModalSub").textContent=additional?"Choose the additional incident type, then choose the report that documents it.":"Select a report type. CAD and incident details are shown below.";
   $("incidentReportForm").classList.add("hiddenx");
   $("reportChooser").classList.remove("hiddenx");
-  $("reportChooser").innerHTML='<div class="max-w-4xl mx-auto"><h3 class="text-xl font-black mb-2">Choose a report</h3><p class="text-sm text-slate-500 mb-5">Available CAD information will be pre-populated. Missing information can be entered manually.</p><div class="grid md:grid-cols-2 gap-4"><button type="button" onclick="openIncidentReportFromChooser(\'fire\')" class="border-2 border-slate-200 hover:border-red-500 rounded-2xl p-6 text-left">Fire Incident Report</button><button type="button" onclick="openIncidentReportFromChooser(\'pcr\')" class="border-2 border-slate-200 hover:border-blue-500 rounded-2xl p-6 text-left">Patient Care Report</button></div></div>';
+  $("reportChooser").innerHTML='<div class="max-w-4xl mx-auto"><h3 class="text-xl font-black mb-2">'+(additional?"Add Another Report":"Choose a report")+'</h3><p class="text-sm text-slate-500 mb-5">'+(additional?"The additional incident type is required before another report can be started.":"Available CAD information will be pre-populated. Missing information can be entered manually.")+'</p>'+typeChooser+'<div class="grid md:grid-cols-2 gap-4"><button type="button" onclick="openIncidentReportFromChooser(\'fire\')" class="border-2 border-slate-200 hover:border-red-500 rounded-2xl p-6 text-left">Fire Incident Report</button><button type="button" onclick="openIncidentReportFromChooser(\'pcr\')" class="border-2 border-slate-200 hover:border-blue-500 rounded-2xl p-6 text-left">Patient Care Report</button></div></div>';
 }
 function openIncidentReportFromChooser(kind){
   try{
     const m=$("reportModal");
     if(!m)return alert("Report window is not available.");
+    if(m.dataset.requireAdditionalType==="1"){
+      const type=$("additionalReportIncidentType")?.value||"";
+      if(!type)return alert("Choose the additional incident type for this report first.");
+      m.dataset.pendingAdditionalIncidentType=type;
+      m.dataset.requireAdditionalType="";
+    }
     if(m.dataset.standalone==="1" || !m.dataset.incidentId)return startStandaloneReport(kind);
     return startIncidentReport(kind);
   }catch(e){
@@ -1790,15 +1802,16 @@ async function finishIncidentWorkflow(){
 }
 async function addAnotherReportToIncident(kind){
   try{
-    const m=$("reportModal"),incidentId=Number(m?.dataset.incidentId||0)||null;if(!incidentId)return alert("This option is available when the report is attached to an incident.");
+    const m=$("reportModal"),incidentId=Number(m?.dataset.incidentId||0)||null;
+    if(!incidentId)return alert("This option is available when the report is attached to an incident.");
     await saveReportDraft(kind);
-    m.dataset.reportId="";
-    const r=await db.from("incidents").select("*,incident_details(*)").eq("cad",m.dataset.cad||"").maybeSingle();if(r.error||!r.data)return alert(r.error?.message||"Incident not found.");
+    const r=await db.from("incidents").select("*,incident_details(*)").eq("cad",m.dataset.cad||"").maybeSingle();
+    if(r.error||!r.data)return alert(r.error?.message||"Incident not found.");
     const d=(r.data.incident_details||{})[0]||r.data.incident_details||{};
+    if(["awaiting_neris","complete"].includes(String(d.status||"")))return alert("This incident has been finished and can no longer be edited.");
     const ur=await db.from("incident_units").select("*").eq("incident_id",incidentId).order("incident_unit_id");if(ur.error)return alert(ur.error.message);
-    await startIncidentReport(kind);
-    const latest=Array.isArray(r.data.reports)&&r.data.reports.length?(r.data.reports[0]?.data||r.data.reports[0]||null):null;
-    if(latest)applyPreviousReportValues(latest);
+    m.dataset.reportId="";m.dataset.requireAdditionalType="1";
+    renderReportChooser(r.data,d,ur.data||[]);
   }catch(e){alert(e?.message||String(e))}
 }
 function bindReportForm(kind){
