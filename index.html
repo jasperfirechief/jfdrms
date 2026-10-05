@@ -1652,10 +1652,13 @@ function applyPreviousReportValues(data){
   $("incidentReportForm")?.querySelectorAll("input,select,textarea").forEach(el=>{
     if(el.matches("[data-report-unit-time],[data-report-person]")||el.id==="reportApparatusPicker")return;
     const value=data[el.id];
-    if(value===undefined||value===null||String(value)==="")return;
+    if(value===undefined||value===null)return;
+    if(el.type==="checkbox"){el.checked=!!value;return;}
+    if(el.type==="radio"){if(el.name&&data["__radio_"+el.name]!==undefined)el.checked=String(data["__radio_"+el.name])===String(el.value);return;}
     if(el.tagName==="SELECT"){
-      const exists=[...el.options].some(o=>o.value===String(value));if(exists)el.value=String(value);
-    }else el.value=String(value);
+      const exists=[...el.options].some(o=>o.value===String(value));
+      if(exists){el.value=String(value);el.dispatchEvent(new Event("change",{bubbles:true}));}
+    }else if(String(value)!=="")el.value=String(value);
   });
 }
 function collectReportFormData(){
@@ -2441,11 +2444,14 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     const scalar={...data};delete scalar.patients;delete scalar.exposures;delete scalar.casualties;delete scalar.vehicles;delete scalar.hazards;delete scalar.responding_apparatus;delete scalar.additional_personnel;delete scalar.incident_types;delete scalar.aid_records;delete scalar.nonfd_aid_records;
     $("incidentReportForm")?.querySelectorAll("input,select,textarea").forEach(el=>{
       const v=scalar[el.id];if(v===undefined||v===null)return;
-      if(el.multiple&&Array.isArray(v)){[...el.options].forEach(o=>o.selected=v.includes(o.value));return;}
-      if(el.type==="checkbox")el.checked=!!v;else if(el.tagName==="SELECT"){const exists=[...el.options].some(o=>o.value===String(v));if(exists)el.value=String(v)}else if(String(v)!=="")el.value=String(v);
+      if(el.multiple&&Array.isArray(v)){[...el.options].forEach(o=>o.selected=v.includes(o.value));el.dispatchEvent(new Event("change",{bubbles:true}));return;}
+      if(el.type==="checkbox")el.checked=!!v;
+      else if(el.type==="radio"){if(el.name&&scalar["__radio_"+el.name]!==undefined)el.checked=String(scalar["__radio_"+el.name])===String(el.value);}
+      else if(el.tagName==="SELECT"){const exists=[...el.options].some(o=>o.value===String(v));if(exists){el.value=String(v);el.dispatchEvent(new Event("change",{bubbles:true}));}}
+      else if(String(v)!=="")el.value=String(v);
     });
-    if(data.rNerisType&&!$("rPrimaryIncidentType")?.value&&$("rPrimaryIncidentType"))$("rPrimaryIncidentType").value=String(data.rNerisType);
-    if(data.rIncidentType&&!$("rPrimaryIncidentType")?.value&&$("rPrimaryIncidentType"))$("rPrimaryIncidentType").value=String(data.rIncidentType);
+    if(data.rNerisType&&!$("rPrimaryIncidentType")?.value&&$("rPrimaryIncidentType")){$("rPrimaryIncidentType").value=String(data.rNerisType);$("rPrimaryIncidentType").dispatchEvent(new Event("change",{bubbles:true}));}
+    if(data.rIncidentType&&!$("rPrimaryIncidentType")?.value&&$("rPrimaryIncidentType")){$("rPrimaryIncidentType").value=String(data.rIncidentType);$("rPrimaryIncidentType").dispatchEvent(new Event("change",{bubbles:true}));}
     if(window.currentReportKind==="pcr"){window.jfdRenderPatients(data.patients||[])}
     window.jfdIncidentTypes=(data.incident_types||[]).slice(1);window.jfdRenderIncidentTypes?.();
     window.jfdAids={fd:data.aid_records||[],nonfd:data.nonfd_aid_records||[]};window.jfdRenderAids?.();
