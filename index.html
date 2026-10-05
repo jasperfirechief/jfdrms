@@ -1585,8 +1585,8 @@ async function validateAndFinishReport(kind){
   try{
     const data=collectReportFormData(),m=$("reportModal"),incidentId=Number(m?.dataset.incidentId||0)||null;
     if(!incidentId)return alert("Standalone reports can be saved as drafts, but must be attached to an incident before NERIS review.");
-    const reportRoot=m?.querySelector("#incidentReportForm")||m||document;for(const row of [...reportRoot.querySelectorAll(".report-response-unit")]){
-      const t=k=>String(row.querySelector('[data-report-unit-time="'+k+'"]')?.value||"").trim();
+    const reportRoot=m?.querySelector("#incidentReportForm")||m||document;const responseContainer=reportRoot.querySelector("#reportResponseUnits");const responseRows=responseContainer?[...responseContainer.querySelectorAll(":scope > .report-response-unit")]:[...reportRoot.querySelectorAll(".report-response-unit")].filter(row=>row.offsetParent!==null);for(const row of responseRows){
+      const t=k=>{const el=row.querySelector('[data-report-unit-time="'+k+'"]');return String(el?.value||"").trim()};
       const normalizeInput=v=>{const s=String(v||"").trim();if(!s)return "";const m=s.match(/^(?:\\d{4}-\\d{2}-\\d{2}T)?(\\d{1,2}):?(\\d{2})(?::\\d{2})?$/);if(!m)return jfdParseTime24(s)||null;const h=Number(m[1]),min=Number(m[2]);return h<=23&&min<=59?String(h).padStart(2,"0")+":"+String(min).padStart(2,"0"):null;};
       const dispatch=normalizeInput(t("dispatch")),enroute=normalizeInput(t("enroute")),onscene=normalizeInput(t("on_scene")),cancelled=normalizeInput(t("cancelled")),inservice=normalizeInput(t("in_service"));
       const normalizeResponseTime=v=>{const raw=String(v||"").trim();if(!raw)return "";if(/^\\d{4}-\\d{2}-\\d{2}T/.test(raw)){const m=raw.match(/T(\\d{2}:\\d{2})/);return m?m[1]:""}return jfdParseTime24(raw)||null;};
