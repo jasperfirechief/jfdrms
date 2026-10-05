@@ -1275,6 +1275,27 @@ function ensureSavedReportViewer(){
   document.body.appendChild(m);return m;
 }
 function closeSavedReportViewer(){const m=$("savedReportViewer");if(m)m.classList.add("hiddenx");}
+async function cancelCurrentReport(){
+  const m=$("reportModal"),cad=String(m?.dataset.cad||"").trim(),reportId=String(m?.dataset.reportId||"").trim();
+  if(!cad||!reportId)return alert("This report has not been saved yet. Close it or save it as a draft first.");
+  if(!confirm("Cancel this report?\n\nOnly this report will be cancelled. Any other reports attached to this incident will not be affected."))return;
+  try{
+    const r=await db.from("incidents").select("reports").eq("cad",cad).maybeSingle();
+    if(r.error||!r.data)throw new Error(r.error?.message||"Incident not found.");
+    const reports=Array.isArray(r.data.reports)?r.data.reports:[];
+    const idx=reports.findIndex(x=>String(x?.report_id||"")===reportId);
+    if(idx<0)throw new Error("Report not found.");
+    reports.splice(idx,1);
+    const upd=await db.from("incidents").update({reports,updated_at:new Date().toISOString()}).eq("cad",cad);
+    if(upd.error)throw new Error(upd.error.message);
+    closeReportModal();
+    await loadIncidents();
+    alert("Report cancelled. Other reports attached to this incident were not changed.");
+  }catch(e){
+    console.error("cancelCurrentReport failed:",e);
+    alert("Unable to cancel this report: "+(e?.message||String(e)));
+  }
+}
 async function editSavedReport(cad,reportId){
   try{
     const r=await db.from("incidents").select("*,incident_details(*)").eq("cad",cad).maybeSingle();
@@ -1829,7 +1850,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     });
     [...box.querySelectorAll("[data-unit-row]")].forEach(r=>{if(!selected.includes(Number(r.dataset.unitRow)))r.remove()});
   };
-  function actionBar(kind){const isFire=kind==="fire";const patientBtn=isFire?"":btn("Add Another Patient","jfdAddPatient({})");const finishBtn=(profile?.app_role==="officer"&&crew.length>0)?btn("Finish With Incident","finishIncidentWorkflow()","primary"):"";return '<div class="sticky bottom-0 z-10 bg-white/95 backdrop-blur border-t pt-3 flex flex-wrap justify-between gap-2"><div class="flex flex-wrap gap-2">'+btn("Save Draft","saveReportDraft(window.currentReportKind)")+patientBtn+btn("Add Another Report to This Incident","addAnotherReportToIncident(window.currentReportKind)")+'</div><div class="flex flex-wrap gap-2">'+btn("Close","closeReportModal()")+finishBtn+'</div></div>'}
+  function actionBar(kind){const isFire=kind==="fire";const patientBtn=isFire?"":btn("Add Another Patient","jfdAddPatient({})");const finishBtn=(profile?.app_role==="officer"&&crew.length>0)?btn("Finish With Incident","finishIncidentWorkflow()","primary"):"";const cancelBtn=btn("Cancel This Report","cancelCurrentReport()");return '<div class="sticky bottom-0 z-10 bg-white/95 backdrop-blur border-t pt-3 flex flex-wrap justify-between gap-2"><div class="flex flex-wrap gap-2">'+btn("Save Draft","saveReportDraft(window.currentReportKind)")+patientBtn+btn("Add Another Report to This Incident","addAnotherReportToIncident(window.currentReportKind)")+'</div><div class="flex flex-wrap gap-2">'+cancelBtn+btn("Close","closeReportModal()")+finishBtn+'</div></div>'}
   function patientSignaturePadHtml(id,p){return '<div class="mt-3"><div class="flex items-center justify-between gap-2"><label class="text-sm font-bold">Patient / Guardian Signature</label><button type="button" onclick="jfdClearSignature(\''+id+'_signaturePad\')" class="border px-2 py-1 rounded text-xs font-bold">Clear</button></div><canvas id="'+id+'_signaturePad" data-signature-pad="'+id+'" class="w-full h-36 mt-1 bg-white border-2 border-slate-300 rounded-lg touch-none"></canvas><p class="text-xs text-slate-500 mt-1">Sign above with a finger, stylus, or touchpad.</p></div>';}
   function patientRefusalHtml(id,p){
     const refusal=!!(p.refusedCare||p.refusedTransport||p.minorRefusal);
