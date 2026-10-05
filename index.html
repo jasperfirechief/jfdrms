@@ -1136,26 +1136,16 @@ function setReportIncidentContext(i,d){const m=$("reportModal");if(!m)return;con
   $("reportModalChrome")?.classList.remove("hiddenx");$("reportFormClose")?.classList.add("hiddenx");
   setReportIncidentContext(i,d);
   const additional=modal?.dataset.requireAdditionalType==="1";
-  const reports=Array.isArray(i?.reports)?i.reports:[];
-  const used=new Set(reports.flatMap(rep=>[rep?.data?.rPrimaryIncidentType,rep?.data?.rSecondaryIncidentType,...(Array.isArray(rep?.data?.incident_types)?rep.data.incident_types:[])].filter(Boolean).map(String)));
-  const options=(NERIS_INCIDENT_TYPES||[]).filter(o=>!additional||!used.has(String(o.value)));
-  const typeChooser=additional?'<div class="mb-5"><label class="block text-sm font-bold">Additional incident type / reason for this report <span class="text-red-700">NERIS REQUIRED</span><select id="additionalReportIncidentType" class="w-full border rounded-lg p-3 mt-1 bg-white"><option value="">Choose incident type...</option>'+options.map(o=>'<option value="'+esc(o.value)+'">'+esc(o.label)+'</option>').join("")+'</select><p class="text-xs text-slate-500 mt-1">Each additional report must be tied to an additional incident type. Shared incident information will carry forward and remain editable.</p></label></div>':"";
   $("reportModalTitle").textContent=additional?"Add Report to Incident":"Create Report";
-  $("reportModalSub").textContent=additional?"Choose the additional incident type, then choose the report that documents it.":"Select a report type. CAD and incident details are shown below.";
+  $("reportModalSub").textContent=additional?"Choose a report type, then choose the additional incident type in the report form.":"Select a report type. CAD and incident details are shown below.";
   $("incidentReportForm").classList.add("hiddenx");
   $("reportChooser").classList.remove("hiddenx");
-  $("reportChooser").innerHTML='<div class="max-w-4xl mx-auto"><h3 class="text-xl font-black mb-2">'+(additional?"Add Another Report":"Choose a report")+'</h3><p class="text-sm text-slate-500 mb-5">'+(additional?"The additional incident type is required before another report can be started.":"Available CAD information will be pre-populated. Missing information can be entered manually.")+'</p>'+typeChooser+'<div class="grid md:grid-cols-2 gap-4"><button type="button" onclick="openIncidentReportFromChooser(\'fire\')" class="border-2 border-slate-200 hover:border-red-500 rounded-2xl p-6 text-left">Fire Incident Report</button><button type="button" onclick="openIncidentReportFromChooser(\'pcr\')" class="border-2 border-slate-200 hover:border-blue-500 rounded-2xl p-6 text-left">Patient Care Report</button></div></div>';
+  $("reportChooser").innerHTML='<div class="max-w-4xl mx-auto"><h3 class="text-xl font-black mb-2">'+(additional?"Add Another Report":"Choose a report")+'</h3><p class="text-sm text-slate-500 mb-5">'+(additional?"The additional incident type will be selected inside the report form. Shared incident information will carry forward and remain editable.":"Available CAD information will be pre-populated. Missing information can be entered manually.")+'</p><div class="grid md:grid-cols-2 gap-4"><button type="button" onclick="openIncidentReportFromChooser(\'fire\')" class="border-2 border-slate-200 hover:border-red-500 rounded-2xl p-6 text-left">Fire Incident Report</button><button type="button" onclick="openIncidentReportFromChooser(\'pcr\')" class="border-2 border-slate-200 hover:border-blue-500 rounded-2xl p-6 text-left">Patient Care Report</button></div></div>';
 }
 function openIncidentReportFromChooser(kind){
   try{
     const m=$("reportModal");
     if(!m)return alert("Report window is not available.");
-    if(m.dataset.requireAdditionalType==="1"){
-      const type=$("additionalReportIncidentType")?.value||"";
-      if(!type)return alert("Choose the additional incident type for this report first.");
-      m.dataset.pendingAdditionalIncidentType=type;
-      m.dataset.requireAdditionalType="";
-    }
     if(m.dataset.standalone==="1" || !m.dataset.incidentId)return startStandaloneReport(kind);
     return startIncidentReport(kind);
   }catch(e){
@@ -1269,6 +1259,7 @@ async function startIncidentReport(kind){
   const d=dr.data||{};if(["awaiting_neris","complete"].includes(String(d.status||"")))return alert("This incident has been finished and can no longer be edited.");
   let reportId=String($("reportModal").dataset.reportId||"").trim();
   const pendingAdditionalType=String($("reportModal").dataset.pendingAdditionalIncidentType||"").trim();
+  const usedReportIncidentTypes=(Array.isArray(i?.reports)?i.reports:[]).flatMap(rep=>[rep?.data?.rPrimaryIncidentType,rep?.data?.rSecondaryIncidentType,...(Array.isArray(rep?.data?.incident_types)?rep.data.incident_types:[])]).filter(Boolean).map(String);
   let reportList=Array.isArray(i.reports)?i.reports:[];
   if(!reportId){
     reportId=crypto.randomUUID();
@@ -1291,6 +1282,11 @@ async function startIncidentReport(kind){
   jfdSearchableSelects();
   if(firstReport) applyPreviousReportValues(firstReport);
   if(pendingAdditionalType && $("rPrimaryIncidentType")) $("rPrimaryIncidentType").value=pendingAdditionalType;
+  if(String($("reportModal").dataset.requireAdditionalType||"")==="1" && $("rPrimaryIncidentType")){
+    const primary=$("rPrimaryIncidentType"), label=primary.closest("label")?.querySelector("span");
+    if(label) label.innerHTML='Additional incident type / reason for this report <span class="jfd-required-badge ml-2 text-[10px] font-black uppercase text-red-700">NERIS REQUIRED</span>';
+    [...primary.options].forEach(o=>{ if(o.value && usedReportIncidentTypes.includes(String(o.value))) o.remove(); });
+  }
   $("reportModal").dataset.pendingAdditionalIncidentType="";
   jfdUpdateNerisRequirements?.(); jfdUpdateConditionalReportSections?.();
   bindReportForm(kind); try{await refreshReportApparatusCrews(iDateForReport(i.dispatch_time));}catch(e){console.error("Report apparatus refresh failed",e);}
