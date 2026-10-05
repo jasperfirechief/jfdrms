@@ -345,8 +345,8 @@ export default async function handler(req,res){
     if(!er.ok)return res.status(502).json({ok:false,error:"Report email failed.",details:ed});
     return res.status(200).json({ok:true,email_id:ed?.messageId||null});
   }
-  res.setHeader("Content-Type","application/pdf");res.setHeader("Content-Disposition",'inline; filename="JFD Incident Report.pdf"');
-  return res.status(200).send(Buffer.from(pdf));
+  res.setHeader("Cache-Control","no-store, no-cache, must-revalidate");res.setHeader("Content-Type","application/pdf");res.setHeader("Content-Length",String(pdf.length));res.setHeader("Content-Disposition",'attachment; filename="JFD Incident Report.pdf"');
+  return res.status(200).end(Buffer.from(pdf));
  }
  catch(e){console.error("JFD report PDF error",e);return res.status(500).json({ok:false,error:e?.message||"Report generation failed"})}
 }
