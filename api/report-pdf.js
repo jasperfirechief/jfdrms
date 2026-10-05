@@ -197,31 +197,97 @@ export async function makePdf(incident={},reports=[]){
  section("Report Completion");
  field("Person Completing Report",fd.rCompletedBy||fd.completedBy||fd.report_completed_by);
  for(let i=0;i<patients.length;i++){
-   const p=patients[i]||{};currentTitle="PATIENT CARE REPORT";newPage(currentTitle);
-   section("Patient Information");
-   twoCol(["Patient",p.name],["Date of Birth",dateText(p.dob)]);
-   twoCol(["Age",p.age],["Sex",p.sex]);field("Patient Address",p.address);twoCol(["Patient Phone",p.phone],["Incident / CAD",incident.cad||fd.rCad]);
-   twoCol(["Incident Date",dateText(fd.rDate||incident.dispatch_time)],["Incident Time",timeText(fd.rDateTime||fd.rDispatch||incident.dispatch_time)]);
-   field("Incident Location",fd.rLocation||incident.location);field("Responding Unit",p.vehicle||p.assignedVehicle||p.unit||fd.responding_unit);
-   section("Chief Complaint / Presentation");
-   field("Chief Complaint / Reason for Response",p.chief);field("Injury / Medical Complaint",p.injury||p.complaint);fullText("Presentation / Brief Narrative",p.presentation||p.narrative||"");
-   section("Assessment / Care");
-   field("Patient Care Provided",p.careProvided===true?"Evaluated and cared for":p.careProvided===false?"Evaluated, no care required":p.evaluation);
-   const vitals=p.vitals||{};for(const [k,v] of Object.entries(vitals))if(v!==undefined&&v!==null&&v!=="")field(prettyKey(k),v);
-   const care=Array.isArray(p.methodsOfCare)?p.methodsOfCare:Array.isArray(p.careMethods)?p.careMethods:Array.isArray(p.methods)?p.methods:[];
-   field("BLS Methods of Care",care);field("Oxygen",p.oxygen||p.oxygenMethod);field("Medical History",p.medicalHistory||p.history);field("Medications",p.medications||p.meds);field("Allergies",p.allergies);
-   section("Disposition");
-   field("Disposition",p.transportDisposition||p.transport||p.disposition);twoCol(["Transporting Agency / Unit",p.transportAgency||p.transportUnit||p.vehicle],["Destination",p.destination]);
-   field("Disposition Narrative",p.dispositionNarrative);twoCol(["Vehicle / Insurance",p.vehicleInfo||p.vehicleInsurance||p.insurance],["Equipment Used / Replaced",p.equipmentUsed||p.equipmentReplaced||p.equipment]);
-   if(p.refusedCare||p.refusedTransport||p.minorRefusal){
-     section("Refusal / Signatures");
-     field("Refusal Type",[p.refusedCare?"Refused Care":"",p.refusedTransport?"Refused Transport":"",""].filter(Boolean).join(", ")||"Minor refusal");
-     twoCol(["Patient / Guardian",p.refusalSigner],["Guardian Relationship",p.guardianRelationship]);
-     field("Risks Explained / Acknowledged",p.risksExplained||p.risksAcknowledged);field("Refusal Date / Time",p.refusalDateTime||p.refusalDate||p.signedAt);
-     field("Provider",p.provider||"JFD RMS user / electronic record");
-     if(String(p.signature||"").startsWith("data:image/png"))try{const bytes=Buffer.from(String(p.signature).split(",")[1],"base64"),img=await pdf.embedPng(bytes);ensure(105);page.drawText("Patient / Guardian Signature",{x:m+7,y:y-12,font:F.bold,size:7.5,color:SLATE});page.drawImage(img,{x:m+7,y:y-87,width:250,height:70});page.drawRectangle({x:m+7,y:y-87,width:250,height:70,borderWidth:.5,borderColor:MID});y-=100}catch{}
+   const p=patients[i]||{};
+   const isRefusal=!!(p.refusedCare||p.refusedTransport||p.minorRefusal||p.refusal||p.refusalType);
+   const refusalType=p.refusalType||[p.refusedCare?"Refused Care":"",p.refusedTransport?"Refused Transport":"",p.minorRefusal?"Minor Refusal":""].filter(Boolean).join(", ")||"Patient Refusal";
+   currentTitle="PATIENT CARE REPORT";newPage(currentTitle);
+
+   // PAGE 1: concise disposition/signature record. Keep clinical PHI off this page
+   // except what is necessary to identify the encounter and execute a refusal.
+   section("Patient Care / Disposition Summary");
+   twoCol(["Incident / CAD",incident.cad||fd.rCad],["Incident Date",dateText(fd.rDate||incident.dispatch_time)]);
+   field("Incident Location",fd.rLocation||incident.location);
+   twoCol(["Response Unit",p.vehicle||p.assignedVehicle||p.unit||fd.responding_unit],["Disposition",p.transportDisposition||p.transport||p.disposition]);
+   twoCol(["Transport Agency / Unit",p.transportAgency||p.transportUnit||p.vehicle],["Destination",p.destination]);
+   field("Chief Complaint / Reason for Response",p.chief||p.complaint||"Not recorded");
+
+   if(isRefusal){
+     section("Patient Refusal / Release");
+     field("Refusal Type",refusalType);
+     field("Recommended Care / Transport",p.recommendedCare||p.refusalRecommendations||p.refusedServices||"See refusal documentation");
+     fullText("Risks / Consequences Explained",p.risksExplained||p.risksAcknowledged||p.refusalExplanation||"The patient or authorized representative was advised of the risks and consequences of refusing the recommended care and/or transport.");
+     twoCol(["Refusing Party",p.refusalSigner||p.patientSigner||p.guardianName||p.name],["Relationship",p.guardianRelationship||p.signerRelationship||"Patient"]);
+     twoCol(["Refusal Date / Time",p.refusalDateTime||p.refusalDate||p.signedAt],["Witness",p.witnessName||p.refusalWitness]);
+     field("If Patient Declined to Sign",p.signatureRefused||p.patientRefusedSignature?"Patient/representative declined to sign.":"");
+     ensure(112);
+     page.drawText("Patient / Guardian Signature",{x:m+7,y:y-12,font:F.bold,size:7.5,color:SLATE});
+     if(String(p.signature||"").startsWith("data:image/png")){
+       try{
+         const bytes=Buffer.from(String(p.signature).split(",")[1],"base64"),img=await pdf.embedPng(bytes);
+         page.drawImage(img,{x:m+7,y:y-91,width:250,height:70});
+       }catch{}
+     }else{
+       page.drawText(p.signatureName||p.refusalSigner||"Electronic signature recorded",{x:m+7,y:y-50,font:F.reg,size:9,color:NAVY});
+     }
+     page.drawRectangle({x:m+7,y:y-92,width:250,height:70,borderWidth:.5,borderColor:MID});
+     page.drawText("Signature",{x:m+265,y:y-12,font:F.bold,size:7.5,color:SLATE});
+     page.drawText("Date / Time",{x:m+390,y:y-12,font:F.bold,size:7.5,color:SLATE});
+     page.drawLine({start:{x:m+265,y:y-58},end:{x:m+380,y:y-58},thickness:.5,color:MID});
+     page.drawLine({start:{x:m+390,y:y-58},end:{x:m+usable-7,y:y-58},thickness:.5,color:MID});
+     y-=105;
+     twoCol(["Witness Signature",p.witnessSignatureName||p.witnessName],["Provider Signature",p.providerSignatureName||p.provider||"JFD EMS Provider"]);
+   }else{
+     section("Disposition / Transfer");
+     field("Disposition Narrative",p.dispositionNarrative||p.transferNarrative||"");
+     twoCol(["Patient / Representative Signature",p.patientSignatureName||p.signatureName||""],["Provider",p.provider||"JFD EMS Provider"]);
    }
-   section("Narrative / Completion");fullText("Narrative",p.narrative||p.comments||"No narrative entered.");field("Person Completing Report",p.completedBy||p.reportCompletedBy||p.provider||"JFD RMS user / electronic record");
+
+   section("Report Identification");
+   twoCol(["Patient Record", "Patient "+(i+1)+" of "+patients.length],["Completed By",p.completedBy||p.reportCompletedBy||p.provider||"JFD RMS user"]);
+   fullText("Protected Clinical Information","Clinical assessment, vital signs, medications, medical history, allergies, interventions, and other protected patient information are contained on subsequent pages of this report.");
+
+   // PAGE 2+: protected clinical record
+   currentTitle="PATIENT CARE REPORT — PROTECTED CLINICAL RECORD";newPage(currentTitle);
+   section("Patient Identification");
+   twoCol(["Patient",p.name],["Date of Birth",dateText(p.dob)]);
+   twoCol(["Age",p.age],["Sex",p.sex]);
+   field("Patient Address",p.address);
+   twoCol(["Patient Phone",p.phone],["Incident / CAD",incident.cad||fd.rCad]);
+
+   section("Assessment / Presentation");
+   field("Chief Complaint / Reason for Response",p.chief||p.complaint);
+   field("Injury / Medical Complaint",p.injury||p.complaint);
+   fullText("Presentation / Brief Narrative",p.presentation||p.narrative||"");
+
+   section("Clinical Assessment");
+   field("Patient Care Provided",p.careProvided===true?"Evaluated and cared for":p.careProvided===false?"Evaluated, no care required":p.evaluation);
+   const vitals=p.vitals||{};
+   if(Object.keys(vitals).length){
+     section("Vital Signs");
+     for(const [k,v] of Object.entries(vitals))if(v!==undefined&&v!==null&&v!=="")field(prettyKey(k),v);
+   }else field("Vital Signs","No vital signs recorded");
+   field("Medical History",p.medicalHistory||p.history);
+   field("Medications",p.medications||p.meds);
+   field("Allergies",p.allergies);
+
+   section("Treatment / Interventions");
+   const care=Array.isArray(p.methodsOfCare)?p.methodsOfCare:Array.isArray(p.careMethods)?p.careMethods:Array.isArray(p.methods)?p.methods:[];
+   field("BLS Methods of Care",care);
+   field("Oxygen",p.oxygen||p.oxygenMethod);
+   field("Medications Administered",p.medicationsAdministered||p.medicationsGiven||p.medications||p.meds);
+   field("Procedures / Interventions",p.interventions||p.procedures);
+   field("Patient Response",p.patientResponse||p.responseToTreatment);
+
+   section("Disposition / Transfer Details");
+   field("Disposition",p.transportDisposition||p.transport||p.disposition);
+   twoCol(["Transporting Agency / Unit",p.transportAgency||p.transportUnit||p.vehicle],["Destination",p.destination]);
+   field("Disposition Narrative",p.dispositionNarrative||p.transferNarrative);
+   twoCol(["Vehicle / Insurance",p.vehicleInfo||p.vehicleInsurance||p.insurance],["Equipment Used / Replaced",p.equipmentUsed||p.equipmentReplaced||p.equipment]);
+
+   section("Clinical Narrative / Completion");
+   fullText("Narrative",p.narrative||p.comments||"No narrative entered.");
+   field("Person Completing Report",p.completedBy||p.reportCompletedBy||p.provider||"JFD RMS user");
+   field("Provider / Crew",p.provider||p.crew||"");
    page.drawText("Patient "+(i+1)+" of "+patients.length,{x:W-m-65,y:23,font:F.bold,size:7,color:SLATE});
  }
  if(!patients.length){currentTitle="PATIENT CARE REPORT";newPage(currentTitle);section("Patient Information");field("Patient Records","None recorded");}
