@@ -1336,9 +1336,20 @@ async function renderReports(){
   const searchHtml='<div class="card p-4 mb-4"><div class="font-bold">Search Reports</div><div class="text-xs text-slate-500 mt-1">Search all saved reports by address, location, occupancy/name, CAD number, report type, incident type, narrative, or other saved report information.</div><div class="grid md:grid-cols-4 gap-2 mt-3"><input id="completedReportSearch" class="border rounded p-2" placeholder="Address, name, keyword, CAD..."><input id="completedReportFrom" type="date" class="border rounded p-2"><input id="completedReportTo" type="date" class="border rounded p-2"><button type="button" onclick="filterCompletedReports()" class="bg-slate-950 text-white rounded p-2 font-bold">Search Reports</button></div><div id="completedReportSearchResults" class="mt-4"></div></div>';
   list.innerHTML=searchHtml+groups.map(g=>{
     const items=rows.filter(x=>x.rep.status===g.key);
-    return '<div class="card p-5"><h2 class="font-black text-lg">'+g.title+'</h2><div class="mt-3 space-y-2">'+(items.length?items.map(x=>'<div class="border rounded-lg p-3 flex flex-wrap justify-between gap-3 items-center"><div><div class="font-bold">'+esc(x.rep.report_type==="pcr_neris_v2"?"Patient Care Report":"Fire Report")+' · CAD '+esc(x.i.cad||"")+'</div><div class="text-sm text-slate-500">'+esc(x.i.type||"Incident")+' · '+esc(x.i.location||"Location not provided")+'</div><div class="text-xs text-slate-400 mt-1">'+esc(x.rep.updated_at?incidentDate(x.rep.updated_at):incidentDate(x.i.dispatch_time))+' '+esc(x.rep.updated_at?incidentTime(x.rep.updated_at):incidentTime(x.i.dispatch_time))+'</div></div><div class="flex gap-2"><button data-cad="'+esc(x.i.cad||"")+'" data-report-id="'+esc(x.rep.report_id||"")+'" onclick="openSavedReportFromButton(this)" class="bg-slate-950 text-white px-3 py-2 rounded-lg text-sm font-bold">Open Report</button>'+(profile?.app_role==="admin"&&x.rep.status==="submitted_to_neris"?'<button type="button" data-cad="'+esc(x.i.cad||"")+'" data-report-id="'+esc(x.rep.report_id||"")+'" onclick="downloadIncidentPdf(this.dataset.cad,this.dataset.reportId)" class="bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-bold">Download PDF</button><button type="button" data-cad="'+esc(x.i.cad||"")+'" data-report-id="'+esc(x.rep.report_id||"")+'" onclick="emailIncidentPdf(this.dataset.cad,this.dataset.reportId)" class="bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-bold">Email PDF</button>':"")+(profile?.app_role==="admin"?'<button data-cad="'+esc(x.i.cad||"")+'" data-report-id="'+esc(x.rep.report_id||"")+'" onclick="adminDeleteReportFromButton(this)" class="bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-bold">Delete</button>':"")+'</div></div>').join(""):'<div class="text-sm text-slate-500">'+g.empty+'</div>')+'</div></div>';
+    return '<div class="card p-5"><h2 class="font-black text-lg">'+g.title+'</h2><div class="mt-3 space-y-2">'+(items.length?items.map(x=>'<div class="border rounded-lg p-3 flex flex-wrap justify-between gap-3 items-center"><div><div class="font-bold">'+esc(x.rep.report_type==="pcr_neris_v2"?"Patient Care Report":"Fire Report")+' · CAD '+esc(x.i.cad||"")+'</div><div class="text-sm text-slate-500">'+esc(x.i.type||"Incident")+' · '+esc(x.i.location||"Location not provided")+'</div><div class="text-xs text-slate-400 mt-1">'+esc(x.rep.updated_at?incidentDate(x.rep.updated_at):incidentDate(x.i.dispatch_time))+' '+esc(x.rep.updated_at?incidentTime(x.rep.updated_at):incidentTime(x.i.dispatch_time))+'</div></div><div class="flex gap-2"><button data-cad="'+esc(x.i.cad||"")+'" data-report-id="'+esc(x.rep.report_id||"")+'" onclick="openSavedReportFromButton(this)" class="bg-slate-950 text-white px-3 py-2 rounded-lg text-sm font-bold">Open Report</button>'+(profile?.app_role==="admin"&&x.rep.status==="ready_for_neris"?'<button type="button" onclick="adminSubmitReportFromButton(this)" data-cad="'+esc(x.i.cad||"")+'" data-report-id="'+esc(x.rep.report_id||"")+'" class="bg-amber-600 text-white px-3 py-2 rounded-lg text-sm font-bold">Review / Submit</button>':"")+(profile?.app_role==="admin"&&x.rep.status==="submitted_to_neris"?'<button type="button" data-cad="'+esc(x.i.cad||"")+'" data-report-id="'+esc(x.rep.report_id||"")+'" onclick="downloadIncidentPdf(this.dataset.cad,this.dataset.reportId)" class="bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-bold">Download PDF</button><button type="button" data-cad="'+esc(x.i.cad||"")+'" data-report-id="'+esc(x.rep.report_id||"")+'" onclick="emailIncidentPdf(this.dataset.cad,this.dataset.reportId)" class="bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-bold">Email PDF</button>':"")+(profile?.app_role==="admin"?'<button data-cad="'+esc(x.i.cad||"")+'" data-report-id="'+esc(x.rep.report_id||"")+'" onclick="adminDeleteReportFromButton(this)" class="bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-bold">Delete</button>':"")+'</div></div>').join(""):'<div class="text-sm text-slate-500">'+g.empty+'</div>')+'</div></div>';
   }).join("");
   filterCompletedReports();
+}
+async function adminSubmitReportFromButton(btn){
+  if(profile?.app_role!=="admin")return alert("Administrator access required.");
+  const cad=btn?.dataset.cad||"",reportId=btn?.dataset.reportId||"";
+  if(!cad||!reportId)return alert("Report identifier is missing.");
+  const incident=await db.from("incidents").select("reports").eq("cad",cad).maybeSingle();
+  if(incident.error||!incident.data)return alert(incident.error?.message||"Incident not found.");
+  const reports=Array.isArray(incident.data.reports)?incident.data.reports:[];
+  const idx=reports.findIndex(x=>String(x?.report_id||"")===String(reportId));
+  if(idx<0)return alert("Report not found.");
+  return adminSubmitReport(cad,idx);
 }
 function completedReportSearchText(x){
   const rep=x.rep||{},i=x.i||{};
@@ -1386,13 +1397,25 @@ function collectReportFormData(){
     if(!el.id||el.matches("[data-report-unit-time],[data-report-person]")||el.type==="checkbox"||el.type==="file")return;
     data[el.id]=el.multiple?[...el.selectedOptions].map(o=>o.value):el.value;
   });
-  data.responding_apparatus=[...(reportModal?.querySelectorAll(".report-response-unit")||[])].map(row=>({
-    apparatus_id:Number(row.dataset.apparatusId||0),
-    unit_number:row.querySelector("[data-report-unit-number]")?.value||row.querySelector(".font-bold")?.textContent?.trim()||"",
-    station:row.querySelector(".text-xs.text-slate-500")?.textContent?.trim()||"",
-    crew:JSON.parse(row.dataset.crew||"[]"),
-    times:Object.fromEntries([...row.querySelectorAll("[data-report-unit-time]")].map(x=>[x.dataset.reportUnitTime,x.value]))
-  }));
+  const responseRoot=$("reportResponseUnits")||reportModal;
+  const responseRows=[...(responseRoot?.querySelectorAll(".report-response-unit[data-report-response-selected='true']")||[])];
+  data.responding_apparatus=responseRows.map(row=>{
+    const times={};
+    ["dispatch","enroute","on_scene","cancelled","in_service"].forEach(k=>{
+      const date=row.querySelector('[data-report-unit-date="'+k+'"]')?.value||"";
+      const raw=row.querySelector('[data-report-unit-time="'+k+'"]')?.value||"";
+      const normalized=jfdParseTime24(raw);
+      if(normalized)times[k]=date?date+"T"+normalized:normalized;
+      else if(String(raw).trim())times[k]=date?date+"T"+String(raw).trim():String(raw).trim();
+    });
+    let crew=[];try{crew=JSON.parse(row.dataset.crew||"[]")}catch{}
+    return {
+      apparatus_id:Number(row.dataset.apparatusId||0),
+      unit_number:row.querySelector("[data-report-unit-number]")?.value||row.querySelector("b")?.textContent?.trim()||"",
+      station:row.querySelector(".text-xs.text-slate-500")?.textContent?.trim()||"",
+      crew,times
+    };
+  }).filter(x=>x.apparatus_id>0);
   data.additional_personnel=[...(reportModal?.querySelectorAll("[data-report-person]:checked")||[])].map(x=>Number(x.dataset.reportPerson));
   return data;
 }
