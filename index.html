@@ -1909,7 +1909,7 @@ async function validateAndFinishReport(kind){
 }
 async function finishIncidentWorkflow(){
  try{
-  if(profile?.app_role!=="officer"||crew.length===0)return alert("Only an on-duty shift officer can finish an incident.");
+  if(profile?.app_role!=="officer"&&profile?.app_role!=="admin")return alert("Only an on-duty officer or administrator can finish an incident.");
   const m=$("reportModal"),incidentId=Number(m?.dataset.incidentId||0)||null,cad=m?.dataset.cad||"";if(!incidentId||!cad)return alert("This report is not attached to an incident.");
   if(!confirm("Are you sure you have added all necessary reports to this incident?"))return;
   if(!confirm("This incident can not be edited after finishing. Continue to finish incident?"))return;
@@ -2048,7 +2048,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     });
     [...box.querySelectorAll("[data-unit-row]")].forEach(r=>{if(!selected.includes(Number(r.dataset.unitRow)))r.remove()});
   };
-  function actionBar(kind){const isFire=kind==="fire";const patientBtn=isFire?"":btn("Add Another Patient","jfdAddPatient({})");const finishBtn=(profile?.app_role==="officer"&&crew.length>0)?btn("Finish With Incident","finishIncidentWorkflow()","primary"):"";const cancelBtn=btn("Cancel This Report","cancelCurrentReport()");return '<div class="sticky bottom-0 z-10 bg-white/95 backdrop-blur border-t pt-3 flex flex-wrap justify-between gap-2"><div class="flex flex-wrap gap-2">'+btn("Save Draft","saveReportDraft(window.currentReportKind)")+patientBtn+btn("Add Another Report to This Incident","addAnotherReportToIncident(window.currentReportKind)")+'</div><div class="flex flex-wrap gap-2">'+cancelBtn+btn("Close","closeReportModal()")+finishBtn+'</div></div>'}
+  function actionBar(kind){const isFire=kind==="fire";const patientBtn=isFire?"":btn("Add Another Patient","jfdAddPatient({})");const finishBtn=((profile?.app_role==="officer"&&crew.length>0)||profile?.app_role==="admin")?btn("Finish This Incident","finishIncidentWorkflow()","primary"):"";const cancelBtn=btn("Cancel This Report","cancelCurrentReport()");return '<div class="sticky bottom-0 z-10 bg-white/95 backdrop-blur border-t pt-3 flex flex-wrap justify-between gap-2"><div class="flex flex-wrap gap-2">'+btn("Save Draft","saveReportDraft(window.currentReportKind)")+patientBtn+btn("Add Another Report to This Incident","addAnotherReportToIncident(window.currentReportKind)")+'</div><div class="flex flex-wrap gap-2">'+cancelBtn+btn("Close","closeReportModal()")+finishBtn+'</div></div>'}
   function patientSignaturePadHtml(id,p){return '<div class="mt-3"><div class="flex items-center justify-between gap-2"><label class="text-sm font-bold">Patient / Guardian Signature</label><button type="button" onclick="jfdClearSignature(\''+id+'_signaturePad\')" class="border px-2 py-1 rounded text-xs font-bold">Clear</button></div><canvas id="'+id+'_signaturePad" data-signature-pad="'+id+'" class="w-full h-36 mt-1 bg-white border-2 border-slate-300 rounded-lg touch-none"></canvas><p class="text-xs text-slate-500 mt-1">Sign above with a finger, stylus, or touchpad.</p></div>';}
   function patientRefusalHtml(id,p){
     const refusal=!!(p.refusedCare||p.refusedTransport||p.minorRefusal);
