@@ -1575,7 +1575,7 @@ async function validateAndFinishReport(kind){
   try{
     const data=collectReportFormData(),m=$("reportModal"),incidentId=Number(m?.dataset.incidentId||0)||null;
     if(!incidentId)return alert("Standalone reports can be saved as drafts, but must be attached to an incident before NERIS review.");
-    for(const row of [...document.querySelectorAll(".report-response-unit")]){
+    const reportRoot=$("incidentReportForm")||m||document;for(const row of [...reportRoot.querySelectorAll(".report-response-unit")]){
       const t=k=>String(row.querySelector('[data-report-unit-time="'+k+'"]')?.value||"").trim();
       const normalizeInput=v=>{const s=String(v||"").trim();if(!s)return "";const m=s.match(/^(?:\\d{4}-\\d{2}-\\d{2}T)?(\\d{1,2}):?(\\d{2})(?::\\d{2})?$/);if(!m)return jfdParseTime24(s)||null;const h=Number(m[1]),min=Number(m[2]);return h<=23&&min<=59?String(h).padStart(2,"0")+":"+String(min).padStart(2,"0"):null;};
       const dispatch=normalizeInput(t("dispatch")),enroute=normalizeInput(t("enroute")),onscene=normalizeInput(t("on_scene")),cancelled=normalizeInput(t("cancelled")),inservice=normalizeInput(t("in_service"));
@@ -2000,7 +2000,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       data[el.id]=el.value;
     });
     data.rDispatchIncidentNumber=data.rDispatchIncidentNumber||data.rCad||$("reportModal")?.dataset.cad||"";
-    const responseRows=[...document.querySelectorAll(".report-response-unit,[data-unit-row]")];
+    const reportRoot=$("incidentReportForm")||$("reportModal")||document;const responseRows=[...reportRoot.querySelectorAll(".report-response-unit,[data-unit-row]")];
     data.responding_apparatus=responseRows.map(row=>{
       const apId=Number(row.dataset.apparatusId||row.dataset.unitRow||0),name=row.querySelector("b")?.textContent?.trim()||"";
       const keys=["enroute","on_scene","cancelled","in_service","clear"];
