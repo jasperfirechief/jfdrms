@@ -104,17 +104,18 @@ export async function makePdf(incident={},reports=[]){
  };
  const responseTable=units=>{
    if(!units.length){field("Responding Apparatus","None recorded");return}
-   const cols=[70,92,106,106,106],xs=[m,m+70,m+162,m+268,m+374],labels=["Unit","Station","Crew","Response","Disposition"];
+   const cols=[70,80,92,115,105,102],xs=[m,m+70,m+150,m+242,m+357,m+462],labels=["Unit","Station","Crew","Dispatch","Response","Disposition"];
    ensure(34);page.drawRectangle({x:m,y:y-22,width:usable,height:22,color:NAVY});
-   labels.forEach((s,i)=>page.drawText(s,{x:xs[i]+5,y:y-14,font:F.bold,size:7,color:WHITE}));y-=22;
+   labels.forEach((s,i)=>page.drawText(s,{x:xs[i]+5,y:y-14,font:F.bold,size:6.8,color:WHITE}));y-=22;
    for(const u of units){
      const z=u.times||{},crew=Array.isArray(u.crew)?u.crew.map(x=>typeof x==="object"?x.name||x.full_name||"":x).filter(Boolean).join(", "):u.crew;
-     const response=[z.enroute&&"En route "+timeText(z.enroute),z.on_scene&&"On scene "+timeText(z.on_scene)].filter(Boolean).join(" • ");
-     const disp=[z.cancelled&&"Cancelled "+timeText(z.cancelled),z.in_service&&"In service "+timeText(z.in_service)||z.clear&&"In service "+timeText(z.clear)].filter(Boolean).join(" • ");
-     const vals=[pretty(u.unit_number||u.unit),pretty(u.station),pretty(crew),response||"—",disp||"—"];
-     const lines=vals.map((v,i)=>wrapLines(v,F.reg,7.2,cols[i]-10));const rows=Math.max(...lines.map(a=>a.length));const rh=Math.max(18,rows*9+7);ensure(rh+2);
+     const dispatch=z.dispatch&&timeText(z.dispatch);
+     const response=[z.enroute&&("En route "+timeText(z.enroute)),z.on_scene&&("On scene "+timeText(z.on_scene))].filter(Boolean).join(" • ");
+     const disp=[z.cancelled&&("Cancelled "+timeText(z.cancelled)),(z.in_service||z.clear)&&("In service "+timeText(z.in_service||z.clear))].filter(Boolean).join(" • ");
+     const vals=[pretty(u.unit_number||u.unit),pretty(u.station),pretty(crew),dispatch||"—",response||"—",disp||"—"];
+     const lines=vals.map((v,i)=>wrapLines(v,F.reg,7.0,cols[i]-10));const rows=Math.max(...lines.map(a=>a.length));const rh=Math.max(18,rows*9+7);ensure(rh+2);
      page.drawRectangle({x:m,y:y-rh,width:usable,height:rh,borderWidth:.35,borderColor:MID});
-     lines.forEach((ls,i)=>ls.forEach((ln,j)=>page.drawText(ln,{x:xs[i]+5,y:y-11-j*9,font:F.reg,size:7.2,color:NAVY})));y-=rh;
+     lines.forEach((ls,i)=>ls.forEach((ln,j)=>page.drawText(ln,{x:xs[i]+5,y:y-11-j*9,font:F.reg,size:7.0,color:NAVY})));y-=rh;
    }
    y-=5;
  };
@@ -125,62 +126,75 @@ export async function makePdf(incident={},reports=[]){
  const units=Array.isArray(fd.responding_apparatus)?fd.responding_apparatus:[];
  
  currentTitle="FIRE INCIDENT REPORT";newPage(currentTitle);
- section("Incident Information");
+ section("Incident Identification");
  twoCol(["CAD / Incident Number",incident.cad||fd.rCad],["Incident Date",dateText(fd.rDate||incident.dispatch_time)]);
  twoCol(["Call Type",fd.rCall||fd.rCallType||incident.type],["Shift",fd.rShift]);
  field("Primary Incident Type",fd.rPrimaryIncidentType||incident.type);
  field("Secondary Incident Type",fd.rSecondaryIncidentType);
- field("Incident Location",fd.rLocation||incident.location);
- twoCol(["Location Type",fd.rLocationType],["Location In Use",fd.rLocationInUse]);
- twoCol(["Used As Intended",fd.rUsedAsIntended],["Property Use / Occupancy",fd.rPrimaryUse||fd.rOccupancy]);
- section("Person / Property");
- twoCol(["Person Involved",fd.rPerson||fd.person_involved],["Owner Name",fd.rOwnerName||fd.owner_name]);
- field("Owner Address",fd.rOwnerAddress||fd.owner_address);
- twoCol(["Owner Phone",fd.rOwnerPhone||fd.owner_phone],["Occupant Name",fd.rOccupantName||fd.rOccName||fd.occupant_name]);
- field("Occupant Address",fd.rOccupantAddress||fd.occupant_address);
- twoCol(["Occupant Phone",fd.rOccPhone||fd.occupant_phone],["Property Use / Occupancy",fd.rPrimaryUse||fd.rOccupancy]);
- section("Insurance / Loss");
- twoCol(["Insurance Company",fd.rInsuranceCompany||fd.rOwnerInsurance||fd.rOccInsurance||fd.insurance_company],["Insurance Phone",fd.rInsurancePhone||fd.insurance_phone]);
- twoCol(["Policy Number",fd.rInsurancePolicy||fd.insurance_policy],["Damage Type",fd.rDamageType||fd.damage_type]);
- field("Estimated Damage",fd.rDamageEstimate||fd.damage_estimate);
- section("Vehicle / Property Involved");
- const vehicles=Array.isArray(fd.vehicles)?fd.vehicles:[];
- if(vehicles.length)vehicles.forEach((v,i)=>{field("Vehicle #"+(i+1),[v.year,v.make,v.model,v.vehicle,v.description].filter(Boolean).join(" "));twoCol(["Owner",v.owner],["Insurance",v.insurance]);field("License / VIN",v.vin||v.license||v.license_vin)});
- else {twoCol(["Vehicle #1",fd.rVehicle1],["Year",fd.rYear1]);twoCol(["Make",fd.rMake1],["Model",fd.rModel1]);field("License / VIN",fd.rVin1);}
- section("Incident Actions / Response");
- field("Action Taken",fd.rActionTaken||fd.action_taken);
- field("No Action Taken",fd.rNoActionTaken||fd.no_action_taken);
- field("Actions / Tactics",Array.isArray(fd.actions_taken)?fd.actions_taken:fd.rActionsTaken);
- twoCol(["Water Supply",fd.rWater||fd.water_supply],["Investigation",fd.rInvestigation||fd.investigation]);
- twoCol(["Fire Location",fd.rFireLoc||fd.fire_location],["Condition",fd.rCondition||fd.condition]);
- twoCol(["Floor / Room",[fd.rFloor||fd.floor_of_origin,fd.rRoom||fd.room_type].filter(Boolean).join(" / ")],["Cause",fd.rCause||fd.cause]);
- twoCol(["Alarms / Suppression",[fd.rFireAlarm,fd.rOtherAlarm,fd.rSuppression,fd.rCookingSuppression].filter(Boolean).join(" / ")],["Casualties / Rescues",fd.casualties]);
- field("Exposures",fd.exposures);
- field("Hazards / HAZMAT",fd.hazards||fd.rHazmat);
- section("Narrative / Completion");
- fullText("Narrative",fd.rNarrative||incident.narrative||"No narrative entered.");
- field("Person Completing Report",fd.rCompletedBy||fd.completedBy||fd.report_completed_by);
  
- currentTitle="TECHNICAL INCIDENT RECORD";newPage(currentTitle);
- section("Incident / Location");
- [["CAD / Incident Number",fd.rCad||incident.cad],["Incident Date",dateText(fd.rDate||incident.dispatch_time)],["Shift",fd.rShift],["Call Type",fd.rCall||fd.rCallType||incident.type],["Primary Incident Type",fd.rPrimaryIncidentType||incident.type],["Secondary Incident Type",fd.rSecondaryIncidentType],["Location",fd.rLocation||incident.location],["Latitude",fd.rLatitude],["Longitude",fd.rLongitude],["Location Type",fd.rLocationType],["Primary Use",fd.rPrimaryUse],["Secondary Use",fd.rSecondaryUse],["Location In Use",fd.rLocationInUse],["Used As Intended",fd.rUsedAsIntended],["Vacancy",fd.rVacancy],["People Present",fd.rPeoplePresent]].forEach(x=>field(x[0],x[1]));
- section("Dispatch / Response");
- [["Dispatch Incident Number",fd.rDispatchIncidentNumber],["Call Arrival",fd.rCallArrival&&dateText(fd.rCallArrival)+" "+timeText(fd.rCallArrival)],["Call Answered",fd.rCallAnswered&&dateText(fd.rCallAnswered)+" "+timeText(fd.rCallAnswered)],["Call Create",fd.rCallCreate&&dateText(fd.rCallCreate)+" "+timeText(fd.rCallCreate)],["Dispatch Time",fd.rDispatch&&dateText(fd.rDispatch)+" "+timeText(fd.rDispatch)]].forEach(x=>field(x[0],x[1]));
+ section("Location & Occupancy");
+ field("Incident Location",fd.rLocation||incident.location);
+ twoCol(["Location Type",fd.rLocationType],["Property Use / Occupancy",fd.rPrimaryUse||fd.rOccupancy]);
+ twoCol(["Location In Use",fd.rLocationInUse],["Used As Intended",fd.rUsedAsIntended]);
+ twoCol(["People Present",fd.rPeoplePresent],["Vacancy",fd.rVacancy]);
+ twoCol(["Latitude",fd.rLatitude],["Longitude",fd.rLongitude]);
+ 
+ section("Owner / Occupant Information");
+ twoCol(["Owner Name",fd.rOwnerName||fd.owner_name],["Owner Phone",fd.rOwnerPhone||fd.owner_phone]);
+ field("Owner Address",fd.rOwnerAddress||fd.owner_address);
+ twoCol(["Occupant Name",fd.rOccupantName||fd.rOccName||fd.occupant_name],["Occupant Phone",fd.rOccPhone||fd.occupant_phone]);
+ field("Occupant Address",fd.rOccupantAddress||fd.occupant_address);
+ 
+ section("Response / Apparatus");
+ const dispatchTimes=[["Dispatch",fd.rDispatch],["En Route",fd.rEnRoute],["On Scene",fd.rOnScene],["Cancelled",fd.rCancelled],["In Service",fd.rInService]];
+ const activeTimes=dispatchTimes.filter(x=>x[1]);
+ if(activeTimes.length){
+   const pairs=[];for(let i=0;i<activeTimes.length;i+=2){pairs.push(activeTimes[i],activeTimes[i+1]||["",""]);twoCol(pairs[0],pairs[1]||["",""]);pairs=[];}
+ }else field("Incident Times","No incident times recorded");
  responseTable(units);
  field("Additional Personnel",fd.additional_personnel);
- section("Fire / Incident Conditions");
- [["Fire Location",fd.rFireLoc],["Condition",fd.rCondition],["Water Supply",fd.rWater],["Damage Type",fd.rDamageType],["Damage Estimate",fd.rDamageEstimate],["Floor",fd.rFloor],["Room",fd.rRoom],["Cause",fd.rCause],["Acres",fd.rAcres],["Smoke Presence",fd.rSmokePresence],["Smoke Alarm Working",fd.rSmokeWorking],["Fire Alarm",fd.rFireAlarm],["Other Alarm",fd.rOtherAlarm],["Suppression",fd.rSuppression],["Cooking Suppression",fd.rCookingSuppression]].forEach(x=>field(x[0],x[1]));
- section("Actions / Tactics");
- field("Action Taken",fd.rActionTaken||fd.action_taken);field("No Action Taken",fd.rNoActionTaken||fd.no_action_taken);field("Actions / Tactics",fd.actions_taken||fd.rActionsTaken);
- section("Exposures / Casualties / Hazards");
- field("Exposures",fd.exposures);field("Casualties / Rescues",fd.casualties);field("Hazards",fd.hazards);
- section("Mutual Aid / Other Agencies");
  const aids=[...(Array.isArray(fd.aid_records)?fd.aid_records:[]),...(Array.isArray(fd.nonfd_aid_records)?fd.nonfd_aid_records:[])];
- field("Mutual Aid",aids.length?aids:"None recorded");
- section("Hazmat / Special Hazards");
- [["Evacuation",fd.rEvac],["Hazard Evacuated",fd.rHazEvacuated],["Hazmat",fd.rHazmat],["Hazmat Disposition",fd.rHazDisposition],["Chemicals",fd.rChemicals],["Chemical Name",fd.rChemicalName],["Chemical Class",fd.rChemicalClass],["Chemical Release",fd.rChemicalRelease],["Electrical Hazard",fd.rElectrical],["Other Hazard",fd.rOtherHazard]].forEach(x=>field(x[0],x[1]));
- section("Narrative / Completion");fullText("Narrative",fd.rNarrative||incident.narrative||"No narrative entered.");field("Report Completed By",fd.rCompletedBy||fd.rCompletedBy);
+ field("Mutual Aid / Other Agencies",aids.length?aids:"None recorded");
  
+ section("Fire / Alarm Conditions");
+ twoCol(["Fire Location",fd.rFireLoc||fd.fire_location],["Arrival Condition",fd.rCondition||fd.condition]);
+ twoCol(["Smoke Presence",fd.rSmokePresence||fd.rSmoke],["Smoke Alarm Working",fd.rSmokeWorking||fd.rSmokeAlarmWorking]);
+ twoCol(["Fire Alarm",fd.rFireAlarm],["Other Alarm",fd.rOtherAlarm]);
+ twoCol(["Suppression System",fd.rSuppression],["Cooking Suppression",fd.rCookingSuppression]);
+ twoCol(["Water Supply",fd.rWater||fd.water_supply],["Fire Investigation",fd.rInvestigation||fd.investigation]);
+ 
+ section("Incident Actions / Findings");
+ twoCol(["Action Taken",fd.rActionTaken||fd.action_taken],["No Action Taken",fd.rNoActionTaken||fd.no_action_taken]);
+ field("Actions / Tactics",Array.isArray(fd.actions_taken)?fd.actions_taken:(fd.rActionsTaken||fd.actions_taken));
+ twoCol(["Cause",fd.rCause||fd.cause],["Damage Type",fd.rDamageType||fd.damage_type]);
+ twoCol(["Damage Estimate",fd.rDamageEstimate||fd.damage_estimate],["Floor / Area",[fd.rFloor||fd.floor_of_origin,fd.rRoom||fd.room_type].filter(Boolean).join(" / ")]);
+ 
+ section("Vehicles / Exposures / Casualties / Hazards");
+ const vehicles=Array.isArray(fd.vehicles)?fd.vehicles:[];
+ if(vehicles.length){
+   vehicles.forEach((v,i)=>{
+     field("Vehicle "+(i+1),[v.year,v.make,v.model,v.vehicle,v.description].filter(Boolean).join(" "));
+     twoCol(["Owner",v.owner],["Insurance",v.insurance]);
+     field("License / VIN",v.vin||v.license||v.license_vin);
+   });
+ }else{
+   const legacyVehicle=[fd.rVehicle1,fd.rYear1,fd.rMake1,fd.rModel1].filter(Boolean).join(" ");
+   if(legacyVehicle)field("Vehicle Involved",legacyVehicle);
+ }
+ field("Exposures",fd.exposures);
+ field("Casualties / Rescues",fd.casualties);
+ field("Hazards / HAZMAT",fd.hazards||fd.rHazmat);
+ 
+ section("Insurance / Loss");
+ twoCol(["Insurance Company",fd.rInsuranceCompany||fd.rOwnerInsurance||fd.rOccInsurance||fd.insurance_company],["Insurance Phone",fd.rInsurancePhone||fd.insurance_phone]);
+ twoCol(["Policy Number",fd.rInsurancePolicy||fd.insurance_policy],["Loss / Damage Type",fd.rDamageType||fd.damage_type]);
+ field("Estimated Damage",fd.rDamageEstimate||fd.damage_estimate);
+ 
+ section("Narrative");
+ fullText("Incident Narrative",fd.rNarrative||incident.narrative||"No narrative entered.");
+ 
+ section("Report Completion");
+ field("Person Completing Report",fd.rCompletedBy||fd.completedBy||fd.report_completed_by);
  for(let i=0;i<patients.length;i++){
    const p=patients[i]||{};currentTitle="PATIENT CARE REPORT";newPage(currentTitle);
    section("Patient Information");
