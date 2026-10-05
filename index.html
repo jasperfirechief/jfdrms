@@ -983,8 +983,8 @@ function reportResponseSection(unitRows=[]){
     return '<label class="flex items-center gap-2 border rounded-lg p-2 bg-white text-sm"><input type="checkbox" data-report-apparatus-check="'+Number(a.apparatus_id)+'" onchange="toggleReportApparatus('+Number(a.apparatus_id)+',this.checked)" class="h-4 w-4"><span class="font-semibold">'+esc(a.unit_number||"Apparatus")+'<span class="text-xs text-slate-500"> · '+esc(a.apparatus_type||"")+(stationName?" · "+esc(stationName):"")+'</span></span></label>';
   }).join("");
   const fixedOptions=JFD_FIXED_RESPONSE_UNITS.map(a=>'<label class="flex items-center gap-2 border-2 border-red-200 rounded-lg p-2 bg-white text-sm"><input type="checkbox" data-report-apparatus-check="'+Number(a.apparatus_id)+'" onchange="toggleReportApparatus('+Number(a.apparatus_id)+',this.checked)" class="h-4 w-4"><span class="font-black">'+a.unit_number+'</span><span class="text-xs text-slate-500"> · Crew '+a.unit_number+'</span></label>').join("");
-  setTimeout(()=>document.querySelectorAll(".report-response-unit").forEach(syncReportUnitTimes),0);
-  return '<section class="border rounded-xl p-4 bg-slate-50 md:col-span-2"><h3 class="font-black text-lg mb-1">Responding Apparatus</h3><p class="text-xs text-slate-500 mb-3">Select every department apparatus that responded. Dispatch time is pre-populated from CAD and is editable. En Route and On Scene are optional; each responding unit must have Dispatch and either Cancelled or In Service.</p><details id="reportApparatusDetails" class="border rounded-xl bg-white"><summary class="cursor-pointer list-none p-3 font-bold flex justify-between"><span>Select Responding Apparatus</span><span id="reportApparatusCount" class="text-xs text-slate-500">'+selected.size+' selected</span></summary><div class="border-t p-3"><div class="grid md:grid-cols-2 gap-2">'+(normalOptions||'<p class="text-sm text-slate-500">No shift-assigned apparatus available.</p>')+'</div><div class="mt-4 pt-4 border-t"><div class="text-xs font-black uppercase tracking-wide text-slate-500 mb-2">Always Available</div><div class="grid md:grid-cols-3 gap-2">'+fixedOptions+'</div></div><button type="button" onclick="finishReportApparatusSelection()" class="mt-3 px-4 py-2 rounded-lg bg-slate-800 text-white font-bold text-sm">Finish</button></div></details><div id="reportResponseUnits" class="space-y-3 mt-4"><p class="text-sm text-slate-500">Select responding apparatus above.</p></div><button type="button" onclick="addUnassignedReportApparatus()" class="mt-3 border border-dashed border-slate-400 bg-white px-4 py-2 rounded-lg font-bold text-sm">+ Add Unassigned Apparatus</button><div class="mt-5 border-t pt-4"><div id="reportOffDutyPersonnel">'+renderOffDutyPersonnel([])+'</div></div></section>'
+  setTimeout(()=>document.querySelectorAll(".report-response-unit").forEach(syncReportUnitTimes),0);setTimeout(()=>loadUnassignedReportApparatus(),0);
+  return '<section class="border rounded-xl p-4 bg-slate-50 md:col-span-2"><h3 class="font-black text-lg mb-1">Responding Apparatus</h3><p class="text-xs text-slate-500 mb-3">Select every department apparatus that responded. Dispatch time is pre-populated from CAD and is editable. En Route and On Scene are optional; each responding unit must have Dispatch and either Cancelled or In Service.</p><details id="reportApparatusDetails" class="border rounded-xl bg-white"><summary class="cursor-pointer list-none p-3 font-bold flex justify-between"><span>Select Responding Apparatus</span><span id="reportApparatusCount" class="text-xs text-slate-500">'+selected.size+' selected</span></summary><div class="border-t p-3"><div class="grid md:grid-cols-2 gap-2">'+(normalOptions||'<p class="text-sm text-slate-500">No shift-assigned apparatus available.</p>')+'</div><div class="mt-4 pt-4 border-t"><div class="text-xs font-black uppercase tracking-wide text-slate-500 mb-2">Always Available</div><div class="grid md:grid-cols-3 gap-2">'+fixedOptions+'</div></div><button type="button" onclick="finishReportApparatusSelection()" class="mt-3 px-4 py-2 rounded-lg bg-slate-800 text-white font-bold text-sm">Finish</button></div></details><div id="reportResponseUnits" class="space-y-3 mt-4"><p class="text-sm text-slate-500">Select responding apparatus above.</p></div><details id="reportUnassignedApparatusDetails" class="border rounded-xl bg-white mt-3"><summary class="cursor-pointer list-none p-3 font-bold flex justify-between"><span>Unassigned Apparatus</span><span id="reportUnassignedCount" class="text-xs text-slate-500">0 selected</span></summary><div class="border-t p-3"><p class="text-xs text-slate-500 mb-3">Select any department apparatus that is not assigned to a station for this shift. Each selected apparatus will have its own crew selection.</p><div id="reportUnassignedApparatusList" class="grid md:grid-cols-2 gap-2"><p class="text-sm text-slate-500">Loading unassigned apparatus...</p></div><button type="button" onclick="finishReportUnassignedApparatusSelection()" class="mt-3 px-4 py-2 rounded-lg bg-slate-800 text-white font-bold text-sm">Finish</button></div></details><div class="mt-5 border-t pt-4"><div id="reportOffDutyPersonnel">'+renderOffDutyPersonnel([])+'</div></div></section>'
 }
 function reportResponseUnitRow(u){
   const apId=Number(u.apparatus_id||0),ap=reportApparatusById(apId),crew=Array.isArray(u.crew_snapshot)?u.crew_snapshot:(Array.isArray(u.crew)?u.crew:[]);
@@ -999,19 +999,14 @@ function reportResponseUnitRow(u){
   return '<div class="report-response-unit border rounded-xl p-3 bg-white" data-report-response-selected="true" data-apparatus-id="'+apId+'" data-crew="'+esc(JSON.stringify(crew))+'" data-unassigned="'+(isUnassigned?'true':'false')+'"><div class="flex justify-between gap-3 items-start"><div><b>'+esc(unitName)+'</b><div class="text-xs text-slate-500">'+(isUnassigned?'Unassigned Apparatus':esc(u.station_snapshot||""))+'</div></div><button type="button" onclick="removeReportApparatus('+apId+')" class="text-red-600 font-bold text-sm">Remove</button></div>'+crewHtml+'<p class="text-xs font-bold text-red-700 mt-3">Military time required. Dispatch is pre-populated from CAD and remains editable.</p><div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-2">'+event("Dispatch","dispatch",di,true)+event("En Route","enroute",en,false)+event("On Scene","on_scene",on,false)+event("Cancelled","cancelled",ca,false)+event("In Service","in_service",cl,false)+'</div></div>';
 }
 function addUnassignedReportApparatus(saved){
-  const box=$("reportResponseUnits");if(!box)return;
-  box.querySelector("p")?.remove();
-  const existing=[...box.querySelectorAll(".report-response-unit[data-unassigned='true']")];
-  const id=Number(saved?.apparatus_id||(-1000-existing.length));
-  const row=document.createElement("div");
-  row.innerHTML=reportResponseUnitRow({apparatus_id:id,unit_number:saved?.unit_number||"Unassigned Apparatus",crew:saved?.crew||[],dispatch_time:saved?.times?.dispatch||$("rDispatch")?.value||"",enroute_time:saved?.times?.enroute||"",on_scene_time:saved?.times?.on_scene||"",cancelled_time:saved?.times?.cancelled||"",in_service_time:saved?.times?.in_service||"",unassigned:true});
-  box.appendChild(row.firstElementChild);
-  const el=box.lastElementChild;syncReportUnitTimes(el);
-  el.querySelector("[data-unassigned-crew]")?.addEventListener("change",e=>{
-    const crew=[...e.target.selectedOptions].map(o=>{const p=personnel.find(x=>Number(x.id)===Number(o.value));return p?{id:Number(p.id),name:(p.first_name||"")+" "+(p.last_name||""),role:p.role||""}:null}).filter(Boolean);
-    el.dataset.crew=JSON.stringify(crew);
-  });
-  return el;
+  const id=Number(saved?.apparatus_id);
+  if(Number.isFinite(id)&&id>0){
+    const cb=document.querySelector('[data-report-unassigned-apparatus][value="'+id+'"]');
+    if(cb&&!cb.checked)cb.checked=true;
+    toggleUnassignedReportApparatus(id,true);
+    return document.querySelector('.report-response-unit[data-apparatus-id="'+id+'"]');
+  }
+  return null;
 }
 function syncReportUnitTimes(row){
   if(!row)return;
@@ -1062,6 +1057,8 @@ function toggleReportApparatus(id,checked){
 function removeReportApparatus(id){
   const row=document.querySelector('[data-apparatus-id="'+Number(id)+'"]');row?.remove();
   const cb=document.querySelector('[data-report-apparatus-check="'+Number(id)+'"]');if(cb)cb.checked=false;
+  const ucb=document.querySelector('[data-report-unassigned-apparatus][value="'+Number(id)+'"]');if(ucb)ucb.checked=false;
+  updateUnassignedReportApparatusCount();
   const box=$("reportResponseUnits");if(box&&!box.querySelector(".report-response-unit"))box.innerHTML='<p class="text-sm text-slate-500">Select responding apparatus above.</p>';
 }
 async function refreshReportApparatusCrews(dateOverride){
