@@ -1360,18 +1360,20 @@ function applyPreviousReportValues(data){
 }
 function collectReportFormData(){
   const data={};
-  $("incidentReportForm")?.querySelectorAll("input,select,textarea").forEach(el=>{
+  const reportModal=$("reportModal");
+  const reportForm=reportModal?.querySelector("#incidentReportForm")||$("incidentReportForm");
+  reportForm?.querySelectorAll("input,select,textarea").forEach(el=>{
     if(!el.id||el.matches("[data-report-unit-time],[data-report-person]")||el.type==="checkbox"||el.type==="file")return;
     data[el.id]=el.multiple?[...el.selectedOptions].map(o=>o.value):el.value;
   });
-  data.responding_apparatus=[...document.querySelectorAll(".report-response-unit")].map(row=>({
+  data.responding_apparatus=[...(reportModal?.querySelectorAll(".report-response-unit")||[])].map(row=>({
     apparatus_id:Number(row.dataset.apparatusId||0),
     unit_number:row.querySelector("[data-report-unit-number]")?.value||row.querySelector(".font-bold")?.textContent?.trim()||"",
     station:row.querySelector(".text-xs.text-slate-500")?.textContent?.trim()||"",
     crew:JSON.parse(row.dataset.crew||"[]"),
     times:Object.fromEntries([...row.querySelectorAll("[data-report-unit-time]")].map(x=>[x.dataset.reportUnitTime,x.value]))
   }));
-  data.additional_personnel=[...document.querySelectorAll("[data-report-person]:checked")].map(x=>Number(x.dataset.reportPerson));
+  data.additional_personnel=[...(reportModal?.querySelectorAll("[data-report-person]:checked")||[])].map(x=>Number(x.dataset.reportPerson));
   return data;
 }
 function nerisIso(v,fallback){const iso=jfdCentralIso(v);return iso||fallback;}
@@ -1575,7 +1577,7 @@ async function validateAndFinishReport(kind){
   try{
     const data=collectReportFormData(),m=$("reportModal"),incidentId=Number(m?.dataset.incidentId||0)||null;
     if(!incidentId)return alert("Standalone reports can be saved as drafts, but must be attached to an incident before NERIS review.");
-    const reportRoot=$("incidentReportForm")||m||document;for(const row of [...reportRoot.querySelectorAll(".report-response-unit")]){
+    const reportRoot=m?.querySelector("#incidentReportForm")||m||document;for(const row of [...reportRoot.querySelectorAll(".report-response-unit")]){
       const t=k=>String(row.querySelector('[data-report-unit-time="'+k+'"]')?.value||"").trim();
       const normalizeInput=v=>{const s=String(v||"").trim();if(!s)return "";const m=s.match(/^(?:\\d{4}-\\d{2}-\\d{2}T)?(\\d{1,2}):?(\\d{2})(?::\\d{2})?$/);if(!m)return jfdParseTime24(s)||null;const h=Number(m[1]),min=Number(m[2]);return h<=23&&min<=59?String(h).padStart(2,"0")+":"+String(min).padStart(2,"0"):null;};
       const dispatch=normalizeInput(t("dispatch")),enroute=normalizeInput(t("enroute")),onscene=normalizeInput(t("on_scene")),cancelled=normalizeInput(t("cancelled")),inservice=normalizeInput(t("in_service"));
