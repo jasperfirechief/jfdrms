@@ -20,7 +20,7 @@ const centralTimeParts=v=>{if(!v)return null;const s=String(v).trim();const wall
 const date=v=>{const p=centralDateParts(v);return p?p.month+"/"+p.day+"/"+p.year:String(v??"")};
 const time=v=>{const p=centralTimeParts(v);return p?p.hour+":"+p.minute:String(v??"")};
 
-export async async function makePdf(incident={},reports=[]){
+export async function makePdf(incident={},reports=[]){
  const pdf=await PDFDocument.create();
  const reg=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
  const W=612,H=792,m=40,usable=W-(m*2),bottom=48,headerH=92;
