@@ -1435,7 +1435,7 @@ async function fetchAllIncidentsForReports(){
   while(true){const r=await db.from("incidents").select("cad,type,location,dispatch_time,updated_at,reports").order("updated_at",{ascending:false}).range(from,from+pageSize-1);if(r.error)throw new Error(r.error.message);const page=r.data||[];rows.push(...page);if(page.length<pageSize)break;from+=pageSize;}
   return rows;
 }
-async function reportTypeLabel(rep){return String(rep?.report_type||"").startsWith("pcr_")?"Patient Care Report":"Fire Incident Report";}
+function reportTypeLabel(rep){return String(rep?.report_type||"").startsWith("pcr_")?"Patient Care Report":"Fire Incident Report";}
 function reportStatusLabel(status){return ({draft:"Draft",complete:"Completed",ready_for_neris:"Awaiting NERIS Review",submitted_to_neris:"Submitted to NERIS"}[status]||humanReportKey(status||"Saved"));}
 function reportsHome(){
  const rows=window._jfdReportRows||[],c={draft:0,fire:0,pcr:0,ready_for_neris:0,submitted_to_neris:0};
