@@ -1793,8 +1793,9 @@ async function loadIncidents(){
     const reports=Array.isArray(i.reports)?i.reports:[];
     const reportCount=reports.length;
     const draftReports=reports.filter(x=>String(x?.status||"draft")==="draft");
+    const incidentStatus=String(d.status||"");
+    const locked=["awaiting_neris","complete"].includes(incidentStatus);
     const status=locked?"finished":(reportCount?"draft":"received");
-    const locked=["awaiting_neris","complete"].includes(String(status));
     const statusClass=locked?"bg-red-100 text-red-800":"bg-emerald-100 text-emerald-800";
     const narrative=(d.narrative||"").replace(/(^|\\n)DATE:\\s*[^\\n]*(\\n|$)/i,"$1").replace(/(^|\\n)TIME:\\s*[^\\n]*(\\n|$)/i,"$1").trim();
     const reportButton=locked?"":draftReports.length?'<button type="button" class="scene-action scene-primary px-3 py-2 rounded-lg text-sm font-bold" onclick="openIncidentDrafts('+JSON.stringify(d.incident_id||"")+')">Open Drafts</button>':'<button type="button" class="scene-action scene-primary px-3 py-2 rounded-lg text-sm font-bold" onclick="createIncidentReport('+JSON.stringify(d.incident_id||"")+')">Create Report</button>';
