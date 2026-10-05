@@ -1585,15 +1585,28 @@ async function validateAndFinishReport(kind){
   try{
     const data=collectReportFormData(),m=$("reportModal"),incidentId=Number(m?.dataset.incidentId||0)||null;
     if(!incidentId)return alert("Standalone reports can be saved as drafts, but must be attached to an incident before NERIS review.");
-    const reportRoot=m?.querySelector("#incidentReportForm")||m||document;const responseContainer=reportRoot.querySelector("#reportResponseUnits");const responseRows=responseContainer?[...responseContainer.querySelectorAll(":scope > .report-response-unit")]:[...reportRoot.querySelectorAll(".report-response-unit")].filter(row=>row.offsetParent!==null);for(const row of responseRows){
-      const t=k=>{const el=row.querySelector('[data-report-unit-time="'+k+'"]');return String(el?.value||"").trim()};
-      const normalizeInput=v=>{const s=String(v||"").trim();if(!s)return "";const m=s.match(/^(?:\\d{4}-\\d{2}-\\d{2}T)?(\\d{1,2}):?(\\d{2})(?::\\d{2})?$/);if(!m)return jfdParseTime24(s)||null;const h=Number(m[1]),min=Number(m[2]);return h<=23&&min<=59?String(h).padStart(2,"0")+":"+String(min).padStart(2,"0"):null;};
-      const dispatch=normalizeInput(t("dispatch")),enroute=normalizeInput(t("enroute")),onscene=normalizeInput(t("on_scene")),cancelled=normalizeInput(t("cancelled")),inservice=normalizeInput(t("in_service"));
-      const normalizeResponseTime=v=>{const raw=String(v||"").trim();if(!raw)return "";if(/^\\d{4}-\\d{2}-\\d{2}T/.test(raw)){const m=raw.match(/T(\\d{2}:\\d{2})/);return m?m[1]:""}return jfdParseTime24(raw)||null;};
+    const apparatus=Array.isArray(data.responding_apparatus)?data.responding_apparatus:[];
+    for(const u of apparatus){
+      const raw=u.times||{};
+      const norm=v=>{
+        const s=String(v||"").trim();if(!s)return "";
+        const m=s.match(/^(?:\d{4}-\d{2}-\d{2}T)?(\d{1,2}):?(\d{2})(?::\d{2})?$/);
+        if(!m)return jfdParseTime24(s)||null;
+        const h=Number(m[1]),min=Number(m[2]);
+        return h<=23&&min<=59?String(h).padStart(2,"0")+":"+String(min).padStart(2,"0"):null;
+      };
+      const dispatch=norm(raw.dispatch),enroute=norm(raw.enroute),onscene=norm(raw.on_scene),cancelled=norm(raw.cancelled),inservice=norm(raw.in_service||raw.clear);
       if(!dispatch)return alert("Dispatch time is required for every responding apparatus.");
       if(!cancelled&&!inservice)return alert("Each responding apparatus must have either Cancelled or In Service entered.");
-      if(cancelled&&inservice&&normalizeResponseTime(cancelled)!==normalizeResponseTime(inservice))return alert("Cancelled and In Service may both be entered, but they must be the same time.");
-      const normalized=[["Dispatch",dispatch],["En Route",enroute],["On Scene",onscene],["Cancelled",cancelled],["In Service",inservice]].filter(([,v])=>String(v||"").trim()).map(([label,v])=>[label,normalizeResponseTime(v)]);let previous=null;for(const [label,value] of normalized){if(value===null)return alert(label+" time must use military time HH:MM.");const mins=Number(value.slice(0,2))*60+Number(value.slice(3,5));if(previous!==null&&mins<previous)return alert("Responding apparatus times must be chronological.");previous=mins;}
+      if(cancelled&&inservice&&cancelled!==inservice)return alert("Cancelled and In Service may both be entered, but they must be the same time.");
+      const ordered=[["Dispatch",dispatch],["En Route",enroute],["On Scene",onscene],["Cancelled",cancelled],["In Service",inservice]].filter(([,v])=>v);
+      let previous=null;
+      for(const [label,value] of ordered){
+        if(value===null)return alert(label+" time must use military time HH:MM.");
+        const mins=Number(value.slice(0,2))*60+Number(value.slice(3,5));
+        if(previous!==null&&mins<previous)return alert("Responding apparatus times must be chronological.");
+        previous=mins;
+      }
     }
     const existing=await db.from("incidents").select("reports").eq("cad",m.dataset.cad||"").maybeSingle();if(existing.error)throw new Error(existing.error.message);
     const reports=Array.isArray(existing.data?.reports)?existing.data.reports:[];
@@ -2013,9 +2026,9 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     const reportRoot=$("incidentReportForm")||$("reportModal")||document;const responseRows=[...reportRoot.querySelectorAll(".report-response-unit,[data-unit-row]")];
     data.responding_apparatus=responseRows.map(row=>{
       const apId=Number(row.dataset.apparatusId||row.dataset.unitRow||0),name=row.querySelector("b")?.textContent?.trim()||"";
-      const keys=["enroute","on_scene","cancelled","in_service","clear"];
+      const keys=["dispatch","enroute","on_scene","cancelled","in_service","clear"];
       const times={};
-      keys.forEach(k=>{const date=row.querySelector('[data-report-unit-date="'+k+'"]')?.value||"",time=jfdParseTime24(row.querySelector('[data-report-unit-time="'+k+'"]')?.value||"");if(date&&time)times[k==="in_service"?"clear":k]=date+"T"+time;});
+      keys.forEach(k=>{const date=row.querySelector('[data-report-unit-date="'+k+'"]')?.value||"",raw=row.querySelector('[data-report-unit-time="'+k+'"]')?.value||"",time=jfdParseTime24(raw);if(date&&time)times[k==="clear"?"clear":k]=date+"T"+time;});
       return {apparatus_id:apId,unit_number:name,times,crew:JSON.parse(row.dataset.crew||"[]")};
     }).filter(x=>x.apparatus_id||x.unit_number);
     data.additional_personnel=[...document.querySelectorAll("[data-report-person]:checked")].map(x=>Number(x.dataset.reportPerson));
