@@ -43,6 +43,7 @@ const date=v=>{const p=centralDateParts(v);return p?p.month+"/"+p.day+"/"+p.year
 const time=v=>{const p=centralTimeParts(v);return p?p.hour+":"+p.minute:String(v??"")};
 
 export async function makePdf(incident={},reports=[]){
+ const startedAt=Date.now();
  const pdf=await PDFDocument.create();
  const reg=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
  const W=612,H=792,m=40,usable=W-(m*2),bottom=48,headerH=92;
@@ -343,7 +344,9 @@ export async function makePdf(incident={},reports=[]){
    // Footer is drawn during page transitions; the final page needs one too.
    if(idx===pages.length-1) { page=pg;drawFooter(); }
  });
- return pdf.save();
+ const bytes=await pdf.save({objectsPerTick:Infinity});
+ console.info("[report-pdf] incident PDF generated",{cad:String(incident?.cad||""),reportCount:Array.isArray(reports)?reports.length:0,pageCount:pdf.getPages().length,bytes:bytes.length,durationMs:Date.now()-startedAt});
+ return bytes;
 }
 
 async function makeArchivePdf(kind,data){
@@ -352,7 +355,7 @@ async function makeArchivePdf(kind,data){
  top(kind==="staffing"?"DAILY STAFFING REPORT":kind==="check"?"APPARATUS CHECK REPORT":kind==="inspection"?"FIRE INSPECTION REPORT":"INCIDENT REPORT");
  const x=data||{};for(const [k,v] of Object.entries(x)){if(v===null||v===undefined||v==="")continue;if(Array.isArray(v)||typeof v==="object"){section(k.replace(/[_-]/g," ").toUpperCase());wrap(JSON.stringify(v,null,2),7,9)}else kv(k.replace(/[_-]/g," "),v)}
  if(kind==="incident"&&x.reports){for(const r of x.reports||[]){section(r.report_type||"Report");for(const [k,v] of Object.entries(r.data||{})){if(v===null||v===undefined||v==="")continue;if(Array.isArray(v)||typeof v==="object")wrap(k+": "+JSON.stringify(v),7,9);else kv(k,v)}}}
- page.drawText("JFD RMS • Administrative Report Archive",{x:m,y:30,font:F.reg,size:7,color:rgb(.4,.4,.4)});return pdf.save();
+ page.drawText("JFD RMS • Administrative Report Archive",{x:m,y:30,font:F.reg,size:7,color:rgb(.4,.4,.4)});return pdf.save({objectsPerTick:Infinity});
 }
 function crc32(buf){let table=crc32.table;if(!table){table=crc32.table=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?(0xedb88320^(c>>>1)):(c>>>1);table[n]=c>>>0;}}let crc=0xffffffff;for(const b of buf)crc=table[(crc^b)&255]^(crc>>>8);return(crc^0xffffffff)>>>0;}
 function zipStore(entries){const locals=[],central=[];let offset=0;for(const entry of entries){const name=Buffer.from(String(entry.name),"utf8"),data=Buffer.from(entry.data),crc=crc32(data),lh=Buffer.alloc(30);lh.writeUInt32LE(0x04034b50,0);lh.writeUInt16LE(20,4);lh.writeUInt16LE(0x800,6);lh.writeUInt32LE(crc,14);lh.writeUInt32LE(data.length,18);lh.writeUInt32LE(data.length,22);lh.writeUInt16LE(name.length,26);locals.push(lh,name,data);const ch=Buffer.alloc(46);ch.writeUInt32LE(0x02014b50,0);ch.writeUInt16LE(20,4);ch.writeUInt16LE(20,6);ch.writeUInt16LE(0x800,8);ch.writeUInt32LE(crc,16);ch.writeUInt32LE(data.length,20);ch.writeUInt32LE(data.length,24);ch.writeUInt16LE(name.length,28);ch.writeUInt32LE(offset,42);central.push(ch,name);offset+=lh.length+name.length+data.length;}const body=Buffer.concat(locals),cd=Buffer.concat(central),end=Buffer.alloc(22);end.writeUInt32LE(0x06054b50,0);end.writeUInt16LE(entries.length,8);end.writeUInt16LE(entries.length,10);end.writeUInt32LE(cd.length,12);end.writeUInt32LE(body.length,16);return Buffer.concat([body,cd,end]);}
