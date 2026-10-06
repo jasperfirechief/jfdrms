@@ -445,6 +445,30 @@ async function boot(){if(loginInProgress||starting||me)return;try{await supabase
 window.rmsBoot=boot;
 async function start(u){if(starting)return;starting=true;me=u;try{let p=null,lastError=null;for(let attempt=0;attempt<3;attempt++){const s=await db.auth.getSession();if(!s.data?.session)throw new Error("Authentication session was not established. Please try signing in again.");const q=await db.from("users").select("*").eq("user_id",u.id).maybeSingle();if(q.data){p=q.data;break}lastError=q.error;if(attempt<2)await new Promise(r=>setTimeout(r,400))}if(!p)throw new Error("Profile load failed: "+(lastError?.message||"No matching RMS user profile was returned."));if(!p.active)throw new Error("Your account is not active.");profile=p;$("login").classList.add("hiddenx");$("app").classList.remove("hiddenx");$("userLabel").textContent=(profile.first_name||"")+" "+(profile.last_name||"")+" · "+String(profile.app_role||"").toUpperCase();$("appError").classList.add("hiddenx");tab("home");try{await refresh()}catch(err){console.error("RMS data startup error",err);$("appError").textContent="Signed in successfully, but some department data could not load: "+(err?.message||"Unknown error");$("appError").classList.remove("hiddenx")}}catch(err){console.error("RMS startup error",err);me=null;profile=null;$("app").classList.add("hiddenx");$("login").classList.remove("hiddenx");$("loginError").textContent=err?.message||"Unable to finish sign-in. Please try again."}finally{starting=false}}
 window.__rmsStartImpl=start;
+(function installReportButtonHandlers(){
+  if(window.__jfdReportButtonHandlersInstalled)return;
+  window.__jfdReportButtonHandlersInstalled=true;
+  document.addEventListener("click",function(e){
+    const b=e.target?.closest?.("#reportsList button,#adminIncidentSearchResults button,#adminReportArchive button,#adminNerisReviewList button");
+    if(!b)return;
+    const text=(b.textContent||"").trim().replace(/\\s+/g," ").toLowerCase();
+    const cad=b.dataset.cad||b.dataset.adminReviewCad||"";
+    const reportId=b.dataset.reportId||b.dataset.adminReviewId||"";
+    if(!cad||!reportId)return;
+    let action=null;
+    if(text==="pdf"||text==="download pdf")action=()=>window.downloadIncidentPdf?.(cad,reportId);
+    else if(text==="email pdf")action=()=>window.emailIncidentPdf?.(cad,reportId);
+    else if(text==="open"||text==="open pdf")action=()=>window.generateIncidentPdf?.(cad,reportId);
+    else if(text==="view report"||text==="review / submit")action=()=>window.openSavedReport?.(cad,reportId);
+    else if(text==="submit to neris"){
+      const incidentPromise=db.from("incidents").select("reports").eq("cad",cad).maybeSingle();
+      action=async()=>{const q=await incidentPromise;const reports=Array.isArray(q.data?.reports)?q.data.reports:[];const idx=reports.findIndex(x=>String(x?.report_id||"")===String(reportId));return window.adminSubmitReport?.(cad,idx)};
+    }
+    if(!action)return;
+    e.preventDefault();e.stopImmediatePropagation();
+    Promise.resolve().then(action).catch(err=>{console.error("Report button action failed:",err);alert(err?.message||String(err))});
+  },true);
+})();
 window.openSavedReport=window.openSavedReport||openSavedReport;
 window.openSavedReportFromButton=window.openSavedReportFromButton||openSavedReportFromButton;
 window.editSavedReport=window.editSavedReport||editSavedReport;
