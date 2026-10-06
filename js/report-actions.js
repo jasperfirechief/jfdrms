@@ -17,7 +17,7 @@ window.jfdHandleReportAction=async function(button){
     const b=button?.dataset||{};
     const cad=b.cad||b.adminReviewCad||"";
     const reportId=b.reportId||b.adminReviewId||"";
-    const action=String(b.reportAction||"").toLowerCase();
+    const action=String(b.reportAction||b.reportActionName||b.action||"").toLowerCase();
     if(!cad)throw new Error("Report CAD number is missing.");
     if((action!=="download_all"&&action!=="email_all")&&!reportId)throw new Error("Report ID is missing.");
     if(action==="download"||action==="pdf")return await window.downloadIncidentPdf(cad,reportId);
@@ -46,7 +46,8 @@ window.generateIncidentPdf=async function(cad,reportId){
     tab=window.open("about:blank","_blank");
     const x=await fetchIncidentPdfBlob(cad,reportId);
     const url=URL.createObjectURL(x.blob);
-    if(tab&&!tab.closed){tab.location.href=url;}else{window.open(url,"_blank","noopener");}
+    if(!x.blob||x.blob.size<100)throw new Error("The PDF service returned an empty or invalid PDF.");
+    if(tab&&!tab.closed){tab.location.replace(url);}else{const w=window.open(url,"_blank");if(!w)throw new Error("The browser blocked the PDF window. Please allow pop-ups for JFD RMS.");}
     setTimeout(()=>URL.revokeObjectURL(url),60000);
   }catch(e){
     if(tab&&!tab.closed)try{tab.close()}catch{}
