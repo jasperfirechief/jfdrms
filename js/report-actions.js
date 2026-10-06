@@ -13,25 +13,32 @@ async function fetchIncidentPdfBlob(cad,reportId){
 }
 window.__reportActionsLoaded=true;
 window.jfdHandleReportAction=async function(button){
-  const b=button?.dataset||{};
-  const cad=b.cad||b.adminReviewCad||"";
-  const reportId=b.reportId||b.adminReviewId||"";
-  const action=String(b.reportAction||"").toLowerCase();
-  if(!cad)return alert("Report CAD number is missing.");
-  if((action!=="download_all"&&action!=="email_all")&&!reportId)return alert("Report ID is missing.");
-  if(action==="download"||action==="pdf")return window.downloadIncidentPdf(cad,reportId);
-  if(action==="open")return window.generateIncidentPdf(cad,reportId);
-  if(action==="email")return window.emailIncidentPdf(cad,reportId);
-  if(action==="view"||action==="review")return window.openSavedReport(cad,reportId);
-  if(action==="submit"){
-    const q=await db.from("incidents").select("reports").eq("cad",cad).maybeSingle();
-    if(q.error||!q.data)throw new Error(q.error?.message||"Incident not found.");
-    const reports=Array.isArray(q.data.reports)?q.data.reports:[];
-    const idx=reports.findIndex(x=>String(x?.report_id||"")===String(reportId));
-    if(idx<0)throw new Error("Report not found.");
-    return window.adminSubmitReport(cad,idx);
+  try{
+    const b=button?.dataset||{};
+    const cad=b.cad||b.adminReviewCad||"";
+    const reportId=b.reportId||b.adminReviewId||"";
+    const action=String(b.reportAction||"").toLowerCase();
+    if(!cad)throw new Error("Report CAD number is missing.");
+    if((action!=="download_all"&&action!=="email_all")&&!reportId)throw new Error("Report ID is missing.");
+    if(action==="download"||action==="pdf")return await window.downloadIncidentPdf(cad,reportId);
+    if(action==="open")return await window.generateIncidentPdf(cad,reportId);
+    if(action==="email")return await window.emailIncidentPdf(cad,reportId);
+    if(action==="view"||action==="review")return await window.openSavedReport(cad,reportId);
+    if(action==="submit"){
+      const q=await db.from("incidents").select("reports").eq("cad",cad).maybeSingle();
+      if(q.error||!q.data)throw new Error(q.error?.message||"Incident not found.");
+      const reports=Array.isArray(q.data.reports)?q.data.reports:[];
+      const idx=reports.findIndex(x=>String(x?.report_id||"")===String(reportId));
+      if(idx<0)throw new Error("Report not found.");
+      return await window.adminSubmitReport(cad,idx);
+    }
+    if(action==="delete")return await window.adminDeleteReportFromButton({dataset:{cad,reportId}});
+    throw new Error("Unknown report action: "+action);
+  }catch(e){
+    console.error("JFD report action failed",e);
+    alert(e?.message||String(e));
+    return false;
   }
-  if(action==="delete")return window.adminDeleteReportFromButton({dataset:{cad,reportId}});
 };
 window.generateIncidentPdf=async function(cad,reportId){
   let tab=null;
