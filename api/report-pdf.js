@@ -49,10 +49,7 @@ export async function makePdf(incident={},reports=[]){
  const reg=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
  const W=612,H=792,m=40,usable=W-(m*2),bottom=48,headerH=92;
  const F={reg,bold},NAVY=rgb(.08,.14,.22),RED=rgb(.62,.04,.04),SLATE=rgb(.34,.39,.45),LIGHT=rgb(.94,.96,.98),MID=rgb(.78,.82,.87),WHITE=rgb(1,1,1);
- const jfdLogo=null;
-
-
- let page,y,pageNo=0;
+let page,y,pageNo=0;
  const pages=[];
  const clean=v=>String(v??"").replace(/\s+/g," ").trim();
  const prettyKey=k=>clean(k).replace(/^r/,"").replace(/([a-z])([A-Z])/g,"$1 $2").replace(/[_-]+/g," ").replace(/\b\w/g,c=>c.toUpperCase());
@@ -75,8 +72,7 @@ export async function makePdf(incident={},reports=[]){
    page.drawRectangle({x:0,y:H-70,width:W,height:70,color:WHITE});
    // Official Jasper Fire Department logo: cross and City of Jasper seal in the center.
    // Embedded as PNG to avoid JPEG/Vips decoding and preserve the actual department artwork.
-   page.drawImage(jfdLogo,{x:m,y:H-64,width:90,height:55});
-   page.drawText("JASPER FIRE DEPARTMENT",{x:m+100,y:H-27,font:F.bold,size:15,color:NAVY});
+page.drawText("JASPER FIRE DEPARTMENT",{x:m+100,y:H-27,font:F.bold,size:15,color:NAVY});
    page.drawText("10 18th Street East · Jasper, Alabama 35501 · 205-221-8509",{x:m+100,y:H-41,font:F.reg,size:7.5,color:SLATE});
    page.drawText(title,{x:m+100,y:H-56,font:F.bold,size:10,color:RED});
    page.drawLine({start:{x:m,y:H-70},end:{x:W-m,y:H-70},thickness:1,color:MID});
