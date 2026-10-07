@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JFD RMS — Incident Report Sandbox</title>
+<style>
+:root{--navy:#172231;--navy2:#243447;--line:#d9e0e7;--muted:#66717e;--bg:#f3f5f7;--white:#fff;--red:#a52222;--green:#176b4a;--amber:#8a5a00}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font:14px/1.45 Arial,Helvetica,sans-serif;color:#1f2933}
+header{background:var(--navy);color:#fff;padding:18px 28px;position:sticky;top:0;z-index:10;box-shadow:0 2px 8px #0002}
+.head{max-width:1280px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:20px}.brand{display:flex;align-items:center;gap:14px}.logo{width:48px;height:48px;border:2px solid #fff;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:11px;text-align:center}.brand b{display:block;font-size:18px;letter-spacing:.5px}.brand span{font-size:12px;opacity:.78}.badge{background:#fff2;border:1px solid #fff4;padding:6px 10px;border-radius:20px;font-size:11px;font-weight:700}
+main{max-width:1280px;margin:24px auto 100px;padding:0 18px}.notice{background:#fff8e1;border:1px solid #ead8a5;padding:10px 14px;border-radius:8px;margin-bottom:16px;color:#604d15}
+.toolbar{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:16px}.toolbar h1{margin:0;font-size:25px}.actions{display:flex;gap:8px;flex-wrap:wrap}
+button{border:1px solid #c8d0d8;background:#fff;color:#25313c;border-radius:6px;padding:9px 13px;font-weight:700;cursor:pointer}button.primary{background:var(--navy2);color:#fff;border-color:var(--navy2)}button.green{background:var(--green);color:#fff;border-color:var(--green)}button.ghost{background:transparent}button.danger{color:#8c2020;border-color:#d8aaaa}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:18px}.card{background:#fff;border:1px solid var(--line);border-radius:9px;margin-bottom:16px;box-shadow:0 1px 2px #00000008}.card h2{font-size:16px;margin:0;padding:13px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}.card h2 small{font-size:11px;color:var(--muted);font-weight:500}.body{padding:16px}
+.fields{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}.field{grid-column:span 4}.field.wide{grid-column:span 8}.field.full{grid-column:1/-1}.field.half{grid-column:span 6}label{display:block;font-size:12px;font-weight:700;margin-bottom:5px;color:#374151}label.req:after{content:" *";color:#b21e1e}input,select,textarea{width:100%;border:1px solid #cbd3db;border-radius:6px;padding:9px;background:#fff;color:#1f2933;font:inherit}textarea{min-height:90px;resize:vertical}input:focus,select:focus,textarea:focus{outline:2px solid #9bb4cc;outline-offset:1px}
+.section-note{color:var(--muted);font-size:12px;margin:0 0 12px}.conditional{display:none}.conditional.show{display:block}
+.patient{border:1px solid #d6dde4;border-radius:8px;margin:12px 0;overflow:hidden}.patient-head{background:#f6f8fa;padding:10px 12px;display:flex;justify-content:space-between;align-items:center}.patient-head strong{font-size:14px}.patient-body{padding:14px}.subhead{font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#4a5561;margin:15px 0 9px}
+.choice{display:flex;gap:8px;flex-wrap:wrap}.choice label{margin:0;font-weight:500;border:1px solid #cbd3db;border-radius:6px;padding:8px 10px;background:#fff;cursor:pointer}.choice input{width:auto;margin-right:5px}
+.side{position:sticky;top:94px;height:max-content}.progress{height:8px;background:#e3e8ed;border-radius:10px;overflow:hidden}.progress i{display:block;height:100%;background:#2f6d8f;width:0}.check{display:flex;gap:9px;padding:9px 0;border-bottom:1px solid #edf0f2}.dot{width:9px;height:9px;border-radius:50%;background:#c9d0d7;margin-top:5px}.dot.ok{background:#2c8a61}.dot.warn{background:#c18a24}.summary{font-size:13px}.summary b{display:block;margin-top:9px}.sticky{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);padding:10px 18px;z-index:20}.sticky-inner{max-width:1280px;margin:auto;display:flex;justify-content:space-between;align-items:center;gap:10px}.status{color:var(--muted);font-size:12px}
+.hidden{display:none!important}.pill{display:inline-block;background:#eef3f7;border:1px solid #d8e0e7;border-radius:20px;padding:3px 8px;font-size:11px;font-weight:700}.red{color:#9e2424}.greenText{color:#176b4a;font-weight:700}
+@media(max-width:900px){.grid{grid-template-columns:1fr}.side{position:static}.field,.field.wide,.field.half{grid-column:1/-1}.head{align-items:flex-start}.toolbar{align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+<body>
+<header><div class="head"><div class="brand"><div class="logo">JFD<br>✚</div><div><b>JASPER FIRE DEPARTMENT</b><span>10 18th Street East · Jasper, Alabama 35501 · 205-221-8509</span></div></div><div class="badge">SANDBOX · NO PRODUCTION DATA</div></div></header>
+<main>
+<div class="notice"><b>Design sandbox.</b> This page models the proposed single Incident Report workflow. Data is stored only in this browser. It does not connect to Active911, Supabase, NERIS, email, or production RMS.</div>
+<div class="toolbar"><div><h1>Incident Report</h1><span class="pill" id="statePill">DRAFT</span></div><div class="actions"><button onclick="loadScenario('medical')">Medical</button><button onclick="loadScenario('mva')">MVA</button><button onclick="loadScenario('fire')">Fire</button><button onclick="loadScenario('alarm')">Fire Alarm</button><button onclick="loadScenario('public')">Public Service</button></div></div>
+
+<div class="grid"><div>
+<section class="card"><h2>Incident Information <small>Common to every call</small></h2><div class="body"><div class="fields">
+<div class="field"><label class="req">CAD / Incident Number</label><input id="cad" placeholder="2026-23059"></div>
+<div class="field"><label class="req">Incident Date</label><input id="date" type="date"></div>
+<div class="field"><label class="req">Shift</label><select id="shift"><option value="">Choose shift</option><option>A</option><option>B</option><option>C</option></select></div>
+<div class="field"><label class="req">Call Type</label><select id="call"><option value="">Choose call type</option><option>EMS</option><option>MVA</option><option>Fire</option><option>Fire Alarm</option><option>Hazard</option><option>Public Service</option><option>Rescue</option><option>Special Duty</option></select></div>
+<div class="field wide"><label class="req">Primary Incident Type</label><input id="type" placeholder="Search/select incident type"></div>
+<div class="field full"><label class="req">Incident Location</label><input id="location" placeholder="Street address, city, state"></div>
+<div class="field"><label class="req">Dispatch Time</label><input id="dispatch" type="time"></div>
+<div class="field"><label>En Route</label><input id="enroute" type="time"></div>
+<div class="field"><label>On Scene</label><input id="onscene" type="time"></div>
+<div class="field"><label>In Service</label><input id="service" type="time"></div>
+<div class="field"><label>Cancelled</label><input id="cancelled" type="time"></div>
+<div class="field full"><label>Incident Narrative</label><textarea id="narrative" placeholder="Describe what occurred, actions taken, and final disposition."></textarea></div>
+</div></div></section>
+
+<section class="card"><h2>Response & Personnel <small>Keep operational details in one place</small></h2><div class="body"><div class="fields">
+<div class="field"><label>Primary Apparatus</label><select><option>Choose apparatus</option><option>Engine 1</option><option>Engine 2</option><option>Rescue 1</option><option>Medic 1</option><option>Chief 1</option></select></div>
+<div class="field"><label>Officer</label><select><option>Choose officer</option><option>On-duty officer</option><option>Admin / Chief</option></select></div>
+<div class="field"><label>Driver</label><select><option>Choose driver</option><option>On-duty driver</option><option>Admin / Chief</option></select></div>
+<div class="field half"><label>Additional responding personnel</label><input placeholder="Select crew members"></div>
+<div class="field half"><label>Mutual Aid</label><select><option>None</option><option>Agency 1</option><option>Agency 2</option><option>Agency 3</option></select></div>
+</div></div></section>
+
+<section class="card" id="patientCard"><h2>Patients <small>Patient-specific information stays together</small></h2><div class="body"><p class="section-note">Add a patient only when one exists. Each patient can have separate care, vitals, disposition, and refusal information.</p><div id="patients"></div><button class="primary" onclick="addPatient()">+ Add Patient</button></div></section>
+
+<section class="card" id="mvaCard"><h2>MVA / Scene <small>Shown only for motor vehicle incidents</small></h2><div class="body"><div class="fields">
+<div class="field"><label>Number of Vehicles</label><input id="vehicles" type="number" min="0"></div>
+<div class="field"><label>Extrication Required?</label><select><option>No</option><option>Yes</option></select></div>
+<div class="field"><label>Airbags / Safety Systems</label><input placeholder="If applicable"></div>
+<div class="field full"><label>Scene Safety / Hazards</label><textarea placeholder="Traffic, fuel, electrical, fire, roadway hazards, etc."></textarea></div>
+</div></div></section>
+
+<section class="card" id="fireCard"><h2>Fire Details <small>Shown only when applicable</small></h2><div class="body"><div class="fields">
+<div class="field"><label>Condition on Arrival</label><select><option>Choose</option><option>No visible fire</option><option>Visible smoke</option><option>Visible fire</option><option>Working fire</option></select></div>
+<div class="field"><label>Area / Room of Origin</label><input></div>
+<div class="field"><label>Actions Taken</label><input placeholder="Suppression, investigation, overhaul, etc."></div>
+<div class="field"><label>Estimated Damage</label><input></div>
+<div class="field"><label>Cause / Investigation</label><input></div>
+<div class="field"><label>Water Supply</label><input></div>
+</div></div></section>
+
+<section class="card" id="alarmCard"><h2>Fire Alarm / Service Details <small>Shown only when applicable</small></h2><div class="body"><div class="fields">
+<div class="field"><label>Alarm / Call Result</label><select><option>Choose</option><option>False alarm</option><option>System malfunction</option><option>Alarm investigated</option><option>Actual emergency</option><option>No problem found</option></select></div>
+<div class="field"><label>Action Taken</label><input></div>
+<div class="field full"><label>Additional Details</label><textarea></textarea></div>
+</div></div></section>
+
+<section class="card"><h2>Additional Information <small>Only complete what applies</small></h2><div class="body"><div class="fields">
+<div class="field full"><label>Additional Notes</label><textarea placeholder="Information not captured above."></textarea></div>
+<div class="field"><label>Completed By</label><input value="Sandbox User"></div>
+<div class="field"><label>Completion Date / Time</label><input type="datetime-local"></div>
+</div></div></section>
+</div>
+
+<aside class="side">
+<section class="card"><h2>Report Progress</h2><div class="body"><div class="progress"><i id="bar"></i></div><div id="percent" style="font-size:12px;margin-top:6px;color:#66717e">0% complete</div>
+<div class="check"><i class="dot" id="c1"></i><div><b>Incident basics</b><br><span class="status">CAD, date, shift, call type, location</span></div></div>
+<div class="check"><i class="dot" id="c2"></i><div><b>Response</b><br><span class="status">Apparatus / crew as applicable</span></div></div>
+<div class="check"><i class="dot" id="c3"></i><div><b>Patients</b><br><span class="status">Care, vitals, disposition, refusal</span></div></div>
+<div class="check"><i class="dot" id="c4"></i><div><b>Call-specific details</b><br><span class="status">Only applicable sections</span></div></div>
+<div class="check"><i class="dot" id="c5"></i><div><b>Completion</b><br><span class="status">Validation and finish</span></div></div></div></section>
+<section class="card"><h2>Design Goal</h2><div class="body summary"><b>One incident.</b> The user documents the call, not a NERIS form.<b>Progressive disclosure.</b> Patient, MVA, fire, and alarm fields appear only when needed.<b>Finish later.</b> Critical information can be saved early and completed after the scene is clear.<b>One official report.</b> The finished PDF assembles the relevant sections into a clean JFD report.</div></section>
+</aside>
+</div>
+</main>
+<div class="sticky"><div class="sticky-inner"><span class="status" id="saveStatus">Not saved</span><div class="actions"><button onclick="saveDraft()">Save Draft</button><button class="ghost" onclick="window.print()">Preview / Print</button><button class="green" onclick="finish()">Validate & Finish</button></div></div></div>
+
+<script>
+const $=id=>document.getElementById(id);
+let patients=[];
+let scenario='medical';
+function today(){return new Date().toISOString().slice(0,10)}
+function loadScenario(s){
+ scenario=s;
+ const map={medical:['EMS','MEDICAL||PATIENT_CARE','Medical call'],mva:['MVA','MVA||MOTOR_VEHICLE_CRASH','Motor vehicle crash'],fire:['Fire','FIRE||STRUCTURE_FIRE','Structure fire'],alarm:['Fire Alarm','PUBSERV||ALARMS_NONMED||FIRE_ALARM','Fire alarm'],public:['Public Service','PUBSERV||OTHER','Public service']};
+ const v=map[s];$('call').value=v[0];$('type').value=v[1];$('date').value=today();$('shift').value='';$('cad').value='';$('location').value='';$('dispatch').value='';$('narrative').value='';
+ $('patientCard').style.display=(s==='medical'||s==='mva')?'block':'none';
+ $('mvaCard').style.display=s==='mva'?'block':'none';
+ $('fireCard').style.display=s==='fire'?'block':'none';
+ $('alarmCard').style.display=(s==='alarm'||s==='public')?'block':'none';
+ patients=[]; renderPatients(); update();
+}
+function addPatient(){
+ patients.push({name:'',sex:'',age:'',care:'',complaint:'',injury:'',disposition:'',refusal:false,treatment:'',bp:'',pulse:'',resp:'',spo2:'',gcs:'',notes:''});
+ renderPatients();update();
+}
+function renderPatients(){
+ const wrap=$('patients');wrap.innerHTML='';
+ patients.forEach((p,i)=>{
+ const el=document.createElement('div');el.className='patient';
+ el.innerHTML=`<div class="patient-head"><strong>Patient ${i+1}</strong><button class="danger" onclick="removePatient(${i})">Remove</button></div>
+ <div class="patient-body"><div class="fields">
+ <div class="field wide"><label>Patient Name</label><input data-p="${i}" data-k="name" value="${esc(p.name)}"></div>
+ <div class="field"><label>Sex</label><select data-p="${i}" data-k="sex"><option value="">Choose</option><option>Female</option><option>Male</option><option>Unknown</option></select></div>
+ <div class="field"><label>Age</label><input type="number" min="0" data-p="${i}" data-k="age" value="${esc(p.age)}"></div>
+ <div class="field"><label class="req">Was patient care provided?</label><select data-p="${i}" data-k="care"><option value="">Choose</option><option>Yes</option><option>No</option></select></div>
+ <div class="field"><label>Disposition</label><select data-p="${i}" data-k="disposition"><option value="">Choose</option><option>Treated / Released</option><option>Transported</option><option>Refused Care / Transport</option><option>Other</option></select></div>
+ <div class="field"><label>Chief Complaint</label><input data-p="${i}" data-k="complaint" placeholder="Search/select or Other" value="${esc(p.complaint)}"></div>
+ <div class="field"><label>Injury</label><input data-p="${i}" data-k="injury" placeholder="Search/select or Other" value="${esc(p.injury)}"></div>
+ <div class="field full"><label>Treatment / Care Provided</label><textarea data-p="${i}" data-k="treatment">${esc(p.treatment)}</textarea></div>
+ <div class="field full"><div class="subhead">Vitals</div></div>
+ <div class="field"><label>Time</label><input type="time"></div><div class="field"><label>Blood Pressure</label><input data-p="${i}" data-k="bp" placeholder="120/80"></div><div class="field"><label>Pulse</label><input data-p="${i}" data-k="pulse"></div><div class="field"><label>Respirations</label><input data-p="${i}" data-k="resp"></div><div class="field"><label>SpO₂</label><input data-p="${i}" data-k="spo2"></div><div class="field"><label>GCS</label><input data-p="${i}" data-k="gcs"></div>
+ <div class="field full"><label>Patient Notes</label><textarea data-p="${i}" data-k="notes">${esc(p.notes)}</textarea></div>
+ <div class="field full refusal-${i}" style="display:${p.disposition==='Refused Care / Transport'?'block':'none'}"><div class="subhead">Refusal</div><div class="fields"><div class="field"><label>Refusal Date / Time</label><input type="datetime-local"></div><div class="field"><label>Patient / Responsible Party Signature</label><input placeholder="Touch signature in production"></div><div class="field full"><label>Refusal Explanation</label><textarea></textarea></div></div></div>
+ </div></div>`;
+ wrap.appendChild(el);
+ el.querySelectorAll('[data-k]').forEach(x=>x.addEventListener('input',()=>{patients[i][x.dataset.k]=x.value;if(x.dataset.k==='disposition'){const r=el.querySelector('.refusal-'+i);r.style.display=x.value==='Refused Care / Transport'?'block':'none'}update()}));
+ });
+}
+function removePatient(i){patients.splice(i,1);renderPatients();update()}
+function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function update(){
+ const basics=[$('cad').value,$('date').value,$('shift').value,$('call').value,$('location').value].every(Boolean);
+ const response=true;
+ const patOk=!(scenario==='medical'||scenario==='mva') || patients.length>0;
+ const callOk=(scenario==='mva' ? $('vehicles').value!=='' : scenario==='fire' ? true : true);
+ const done=[basics,response,patOk,callOk,false];
+ done.forEach((v,i)=>{$('c'+(i+1)).className='dot '+(v?'ok':'')});
+ const pct=Math.round(done.filter(Boolean).length/done.length*100);$('bar').style.width=pct+'%';$('percent').textContent=pct+'% complete';
+}
+function saveDraft(){localStorage.setItem('jfd_incident_sandbox',JSON.stringify({scenario,patients,values:Object.fromEntries([...document.querySelectorAll('input,select,textarea')].filter(x=>x.id).map(x=>[x.id,x.value]))}));$('saveStatus').textContent='Draft saved locally · '+new Date().toLocaleTimeString();$('statePill').textContent='DRAFT'}
+function finish(){update();const basics=[$('cad').value,$('date').value,$('shift').value,$('call').value,$('location').value].every(Boolean);if(!basics){alert('Complete the required incident information before finishing this sandbox report.');return}$('statePill').textContent='FINISHED';$('saveStatus').textContent='Validation passed · sandbox only';window.scrollTo({top:0,behavior:'smooth'})}
+document.querySelectorAll('input,select,textarea').forEach(x=>x.addEventListener('input',update));
+$('date').value=today();loadScenario('medical');addPatient();
+</script>
+</body>
+</html>
