@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { JFD_LOGO_PNG } from "./jfd-logo-data.js";
 
 
 const SUPABASE_URL="https://audgtwcctdoiptuekqvn.supabase.co";
@@ -68,13 +69,14 @@ let page,y,pageNo=0;
    for(const word of words){const next=line?line+" "+word:word;if(font.widthOfTextAtSize(next,size)>maxWidth&&line){lines.push(line);line=word}else line=next}
    if(line)lines.push(line);return lines.length?lines:["—"];
  };
+ const logo=await pdf.embedPng(Buffer.from(JFD_LOGO_PNG,"base64"));
+ const logoDims=logo.scaleToFit(58,50);
  const drawHeader=title=>{
    page.drawRectangle({x:0,y:H-70,width:W,height:70,color:WHITE});
-   // Official Jasper Fire Department logo: cross and City of Jasper seal in the center.
-   // Embedded as PNG to avoid JPEG/Vips decoding and preserve the actual department artwork.
-page.drawText("JASPER FIRE DEPARTMENT",{x:m+100,y:H-27,font:F.bold,size:15,color:NAVY});
-   page.drawText("10 18th Street East · Jasper, Alabama 35501 · 205-221-8509",{x:m+100,y:H-41,font:F.reg,size:7.5,color:SLATE});
-   page.drawText(title,{x:m+100,y:H-56,font:F.bold,size:10,color:RED});
+   page.drawImage(logo,{x:m,y:H-61+((50-logoDims.height)/2),width:logoDims.width,height:logoDims.height});
+   page.drawText("JASPER FIRE DEPARTMENT",{x:m+72,y:H-27,font:F.bold,size:15,color:NAVY});
+   page.drawText("10 18th Street East · Jasper, Alabama 35501 · 205-221-8509",{x:m+72,y:H-41,font:F.reg,size:7.5,color:SLATE});
+   page.drawText(title,{x:m+72,y:H-56,font:F.bold,size:10,color:RED});
    page.drawLine({start:{x:m,y:H-70},end:{x:W-m,y:H-70},thickness:1,color:MID});
  };
  const drawFooter=()=>{
@@ -159,182 +161,224 @@ page.drawText("JASPER FIRE DEPARTMENT",{x:m+100,y:H-27,font:F.bold,size:15,color
   }
   const units=[...unitMap.values()];
  
- currentTitle="FIRE INCIDENT REPORT";newPage(currentTitle);
- section("Incident Summary");
- twoCol(["Incident / CAD Number",incident.cad||fd.rCad],["Incident Date",dateText(fd.rDate||incident.dispatch_time)]);
- field("Incident Location",fd.rLocation||incident.location);
- twoCol(["Call Type",fd.rCall||fd.rCallType||incident.type],["Location Type",fd.rLocationType]);
- field("Property Use / Occupancy",fd.rPrimaryUse||fd.rOccupancy);
-
- section("Owner / Occupant Information");
- twoCol(["Owner Name",fd.rOwnerName||fd.owner_name],["Owner Phone",fd.rOwnerPhone||fd.owner_phone]);
- field("Owner Address",fd.rOwnerAddress||fd.owner_address);
- twoCol(["Occupant Name",fd.rOccupantName||fd.rOccName||fd.occupant_name],["Occupant Phone",fd.rOccPhone||fd.occupant_phone]);
- field("Occupant Address",fd.rOccupantAddress||fd.occupant_address);
-
- section("Fire Department Report");
- field("Date of Incident",dateText(fd.rDate||incident.dispatch_time));
- field("Type of Response",fd.rCall||fd.rCallType||incident.type);
- field("Department Contact","Jasper Fire Department • 10 18th Street East • Jasper, Alabama 35501 • 205-221-8509");
- fullText("General Incident Description","This page provides the basic incident and property information for the owner or occupant. Detailed operational, apparatus, NERIS, investigative, and other department-use information is provided on subsequent pages.");
- 
- currentTitle="FIRE INCIDENT REPORT";newPage(currentTitle);
- section("Department Technical Record");
-
- const dispatchTimes=[["Dispatch",fd.rDispatch],["En Route",fd.rEnRoute],["On Scene",fd.rOnScene],["Cancelled",fd.rCancelled],["In Service",fd.rInService]];
- const activeTimes=dispatchTimes.filter(x=>x[1]);
- if(activeTimes.length){
-   const pairs=[];for(let i=0;i<activeTimes.length;i+=2){pairs.push(activeTimes[i],activeTimes[i+1]||["",""]);twoCol(pairs[0],pairs[1]||["",""]);pairs=[];}
- }else field("Incident Times","No incident times recorded");
- responseTable(units);
- field("Additional Personnel",fd.additional_personnel);
+ const callType=String(fd.rCall||fd.rCallType||incident.type||"").trim();
+ const primaryType=String(fd.rPrimaryIncidentType||fd.primary_incident_type||fd.rIncidentType||"").toUpperCase();
+ const isMva=/\\bMVA\\b|MOTOR[_ ]VEHICLE|COLLISION|CRASH/.test((callType+" "+primaryType).toUpperCase());
+ const isFireLike=!isMva && /FIRE|STRUCTURE|ALARM|SMOKE|EXPLOS|WILDFIRE/.test((callType+" "+primaryType).toUpperCase());
+ const hasVal=v=>v!==undefined&&v!==null&&String(v).trim()!==""&&String(v).trim()!=="—";
+ const firstVal=(...vs)=>vs.find(hasVal);
+ const nonEmptyObject=o=>o&&typeof o==="object"&&!Array.isArray(o)&&Object.values(o).some(hasVal);
+ const vehicleList=Array.isArray(fd.vehicles)?fd.vehicles:[];
+ const legacyVehicle=[fd.rVehicle1,fd.rYear1,fd.rMake1,fd.rModel1].filter(hasVal).join(" ");
+ const hasVehicles=vehicleList.length>0||!!legacyVehicle;
+ const hasNarrative=hasVal(fd.rNarrative)||hasVal(incident.narrative);
+ const hasOwner=hasVal(fd.rOwnerName)||hasVal(fd.owner_name)||hasVal(fd.rOwnerPhone)||hasVal(fd.owner_phone)||hasVal(fd.rOwnerAddress)||hasVal(fd.owner_address);
+ const hasOccupant=hasVal(fd.rOccupantName)||hasVal(fd.rOccName)||hasVal(fd.occupant_name)||hasVal(fd.rOccPhone)||hasVal(fd.occupant_phone)||hasVal(fd.rOccupantAddress)||hasVal(fd.occupant_address);
  const aids=[...(Array.isArray(fd.aid_records)?fd.aid_records:[]),...(Array.isArray(fd.nonfd_aid_records)?fd.nonfd_aid_records:[])];
- field("Mutual Aid / Other Agencies",aids.length?aids:"None recorded");
- 
- section("Fire / Alarm Conditions");
- twoCol(["Fire Location",fd.rFireLoc||fd.fire_location],["Arrival Condition",fd.rCondition||fd.condition]);
- twoCol(["Smoke Presence",fd.rSmokePresence||fd.rSmoke],["Smoke Alarm Working",fd.rSmokeWorking||fd.rSmokeAlarmWorking]);
- twoCol(["Fire Alarm",fd.rFireAlarm],["Other Alarm",fd.rOtherAlarm]);
- twoCol(["Suppression System",fd.rSuppression],["Cooking Suppression",fd.rCookingSuppression]);
- twoCol(["Water Supply",fd.rWater||fd.water_supply],["Fire Investigation",fd.rInvestigation||fd.investigation]);
- 
- section("Incident Actions / Findings");
- twoCol(["Action Taken",fd.rActionTaken||fd.action_taken],["No Action Taken",fd.rNoActionTaken||fd.no_action_taken]);
- field("Actions / Tactics",Array.isArray(fd.actions_taken)?fd.actions_taken:(fd.rActionsTaken||fd.actions_taken));
- twoCol(["Cause",fd.rCause||fd.cause],["Damage Type",fd.rDamageType||fd.damage_type]);
- twoCol(["Damage Estimate",fd.rDamageEstimate||fd.damage_estimate],["Floor / Area",[fd.rFloor||fd.floor_of_origin,fd.rRoom||fd.room_type].filter(Boolean).join(" / ")]);
- 
- section("Vehicles / Exposures / Casualties / Hazards");
- const vehicles=Array.isArray(fd.vehicles)?fd.vehicles:[];
- if(vehicles.length){
-   vehicles.forEach((v,i)=>{
-     field("Vehicle "+(i+1),[v.year,v.make,v.model,v.vehicle,v.description].filter(Boolean).join(" "));
-     twoCol(["Owner",v.owner],["Insurance",v.insurance]);
-     field("License / VIN",v.vin||v.license||v.license_vin);
-   });
- }else{
-   const legacyVehicle=[fd.rVehicle1,fd.rYear1,fd.rMake1,fd.rModel1].filter(Boolean).join(" ");
-   if(legacyVehicle)field("Vehicle Involved",legacyVehicle);
- }
- field("Exposures",fd.exposures);
- field("Casualties / Rescues",fd.casualties);
- field("Hazards / HAZMAT",fd.hazards||fd.rHazmat);
- 
- section("Insurance / Loss");
- twoCol(["Insurance Company",fd.rInsuranceCompany||fd.rOwnerInsurance||fd.rOccInsurance||fd.insurance_company],["Insurance Phone",fd.rInsurancePhone||fd.insurance_phone]);
- twoCol(["Policy Number",fd.rInsurancePolicy||fd.insurance_policy],["Loss / Damage Type",fd.rDamageType||fd.damage_type]);
- field("Estimated Damage",fd.rDamageEstimate||fd.damage_estimate);
- 
- section("Narrative");
- fullText("Incident Narrative",fd.rNarrative||incident.narrative||"No narrative entered.");
- 
- section("Report Completion");
- field("Person Completing Report",fd.rCompletedBy||fd.completedBy||fd.report_completed_by);
- for(let i=0;i<patients.length;i++){
-   const p=patients[i]||{};
-   const isRefusal=!!(p.refusedCare||p.refusedTransport||p.minorRefusal||p.refusal||p.refusalType);
-   const refusalType=p.refusalType||[p.refusedCare?"Refused Care":"",p.refusedTransport?"Refused Transport":"",p.minorRefusal?"Minor Refusal":""].filter(Boolean).join(", ")||"Patient Refusal";
-   currentTitle="PATIENT CARE REPORT";newPage(currentTitle);
+ const hasAid=aids.length>0;
+ const hasFireConditions=isFireLike && [
+   fd.rFireLoc,fd.fire_location,fd.rCondition,fd.condition,fd.rSmokePresence,fd.rSmoke,fd.rSmokeWorking,fd.rSmokeAlarmWorking,
+   fd.rFireAlarm,fd.rOtherAlarm,fd.rSuppression,fd.rCookingSuppression,fd.rWater,fd.water_supply,fd.rInvestigation,fd.investigation
+ ].some(hasVal);
+ const hasActions=[
+   fd.rActionTaken,fd.action_taken,fd.rNoActionTaken,fd.no_action_taken,fd.rActionsTaken,fd.actions_taken
+ ].some(hasVal);
+ const hasFindings=[fd.rCause,fd.cause,fd.rDamageType,fd.damage_type,fd.rDamageEstimate,fd.damage_estimate,fd.rFloor,fd.floor_of_origin,fd.rRoom,fd.room_type].some(hasVal);
+ const hasExposure=[fd.exposures,fd.casualties,fd.hazards,fd.rHazmat].some(hasVal);
+ const hasInsurance=[fd.rInsuranceCompany,fd.rOwnerInsurance,fd.rOccInsurance,fd.insurance_company,fd.rInsurancePhone,fd.insurance_phone,fd.rInsurancePolicy,fd.insurance_policy,fd.rDamageType,fd.damage_type,fd.rDamageEstimate,fd.damage_estimate].some(hasVal);
 
-   // PAGE 1: concise disposition/signature record. Keep clinical PHI off this page
-   // except what is necessary to identify the encounter and execute a refusal.
-   section("Patient Care / Disposition Summary");
-   twoCol(["Incident / CAD",incident.cad||fd.rCad],["Incident Date",dateText(fd.rDate||incident.dispatch_time)]);
-   field("Incident Location",fd.rLocation||incident.location);
-   twoCol(["Response Unit",p.vehicle||p.assignedVehicle||p.unit||fd.responding_unit],["Disposition",p.transportDisposition||p.transport||p.disposition]);
-   twoCol(["Transport Agency / Unit",p.transportAgency||p.transportUnit||p.vehicle],["Destination",p.destination]);
-   field("Chief Complaint / Reason for Response",p.chief||p.complaint||"Not recorded");
+ currentTitle=isMva?"MOTOR VEHICLE ACCIDENT REPORT":"FIRE INCIDENT REPORT";newPage(currentTitle);
+ section("Incident Summary");
+ twoCol(["Incident / CAD Number",firstVal(incident.cad,fd.rCad)],["Incident Date",dateText(firstVal(fd.rDate,incident.dispatch_time,incident.incident_date))]);
+ field("Incident Location",firstVal(fd.rLocation,incident.location));
+ twoCol(["Call Type",callType],["Location Type",firstVal(fd.rLocationType,incident.location_type)]);
+ const primaryDisplay=pretty(firstVal(fd.rPrimaryIncidentType,fd.primary_incident_type,fd.rIncidentType));
+ if(hasVal(fd.rPrimaryIncidentType)||hasVal(fd.primary_incident_type)||hasVal(fd.rIncidentType))field("Primary Incident Type",primaryDisplay);
+ if(hasVal(fd.rShift)||hasVal(fd.shift)||hasVal(incident.shift))twoCol(["Shift",firstVal(fd.rShift,fd.shift,incident.shift)],["Property Use / Occupancy",firstVal(fd.rPrimaryUse,fd.rOccupancy)]);
+ else if(hasVal(fd.rPrimaryUse)||hasVal(fd.rOccupancy))field("Property Use / Occupancy",firstVal(fd.rPrimaryUse,fd.rOccupancy));
 
-   if(isRefusal){
-     section("Patient Refusal / Release");
-     field("Refusal Type",refusalType);
-     field("Recommended Care / Transport",p.recommendedCare||p.refusalRecommendations||p.refusedServices||"See refusal documentation");
-     fullText("Risks / Consequences Explained",p.risksExplained||p.risksAcknowledged||p.refusalExplanation||"The patient or authorized representative was advised of the risks and consequences of refusing the recommended care and/or transport.");
-     twoCol(["Refusing Party",p.refusalSigner||p.patientSigner||p.guardianName||p.name],["Relationship",p.guardianRelationship||p.signerRelationship||"Patient"]);
-     twoCol(["Refusal Date / Time",p.refusalDateTime||p.refusalDate||p.signedAt],["Witness",p.witnessName||p.refusalWitness]);
-     field("If Patient Declined to Sign",p.signatureRefused||p.patientRefusedSignature?"Patient/representative declined to sign.":"");
-     ensure(112);
-     page.drawText("Patient / Guardian Signature",{x:m+7,y:y-12,font:F.bold,size:7.5,color:SLATE});
-     if(String(p.signature||"").startsWith("data:image/png")){
-       try{
-         const bytes=Buffer.from(String(p.signature).split(",")[1],"base64"),img=await pdf.embedPng(bytes);
-         page.drawImage(img,{x:m+7,y:y-91,width:250,height:70});
-       }catch{}
-     }else{
-       page.drawText(p.signatureName||p.refusalSigner||"Electronic signature recorded",{x:m+7,y:y-50,font:F.reg,size:9,color:NAVY});
-     }
-     page.drawRectangle({x:m+7,y:y-92,width:250,height:70,borderWidth:.5,borderColor:MID});
-     page.drawText("Signature",{x:m+265,y:y-12,font:F.bold,size:7.5,color:SLATE});
-     page.drawText("Date / Time",{x:m+390,y:y-12,font:F.bold,size:7.5,color:SLATE});
-     page.drawLine({start:{x:m+265,y:y-58},end:{x:m+380,y:y-58},thickness:.5,color:MID});
-     page.drawLine({start:{x:m+390,y:y-58},end:{x:m+usable-7,y:y-58},thickness:.5,color:MID});
-     y-=105;
-     twoCol(["Witness Signature",p.witnessSignatureName||p.witnessName],["Provider Signature",p.providerSignatureName||p.provider||"JFD EMS Provider"]);
-   }else{
-     section("Disposition / Transfer");
-     field("Disposition Narrative",p.dispositionNarrative||p.transferNarrative||"");
-     twoCol(["Patient / Representative Signature",p.patientSignatureName||p.signatureName||""],["Provider",p.provider||"JFD EMS Provider"]);
+ if(hasOwner||hasOccupant){
+   section("Owner / Occupant Information");
+   if(hasOwner){
+     twoCol(["Owner Name",firstVal(fd.rOwnerName,fd.owner_name)],["Owner Phone",firstVal(fd.rOwnerPhone,fd.owner_phone)]);
+     if(hasVal(fd.rOwnerAddress)||hasVal(fd.owner_address))field("Owner Address",firstVal(fd.rOwnerAddress,fd.owner_address));
    }
-
-   section("Report Identification");
-   twoCol(["Patient Record", "Patient "+(i+1)+" of "+patients.length],["Completed By",p.completedBy||p.reportCompletedBy||p.provider||"JFD RMS user"]);
-   fullText("Protected Clinical Information","Clinical assessment, vital signs, medications, medical history, allergies, interventions, and other protected patient information are contained on subsequent pages of this report.");
-
-   // PAGE 2+: protected clinical record
-   currentTitle="PATIENT CARE REPORT — PROTECTED CLINICAL RECORD";newPage(currentTitle);
-   section("Patient Identification");
-   twoCol(["Patient",p.name],["Date of Birth",dateText(p.dob)]);
-   twoCol(["Age",p.age],["Sex",p.sex]);
-   field("Patient Address",p.address);
-   twoCol(["Patient Phone",p.phone],["Incident / CAD",incident.cad||fd.rCad]);
-
-   section("Assessment / Presentation");
-   field("Chief Complaint / Reason for Response",p.chief||p.complaint);
-   field("Injury / Medical Complaint",p.injury||p.complaint);
-   fullText("Presentation / Brief Narrative",p.presentation||p.narrative||"");
-
-   section("Clinical Assessment");
-   field("Patient Care Provided",p.careProvided===true?"Evaluated and cared for":p.careProvided===false?"Evaluated, no care required":p.evaluation);
-   const vitals=p.vitals||{};
-   if(Object.keys(vitals).length){
-     section("Vital Signs");
-     for(const [k,v] of Object.entries(vitals))if(v!==undefined&&v!==null&&v!=="")field(prettyKey(k),v);
-   }else field("Vital Signs","No vital signs recorded");
-   field("Medical History",p.medicalHistory||p.history);
-   field("Medications",p.medications||p.meds);
-   field("Allergies",p.allergies);
-
-   section("Treatment / Interventions");
-   const care=Array.isArray(p.methodsOfCare)?p.methodsOfCare:Array.isArray(p.careMethods)?p.careMethods:Array.isArray(p.methods)?p.methods:[];
-   field("BLS Methods of Care",care);
-   field("Oxygen",p.oxygen||p.oxygenMethod);
-   field("Medications Administered",p.medicationsAdministered||p.medicationsGiven||p.medications||p.meds);
-   field("Procedures / Interventions",p.interventions||p.procedures);
-   field("Patient Response",p.patientResponse||p.responseToTreatment);
-
-   section("Disposition / Transfer Details");
-   field("Disposition",p.transportDisposition||p.transport||p.disposition);
-   twoCol(["Transporting Agency / Unit",p.transportAgency||p.transportUnit||p.vehicle],["Destination",p.destination]);
-   field("Disposition Narrative",p.dispositionNarrative||p.transferNarrative);
-   twoCol(["Vehicle / Insurance",p.vehicleInfo||p.vehicleInsurance||p.insurance],["Equipment Used / Replaced",p.equipmentUsed||p.equipmentReplaced||p.equipment]);
-
-   section("Clinical Narrative / Completion");
-   fullText("Narrative",p.narrative||p.comments||"No narrative entered.");
-   field("Person Completing Report",p.completedBy||p.reportCompletedBy||p.provider||"JFD RMS user");
-   field("Provider / Crew",p.provider||p.crew||"");
-   page.drawText("Patient "+(i+1)+" of "+patients.length,{x:W-m-65,y:23,font:F.bold,size:7,color:SLATE});
+   if(hasOccupant){
+     twoCol(["Occupant Name",firstVal(fd.rOccupantName,fd.rOccName,fd.occupant_name)],["Occupant Phone",firstVal(fd.rOccPhone,fd.occupant_phone)]);
+     if(hasVal(fd.rOccupantAddress)||hasVal(fd.occupant_address))field("Occupant Address",firstVal(fd.rOccupantAddress,fd.occupant_address));
+   }
  }
- if(!patients.length){currentTitle="PATIENT CARE REPORT";newPage(currentTitle);section("Patient Information");field("Patient Records","None recorded");}
- 
- currentTitle="NERIS INVESTIGATION DETAILS";newPage(currentTitle);
- section("Investigation");
- for(const r of fire){
+
+ currentTitle=isMva?"MOTOR VEHICLE ACCIDENT REPORT":"FIRE INCIDENT REPORT";newPage(currentTitle);
+ section("Department Technical Record");
+ const dispatchTimes=[["Dispatch",fd.rDispatch],["En Route",fd.rEnRoute],["On Scene",fd.rOnScene],["Cancelled",fd.rCancelled],["In Service",fd.rInService]];
+ const activeTimes=dispatchTimes.filter(x=>hasVal(x[1]));
+ if(activeTimes.length){
+   for(let i=0;i<activeTimes.length;i+=2)twoCol(activeTimes[i],activeTimes[i+1]||["",""]);
+ }else if(units.length) field("Incident Times","See responding apparatus times below");
+ else field("Incident Times","No incident times recorded");
+ responseTable(units);
+ if(hasVal(fd.additional_personnel))field("Additional Personnel",fd.additional_personnel);
+ if(hasAid)field("Mutual Aid / Other Agencies",aids);
+
+ if(hasVehicles){
+   section(isMva?"Vehicles Involved":"Vehicles / Property Involved");
+   if(vehicleList.length){
+     vehicleList.forEach((v,i)=>{
+       field("Vehicle "+(i+1),[v.year,v.make,v.model,v.vehicle,v.description].filter(hasVal).join(" "));
+       const owner=firstVal(v.owner,v.owner_name),insurance=firstVal(v.insurance,v.insurance_company);
+       if(hasVal(owner)||hasVal(insurance))twoCol(["Owner",owner],["Insurance",insurance]);
+       const vin=firstVal(v.vin,v.license,v.license_vin,v.license_plate);
+       if(hasVal(vin))field("License / VIN",vin);
+     });
+   }else field("Vehicle Involved",legacyVehicle);
+ }
+
+ if(hasFireConditions){
+   section("Fire / Alarm Conditions");
+   twoCol(["Fire Location",firstVal(fd.rFireLoc,fd.fire_location)],["Arrival Condition",firstVal(fd.rCondition,fd.condition)]);
+   twoCol(["Smoke Presence",firstVal(fd.rSmokePresence,fd.rSmoke)],["Smoke Alarm Working",firstVal(fd.rSmokeWorking,fd.rSmokeAlarmWorking)]);
+   twoCol(["Fire Alarm",fd.rFireAlarm],["Other Alarm",fd.rOtherAlarm]);
+   twoCol(["Suppression System",fd.rSuppression],["Cooking Suppression",fd.rCookingSuppression]);
+   twoCol(["Water Supply",firstVal(fd.rWater,fd.water_supply)],["Fire Investigation",firstVal(fd.rInvestigation,fd.investigation)]);
+ }
+
+ if(hasActions||hasFindings){
+   section("Incident Actions / Findings");
+   if(hasVal(fd.rActionTaken)||hasVal(fd.action_taken)||hasVal(fd.rNoActionTaken)||hasVal(fd.no_action_taken))twoCol(["Action Taken",firstVal(fd.rActionTaken,fd.action_taken)],["No Action Taken",firstVal(fd.rNoActionTaken,fd.no_action_taken)]);
+   if(hasVal(fd.rActionsTaken)||hasVal(fd.actions_taken))field("Actions / Tactics",Array.isArray(fd.actions_taken)?fd.actions_taken:fd.rActionsTaken);
+   if(hasFindings){
+     if(hasVal(fd.rCause)||hasVal(fd.cause)||hasVal(fd.rDamageType)||hasVal(fd.damage_type))twoCol(["Cause",firstVal(fd.rCause,fd.cause)],["Damage Type",firstVal(fd.rDamageType,fd.damage_type)]);
+     if(hasVal(fd.rDamageEstimate)||hasVal(fd.damage_estimate)||hasVal(fd.rFloor)||hasVal(fd.floor_of_origin)||hasVal(fd.rRoom)||hasVal(fd.room_type))twoCol(["Damage Estimate",firstVal(fd.rDamageEstimate,fd.damage_estimate)],["Floor / Area",[firstVal(fd.rFloor,fd.floor_of_origin),firstVal(fd.rRoom,fd.room_type)].filter(hasVal).join(" / ")]);
+   }
+ }
+
+ if(hasExposure){
+   section("Exposures / Casualties / Hazards");
+   if(hasVal(fd.exposures))field("Exposures",fd.exposures);
+   if(hasVal(fd.casualties))field("Casualties / Rescues",fd.casualties);
+   if(hasVal(fd.hazards)||hasVal(fd.rHazmat))field("Hazards / HAZMAT",firstVal(fd.hazards,fd.rHazmat));
+ }
+
+ if(hasInsurance){
+   section("Insurance / Loss");
+   if(hasVal(fd.rInsuranceCompany)||hasVal(fd.rOwnerInsurance)||hasVal(fd.rOccInsurance)||hasVal(fd.insurance_company))twoCol(["Insurance Company",firstVal(fd.rInsuranceCompany,fd.rOwnerInsurance,fd.rOccInsurance,fd.insurance_company)],["Insurance Phone",firstVal(fd.rInsurancePhone,fd.insurance_phone)]);
+   if(hasVal(fd.rInsurancePolicy)||hasVal(fd.insurance_policy)||hasVal(fd.rDamageType)||hasVal(fd.damage_type))twoCol(["Policy Number",firstVal(fd.rInsurancePolicy,fd.insurance_policy)],["Loss / Damage Type",firstVal(fd.rDamageType,fd.damage_type)]);
+   if(hasVal(fd.rDamageEstimate)||hasVal(fd.damage_estimate))field("Estimated Damage",firstVal(fd.rDamageEstimate,fd.damage_estimate));
+ }
+
+ if(hasNarrative){
+   section("Narrative");
+   fullText("Incident Narrative",firstVal(fd.rNarrative,incident.narrative));
+ }
+
+ if(hasVal(fd.rCompletedBy)||hasVal(fd.completedBy)||hasVal(fd.report_completed_by)){
+   section("Report Completion");
+   field("Person Completing Report",firstVal(fd.rCompletedBy,fd.completedBy,fd.report_completed_by));
+ }
+
+ const hasPcrRecords=pcr.length>0 && patients.length>0;
+ if(hasPcrRecords){
+   for(let i=0;i<patients.length;i++){
+     const p=patients[i]||{};
+     const isRefusal=!!(p.refusedCare||p.refusedTransport||p.minorRefusal||p.refusal||p.refusalType);
+     const refusalType=p.refusalType||[p.refusedCare?"Refused Care":"",p.refusedTransport?"Refused Transport":"",p.minorRefusal?"Minor Refusal":""].filter(Boolean).join(", ")||"Patient Refusal";
+     currentTitle="PATIENT CARE REPORT";newPage(currentTitle);
+     section("Patient Care / Disposition Summary");
+     twoCol(["Incident / CAD",firstVal(incident.cad,fd.rCad)],["Incident Date",dateText(firstVal(fd.rDate,incident.dispatch_time))]);
+     field("Incident Location",firstVal(fd.rLocation,incident.location));
+     twoCol(["Response Unit",firstVal(p.vehicle,p.assignedVehicle,p.unit,fd.responding_unit)],["Disposition",firstVal(p.transportDisposition,p.transport,p.disposition)]);
+     if(hasVal(p.transportAgency)||hasVal(p.transportUnit)||hasVal(p.vehicle)||hasVal(p.destination))twoCol(["Transport Agency / Unit",firstVal(p.transportAgency,p.transportUnit,p.vehicle)],["Destination",p.destination]);
+     if(hasVal(p.chief)||hasVal(p.complaint))field("Chief Complaint / Reason for Response",firstVal(p.chief,p.complaint));
+
+     if(isRefusal){
+       section("Patient Refusal / Release");
+       field("Refusal Type",refusalType);
+       if(hasVal(p.recommendedCare)||hasVal(p.refusalRecommendations)||hasVal(p.refusedServices))field("Recommended Care / Transport",firstVal(p.recommendedCare,p.refusalRecommendations,p.refusedServices));
+       if(hasVal(p.risksExplained)||hasVal(p.risksAcknowledged)||hasVal(p.refusalExplanation))fullText("Risks / Consequences Explained",firstVal(p.risksExplained,p.risksAcknowledged,p.refusalExplanation));
+       if(hasVal(p.refusalSigner)||hasVal(p.patientSigner)||hasVal(p.guardianName)||hasVal(p.name))twoCol(["Refusing Party",firstVal(p.refusalSigner,p.patientSigner,p.guardianName,p.name)],["Relationship",firstVal(p.guardianRelationship,p.signerRelationship,"Patient")]);
+       if(hasVal(p.refusalDateTime)||hasVal(p.refusalDate)||hasVal(p.signedAt)||hasVal(p.witnessName)||hasVal(p.refusalWitness))twoCol(["Refusal Date / Time",firstVal(p.refusalDateTime,p.refusalDate,p.signedAt)],["Witness",firstVal(p.witnessName,p.refusalWitness)]);
+       if(p.signatureRefused||p.patientRefusedSignature)field("If Patient Declined to Sign","Patient/representative declined to sign.");
+       ensure(112);
+       page.drawText("Patient / Guardian Signature",{x:m+7,y:y-12,font:F.bold,size:7.5,color:SLATE});
+       if(String(p.signature||"").startsWith("data:image/png")){
+         try{const bytes=Buffer.from(String(p.signature).split(",")[1],"base64"),img=await pdf.embedPng(bytes);page.drawImage(img,{x:m+7,y:y-91,width:250,height:70});}catch{}
+       }else page.drawText(p.signatureName||p.refusalSigner||"Electronic signature recorded",{x:m+7,y:y-50,font:F.reg,size:9,color:NAVY});
+       page.drawRectangle({x:m+7,y:y-92,width:250,height:70,borderWidth:.5,borderColor:MID});
+       page.drawText("Signature",{x:m+265,y:y-12,font:F.bold,size:7.5,color:SLATE});
+       page.drawText("Date / Time",{x:m+390,y:y-12,font:F.bold,size:7.5,color:SLATE});
+       page.drawLine({start:{x:m+265,y:y-58},end:{x:m+380,y:y-58},thickness:.5,color:MID});
+       page.drawLine({start:{x:m+390,y:y-58},end:{x:m+usable-7,y:y-58},thickness:.5,color:MID});
+       y-=105;
+     }else if(hasVal(p.dispositionNarrative)||hasVal(p.transferNarrative)||hasVal(p.patientSignatureName)||hasVal(p.signatureName)||hasVal(p.provider)){
+       section("Disposition / Transfer");
+       if(hasVal(p.dispositionNarrative)||hasVal(p.transferNarrative))field("Disposition Narrative",firstVal(p.dispositionNarrative,p.transferNarrative));
+       if(hasVal(p.patientSignatureName)||hasVal(p.signatureName)||hasVal(p.provider))twoCol(["Patient / Representative Signature",firstVal(p.patientSignatureName,p.signatureName)],["Provider",p.provider]);
+     }
+     section("Report Identification");
+     twoCol(["Patient Record","Patient "+(i+1)+" of "+patients.length],["Completed By",firstVal(p.completedBy,p.reportCompletedBy,p.provider,"JFD RMS user")]);
+
+     currentTitle="PATIENT CARE REPORT — PROTECTED CLINICAL RECORD";newPage(currentTitle);
+     section("Patient Identification");
+     twoCol(["Patient",p.name],["Date of Birth",dateText(p.dob)]);
+     twoCol(["Age",p.age],["Sex",p.sex]);
+     if(hasVal(p.address))field("Patient Address",p.address);
+     if(hasVal(p.phone)||hasVal(incident.cad)||hasVal(fd.rCad))twoCol(["Patient Phone",p.phone],["Incident / CAD",firstVal(incident.cad,fd.rCad)]);
+     section("Assessment / Presentation");
+     if(hasVal(p.chief)||hasVal(p.complaint))field("Chief Complaint / Reason for Response",firstVal(p.chief,p.complaint));
+     if(hasVal(p.injury)||hasVal(p.complaint))field("Injury / Medical Complaint",firstVal(p.injury,p.complaint));
+     if(hasVal(p.presentation)||hasVal(p.narrative))fullText("Presentation / Brief Narrative",firstVal(p.presentation,p.narrative));
+     section("Clinical Assessment");
+     if(p.careProvided===true||p.careProvided===false||hasVal(p.evaluation))field("Patient Care Provided",p.careProvided===true?"Evaluated and cared for":p.careProvided===false?"Evaluated, no care required":p.evaluation);
+     const vitals=p.vitals||{};
+     if(Object.keys(vitals).length){section("Vital Signs");for(const [k,v] of Object.entries(vitals))if(hasVal(v))field(prettyKey(k),v);}
+     if(hasVal(p.medicalHistory)||hasVal(p.history))field("Medical History",firstVal(p.medicalHistory,p.history));
+     if(hasVal(p.medications)||hasVal(p.meds))field("Medications",firstVal(p.medications,p.meds));
+     if(hasVal(p.allergies))field("Allergies",p.allergies);
+     const care=Array.isArray(p.methodsOfCare)?p.methodsOfCare:Array.isArray(p.careMethods)?p.careMethods:Array.isArray(p.methods)?p.methods:[];
+     if(care.length||hasVal(p.oxygen)||hasVal(p.oxygenMethod)||hasVal(p.medicationsAdministered)||hasVal(p.medicationsGiven)||hasVal(p.interventions)||hasVal(p.procedures)||hasVal(p.patientResponse)||hasVal(p.responseToTreatment)){
+       section("Treatment / Interventions");
+       if(care.length)field("BLS Methods of Care",care);
+       if(hasVal(p.oxygen)||hasVal(p.oxygenMethod))field("Oxygen",firstVal(p.oxygen,p.oxygenMethod));
+       if(hasVal(p.medicationsAdministered)||hasVal(p.medicationsGiven))field("Medications Administered",firstVal(p.medicationsAdministered,p.medicationsGiven));
+       if(hasVal(p.interventions)||hasVal(p.procedures))field("Procedures / Interventions",firstVal(p.interventions,p.procedures));
+       if(hasVal(p.patientResponse)||hasVal(p.responseToTreatment))field("Patient Response",firstVal(p.patientResponse,p.responseToTreatment));
+     }
+     if(hasVal(p.transportDisposition)||hasVal(p.transport)||hasVal(p.disposition)||hasVal(p.transportAgency)||hasVal(p.transportUnit)||hasVal(p.destination)||hasVal(p.dispositionNarrative)||hasVal(p.transferNarrative)){
+       section("Disposition / Transfer Details");
+       if(hasVal(p.transportDisposition)||hasVal(p.transport)||hasVal(p.disposition))field("Disposition",firstVal(p.transportDisposition,p.transport,p.disposition));
+       if(hasVal(p.transportAgency)||hasVal(p.transportUnit)||hasVal(p.vehicle)||hasVal(p.destination))twoCol(["Transporting Agency / Unit",firstVal(p.transportAgency,p.transportUnit,p.vehicle)],["Destination",p.destination]);
+       if(hasVal(p.dispositionNarrative)||hasVal(p.transferNarrative))field("Disposition Narrative",firstVal(p.dispositionNarrative,p.transferNarrative));
+       if(hasVal(p.vehicleInfo)||hasVal(p.vehicleInsurance)||hasVal(p.insurance)||hasVal(p.equipmentUsed)||hasVal(p.equipmentReplaced)||hasVal(p.equipment))twoCol(["Vehicle / Insurance",firstVal(p.vehicleInfo,p.vehicleInsurance,p.insurance)],["Equipment Used / Replaced",firstVal(p.equipmentUsed,p.equipmentReplaced,p.equipment)]);
+     }
+     if(hasVal(p.narrative)||hasVal(p.comments)||hasVal(p.completedBy)||hasVal(p.reportCompletedBy)||hasVal(p.provider)||hasVal(p.crew)){
+       section("Clinical Narrative / Completion");
+       if(hasVal(p.narrative)||hasVal(p.comments))fullText("Narrative",firstVal(p.narrative,p.comments));
+       if(hasVal(p.completedBy)||hasVal(p.reportCompletedBy)||hasVal(p.provider))field("Person Completing Report",firstVal(p.completedBy,p.reportCompletedBy,p.provider));
+       if(hasVal(p.provider)||hasVal(p.crew))field("Provider / Crew",firstVal(p.provider,p.crew));
+     }
+     page.drawText("Patient "+(i+1)+" of "+patients.length,{x:W-m-65,y:23,font:F.bold,size:7,color:SLATE});
+   }
+ }
+
+ const investigationRows=fire.flatMap(r=>{
    const d=r?.data||{};
-   [["Investigation Required",d.rInvestigation],["Investigation Type",d.rInvestigationType],["Cause",d.rCause||d.cause],["Origin Floor",d.rFloor||d.floor_of_origin],["Origin Room / Area",d.rRoom||d.room_type],["Arrival Condition",d.rCondition||d.condition],["Damage Type",d.rDamageType||d.damage_type],["Damage Estimate",d.rDamageEstimate||d.damage_estimate],["Fire Location",d.rFireLoc||d.fire_location],["Water Supply",d.rWater||d.water_supply],["Smoke Alarm Presence",d.rSmokePresence||d.smoke_alarm_presence],["Smoke Alarm Working",d.rSmokeWorking||d.smoke_alarm_working],["Fire Alarm",d.rFireAlarm||d.fire_alarm],["Other Alarm",d.rOtherAlarm||d.other_alarm],["Suppression System",d.rSuppression||d.suppression_system],["Cooking Fire Suppression",d.rCookingSuppression||d.cooking_suppression]].forEach(x=>field(x[0],x[1]));
-   const n=d.neris_investigation||d.nerisInvestigation||d.investigation_details||d.neris?.investigation;
-   if(n&&typeof n==="object"){section("Additional NERIS Investigation Data");for(const [k,v] of Object.entries(n))if(v!==undefined&&v!==null&&v!=="")field(prettyKey(k),v)}
+   return [
+     ["Investigation Required",d.rInvestigation],["Investigation Type",d.rInvestigationType],["Cause",d.rCause||d.cause],
+     ["Origin Floor",d.rFloor||d.floor_of_origin],["Origin Room / Area",d.rRoom||d.room_type],["Arrival Condition",d.rCondition||d.condition],
+     ["Damage Type",d.rDamageType||d.damage_type],["Damage Estimate",d.rDamageEstimate||d.damage_estimate],["Fire Location",d.rFireLoc||d.fire_location],
+     ["Water Supply",d.rWater||d.water_supply],["Smoke Alarm Presence",d.rSmokePresence||d.smoke_alarm_presence],["Smoke Alarm Working",d.rSmokeWorking||d.smoke_alarm_working],
+     ["Fire Alarm",d.rFireAlarm||d.fire_alarm],["Other Alarm",d.rOtherAlarm||d.other_alarm],["Suppression System",d.rSuppression||d.suppression_system],
+     ["Cooking Fire Suppression",d.rCookingSuppression||d.cooking_suppression]
+   ];
+ }).filter(x=>hasVal(x[1]));
+ const nerisObjects=fire.flatMap(r=>{const d=r?.data||{};const n=d.neris_investigation||d.nerisInvestigation||d.investigation_details||d.neris?.investigation;return n&&typeof n==="object"?Object.entries(n).filter(([,v])=>hasVal(v)).map(([k,v])=>[prettyKey(k),v]):[]});
+ if(isFireLike && (investigationRows.length||nerisObjects.length)){
+   currentTitle="NERIS INVESTIGATION DETAILS";newPage(currentTitle);
+   section("Investigation");
+   investigationRows.forEach(x=>field(x[0],x[1]));
+   if(nerisObjects.length){section("Additional NERIS Investigation Data");nerisObjects.forEach(x=>field(x[0],x[1]));}
  }
- if(!fire.length)field("NERIS Investigation","No Fire Incident Report investigation data attached.");
  for(const p of pages){} // pages retained for final footer pass
  pages.forEach((pg,idx)=>{
    // Footer is drawn during page transitions; the final page needs one too.
