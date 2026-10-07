@@ -3,79 +3,105 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>JFD Incident Report — PDF Lab</title>
+<title>JFD RMS — Incident Report Sandbox</title>
 <style>
-@page{size:letter;margin:.55in}
-*{box-sizing:border-box}body{margin:0;background:#eef1f4;color:#18232e;font-family:Arial,Helvetica,sans-serif}
-.toolbar{position:sticky;top:0;background:#18232e;color:#fff;padding:12px 18px;display:flex;gap:10px;align-items:center;z-index:5}
-.toolbar strong{margin-right:auto}.toolbar button{border:0;border-radius:5px;padding:9px 14px;font-weight:700;cursor:pointer}
-.paper{width:8.5in;min-height:11in;margin:24px auto;background:#fff;padding:.48in;box-shadow:0 2px 16px #0002}
-.header{display:grid;grid-template-columns:76px 1fr;gap:14px;align-items:center;border-bottom:2px solid #c9d0d7;padding-bottom:11px}
-.logo{width:68px;height:68px;border:2px solid #7d1111;border-radius:50%;display:grid;place-items:center;color:#7d1111;font-size:10px;font-weight:800;text-align:center}
-.dept{font-size:20px;font-weight:800;letter-spacing:.4px}.addr{font-size:10px;color:#59636d;margin-top:3px}.title{font-size:13px;font-weight:800;color:#7d1111;margin-top:8px}
-.section{margin-top:15px;border:1px solid #cbd2d9}.section h2{font-size:10px;letter-spacing:.5px;margin:0;padding:7px 9px;background:#f0f3f6;border-bottom:1px solid #cbd2d9}
-.grid{display:grid;grid-template-columns:1fr 1fr}.field{padding:7px 9px;border-bottom:1px solid #e2e6ea;min-height:38px}.field:nth-child(odd){border-right:1px solid #e2e6ea}.label{font-size:8px;text-transform:uppercase;color:#65717d;font-weight:700}.value{font-size:10px;margin-top:3px}
-.full{grid-column:1/-1}.table{width:100%;border-collapse:collapse;font-size:8.5px}.table th{background:#18232e;color:#fff;text-align:left}.table td,.table th{padding:6px;border:1px solid #cbd2d9;vertical-align:top}
-.narrative{padding:9px;font-size:9px;line-height:1.45;min-height:75px}
-.footer{margin-top:16px;border-top:1px solid #cbd2d9;padding-top:6px;font-size:7px;color:#68727c;display:flex;justify-content:space-between}
-.note{font-size:11px;color:#59636d;margin:18px auto;max-width:8.5in}
-@media print{body{background:#fff}.toolbar,.note{display:none}.paper{margin:0;box-shadow:none;width:auto;min-height:auto;padding:0}.section{break-inside:avoid}.header{break-inside:avoid}}
+:root{--red:#b91c1c;--navy:#0f172a;--slate:#475569;--line:#cbd5e1;--soft:#f8fafc;--green:#166534}
+*{box-sizing:border-box}body{margin:0;background:#eef2f6;color:#172033;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.top{position:sticky;top:0;z-index:20;background:var(--navy);color:#fff;padding:12px 18px;display:flex;gap:12px;align-items:center}.top strong{font-size:15px}.badge{background:#f59e0b;color:#111827;padding:4px 8px;border-radius:999px;font-size:10px;font-weight:900;letter-spacing:.05em}.top .spacer{flex:1}
+button{border:0;border-radius:8px;padding:10px 14px;font-weight:800;cursor:pointer}.primary{background:var(--red);color:white}.secondary{background:#fff;color:#172033;border:1px solid var(--line)}.green{background:#166534;color:#fff}.danger{background:#991b1b;color:#fff}
+.wrap{max-width:1080px;margin:24px auto;padding:0 16px}.intro{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px;box-shadow:0 2px 8px #0000000a}.intro h1{margin:0 0 5px;font-size:25px}.intro p{margin:5px 0;color:var(--slate)}
+.scenarios{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:15px}.scenario{background:#fff;border:2px solid var(--line);text-align:left}.scenario.active{border-color:var(--red);box-shadow:0 0 0 2px #b91c1c22}.scenario b{display:block}.scenario small{display:block;color:var(--slate);margin-top:4px}
+.workflow{display:flex;gap:7px;align-items:center;margin:18px 0;overflow:auto}.step{padding:8px 12px;border-radius:999px;background:#dce2e8;color:#475569;font-size:12px;font-weight:800;white-space:nowrap}.step.active{background:var(--red);color:#fff}.step.done{background:#dcfce7;color:var(--green)}
+.banner{background:var(--navy);color:#fff;border-radius:14px;padding:13px 15px;display:flex;gap:12px;align-items:center;margin-bottom:14px}.banner .meta{font-size:12px;color:#cbd5e1}.banner strong{font-size:16px}.banner .grow{flex:1}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;margin-bottom:14px;overflow:hidden}.card h2{margin:0;padding:13px 15px;background:var(--soft);font-size:15px;border-bottom:1px solid var(--line)}.body{padding:15px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.full{grid-column:1/-1}
+label{display:block;font-size:12px;font-weight:800;color:#334155}input,select,textarea{display:block;width:100%;margin-top:5px;border:1px solid #b9c3ce;border-radius:8px;padding:10px;background:#fff;color:#172033;font:inherit;font-weight:500}textarea{resize:vertical;min-height:90px}.required{color:var(--red)}.hint{font-size:11px;color:#64748b;font-weight:500;margin-top:4px}
+.capture{border:2px solid #f59e0b;background:#fffbeb}.capture h2{background:#fffbeb}.capture .body{padding:16px}
+.patient{border:1px solid #d8dee6;border-radius:12px;padding:14px;margin-bottom:12px}.patient-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}.patient-head strong{font-size:14px}.patient-head span{font-size:11px;color:#64748b}.patient-head .grow{flex:1}
+.choice{display:flex;flex-wrap:wrap;gap:8px}.choice label{border:1px solid #cbd5e1;border-radius:8px;padding:9px 11px;background:#fff;font-weight:700}.choice input{display:inline;width:auto;margin:0 5px 0 0}
+.actions{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--line)}.actions .right{display:flex;gap:8px}
+.notice{padding:10px 12px;border-radius:9px;background:#eff6ff;color:#1e40af;font-size:12px;font-weight:700;margin-bottom:12px}.status{font-size:11px;color:#cbd5e1}.saveState{color:#166534;font-weight:800;font-size:12px;margin-top:8px}
+.review{display:none}.review.show{display:block}.check{display:flex;gap:9px;align-items:flex-start;padding:10px;border-bottom:1px solid #e5e7eb}.check:last-child{border-bottom:0}.dot{width:9px;height:9px;border-radius:50%;background:#22c55e;margin-top:4px;flex:none}.dot.warn{background:#f59e0b}.paper{background:#fff;border:1px solid var(--line);padding:28px;box-shadow:0 2px 12px #00000012}.paperHead{display:grid;grid-template-columns:75px 1fr;gap:14px;border-bottom:2px solid var(--line);padding-bottom:12px}.logo{width:64px;height:64px;border:2px solid #991b1b;border-radius:50%;display:grid;place-items:center;text-align:center;color:#991b1b;font-weight:900;font-size:9px}.paper h1{font-size:19px;margin:0}.paper .red{color:var(--red);font-weight:900;font-size:11px;margin-top:5px}.paper section{border:1px solid var(--line);margin-top:13px}.paper section h3{margin:0;padding:7px 9px;background:#f1f5f9;font-size:9px;letter-spacing:.06em}.paper .cells{display:grid;grid-template-columns:1fr 1fr}.paper .cell{padding:8px;border-top:1px solid #e5e7eb;font-size:10px}.paper .cell:nth-child(odd){border-right:1px solid #e5e7eb}.paper .label{display:block;text-transform:uppercase;font-size:7px;color:#64748b;font-weight:900}.paper .value{display:block;margin-top:3px}.paper .wide{grid-column:1/-1}.paper .narr{padding:10px;font-size:10px;line-height:1.5;white-space:pre-wrap}.paper .footer{font-size:8px;color:#64748b;margin-top:14px;padding-top:7px;border-top:1px solid var(--line);display:flex;justify-content:space-between}
+@media(max-width:850px){.scenarios{grid-template-columns:repeat(2,1fr)}.grid,.paper .cells{grid-template-columns:1fr}.full,.paper .wide{grid-column:auto}.paper .cell:nth-child(odd){border-right:0}.top{flex-wrap:wrap}}
+@media print{body{background:#fff}.top,.intro,.scenarios,.workflow,.banner,.capture,.actions,.notice,.review-controls{display:none!important}.wrap{max-width:none;margin:0;padding:0}.paper{box-shadow:none;border:0;padding:0}}
 </style>
 </head>
 <body>
-<div class="toolbar"><strong>JFD RMS — Incident Report PDF Lab</strong><button onclick="window.print()">Print / Save PDF</button></div>
-<div class="note">Experimental preview only. This page is isolated from the production RMS. It demonstrates the proposed <b>single Incident Report</b> paper format: common incident information first, followed by only the sections that apply.</div>
-<main class="paper">
-<header class="header">
-<div class="logo">JFD<br>CROSS<br>&amp; SEAL</div>
-<div><div class="dept">JASPER FIRE DEPARTMENT</div><div class="addr">10 18th Street East · Jasper, Alabama 35501 · 205-221-8509</div><div class="title">INCIDENT REPORT · MOTOR VEHICLE ACCIDENT</div></div>
-</header>
-
-<section class="section"><h2>INCIDENT INFORMATION</h2><div class="grid">
-<div class="field"><div class="label">CAD / Incident Number</div><div class="value">2026-22710</div></div>
-<div class="field"><div class="label">Incident Date / Time</div><div class="value">10/06/2026 · 14:22</div></div>
-<div class="field"><div class="label">Call Type</div><div class="value">MVA</div></div>
-<div class="field"><div class="label">Primary Incident Type</div><div class="value">Motor Vehicle Collision</div></div>
-<div class="field full"><div class="label">Location</div><div class="value">3125 E HIGHWAY 78, JASPER, AL</div></div>
-<div class="field"><div class="label">Location Type</div><div class="value">Street / Highway</div></div>
-<div class="field"><div class="label">Shift</div><div class="value">C</div></div>
-</div></section>
-
-<section class="section"><h2>RESPONSE</h2><table class="table"><tr><th>Unit</th><th>Crew</th><th>Dispatch</th><th>En Route</th><th>On Scene</th><th>Clear</th></tr>
-<tr><td>Engine 1</td><td>Officer Smith · Driver Jones</td><td>14:22</td><td>14:23</td><td>14:27</td><td>15:04</td></tr>
-<tr><td>Rescue 1</td><td>Officer Brown · Driver Davis</td><td>14:22</td><td>14:24</td><td>14:28</td><td>15:10</td></tr></table></section>
-
-<section class="section"><h2>MVA / SCENE DETAILS</h2><div class="grid">
-<div class="field"><div class="label">Vehicles Involved</div><div class="value">2</div></div>
-<div class="field"><div class="label">Patients</div><div class="value">1</div></div>
-<div class="field"><div class="label">Injuries</div><div class="value">1</div></div>
-<div class="field"><div class="label">Fatalities</div><div class="value">0</div></div>
-<div class="field full"><div class="label">Scene / Actions</div><div class="value">Traffic control, patient assessment, basic treatment, vehicle stabilization.</div></div>
-</div></section>
-
-<section class="section"><h2>PATIENT 1 — PATIENT CARE</h2><div class="grid">
-<div class="field"><div class="label">Patient</div><div class="value">John Doe</div></div>
-<div class="field"><div class="label">Age / Sex</div><div class="value">48 · Male</div></div>
-<div class="field"><div class="label">Chief Complaint</div><div class="value">Neck and back pain</div></div>
-<div class="field"><div class="label">Injury</div><div class="value">Suspected cervical injury</div></div>
-<div class="field"><div class="label">Care Provided?</div><div class="value">Yes</div></div>
-<div class="field"><div class="label">Disposition</div><div class="value">Transported by ambulance</div></div>
+<div class="top"><strong>JFD RMS — Incident Report Sandbox</strong><span class="badge">SANDBOX · NO PRODUCTION DATA</span><span class="spacer"></span><span class="status" id="status"></span><button class="secondary" onclick="resetDemo()">Reset Demo</button></div>
+<div class="wrap">
+<div class="intro">
+<h1>One Incident Report — Data Entry Test</h1>
+<p>This is the interactive workflow test. It does not connect to Supabase, Active911, NERIS, email, or the production database. Everything is saved only in this browser.</p>
+<div class="scenarios">
+<button class="scenario active" data-type="medical" onclick="setType('medical')">🚑 <b>Medical</b><small>Patient care / refusal</small></button>
+<button class="scenario" data-type="mva" onclick="setType('mva')">🚗 <b>MVA</b><small>Collision / patient</small></button>
+<button class="scenario" data-type="fire" onclick="setType('fire')">🔥 <b>Fire</b><small>Structure / outside</small></button>
+<button class="scenario" data-type="alarm" onclick="setType('alarm')">🚨 <b>Fire Alarm</b><small>Alarm investigation</small></button>
+<button class="scenario" data-type="public" onclick="setType('public')">🛠️ <b>Public Service</b><small>Other response</small></button>
 </div>
-<table class="table"><tr><th>Time</th><th>BP</th><th>Pulse</th><th>Resp</th><th>SpO₂</th><th>GCS</th><th>Pain</th></tr>
-<tr><td>14:34</td><td>148/92</td><td>102</td><td>20</td><td>97%</td><td>15</td><td>7</td></tr>
-<tr><td>14:47</td><td>140/88</td><td>94</td><td>18</td><td>98%</td><td>15</td><td>5</td></tr></table></section>
-
-<section class="section"><h2>TREATMENT / INTERVENTIONS</h2><div class="narrative">Patient assessed and monitored. Cervical precautions maintained. Oxygen administered as indicated. Patient transferred to ambulance crew for transport and continued care.</div></section>
-
-<section class="section"><h2>NARRATIVE</h2><div class="narrative">JFD units responded to the reported motor vehicle collision. On arrival, crews established scene safety and evaluated the involved occupants. One patient reported neck and back pain. Patient assessment and vital signs were obtained, treatment was provided, and the patient was transferred to the transporting ambulance crew. Units cleared after scene operations were completed.</div></section>
-
-<section class="section"><h2>RECORD / COMPLETION</h2><div class="grid">
-<div class="field"><div class="label">Completed By</div><div class="value">JFD RMS User</div></div>
-<div class="field"><div class="label">NERIS Status</div><div class="value">Ready for Administrative Review</div></div>
-<div class="field full"><div class="label">Report Note</div><div class="value">This official paper report is assembled from the incident record. Empty/non-applicable sections are omitted.</div></div>
-</div></section>
-
-<div class="footer"><span>JFD RMS · Jasper Fire Department</span><span>Incident 2026-22710 · Page 1</span></div>
-</main>
+</div>
+<div class="workflow"><span class="step active" id="s1">1 · Quick Capture</span><span class="step" id="s2">2 · Details</span><span class="step" id="s3">3 · Review</span><span class="step" id="s4">4 · Official Report</span></div>
+<div id="app"></div>
+</div>
+<script>
+const KEY="jfd-incident-sandbox-v2";
+let state=JSON.parse(localStorage.getItem(KEY)||"null")||{type:"medical",step:1,cad:"2026-SANDBOX-001",date:"2026-10-07",time:"09:15",location:"2805 9TH AVE, JASPER, AL",shift:"C",callType:"EMS / Medical",incidentType:"Medical / Illness",patients:[],saved:false,narrative:""};
+const types={
+ medical:{call:"EMS / Medical",incident:"Medical / Illness",title:"Medical / Patient Care"},
+ mva:{call:"MVA / Transportation",incident:"Motor Vehicle Collision",title:"MVA / Transportation"},
+ fire:{call:"Fire",incident:"Structure Fire",title:"Fire"},
+ alarm:{call:"Fire Alarm",incident:"Fire Alarm / Investigation",title:"Fire Alarm"},
+ public:{call:"Public Service",incident:"Public Service",title:"Public Service / Other"}
+};
+function persist(){localStorage.setItem(KEY,JSON.stringify(state));document.getElementById("status").textContent=state.saved?"Saved locally":"Draft";document.querySelectorAll(".step").forEach((x,i)=>x.classList.toggle("active",i===state.step-1));}
+function setType(type){state.type=type;state.step=1;state.saved=false;state.callType=types[type].call;state.incidentType=types[type].incident;if(type!=="medical"&&type!=="mva")state.patients=[];persist();render()}
+function resetDemo(){localStorage.removeItem(KEY);location.reload()}
+function input(id,label,val,req=false,cls=""){return '<label class="'+cls+'">'+label+(req?' <span class="required">*</span>':'')+'<input id="'+id+'" value="'+esc(val||"")+'"></label>'}
+function select(id,label,val,opts,req=false,cls=""){return '<label class="'+cls+'">'+label+(req?' <span class="required">*</span>':'')+'<select id="'+id+'">'+opts.map(o=>'<option '+(o===val?'selected':'')+'>'+esc(o)+'</option>').join("")+'</select></label>'}
+function area(id,label,val,cls=""){return '<label class="'+cls+'">'+label+'<textarea id="'+id+'">'+esc(val||"")+'</textarea></label>'}
+function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function saveCommon(){state.cad=document.getElementById("cad").value;state.date=document.getElementById("date").value;state.time=document.getElementById("time").value;state.location=document.getElementById("location").value;state.shift=document.getElementById("shift").value;state.incidentType=document.getElementById("incidentType").value;state.narrative=document.getElementById("narrative")?.value||state.narrative}
+function render(){persist();const t=types[state.type];let h='<div class="banner"><div class="grow"><strong>'+t.title+'</strong><div class="meta">'+state.cad+' · '+state.location+'</div></div><div class="status">'+(state.saved?"Draft saved":"Not saved")+'</div></div>';
+h+='<div class="card"><h2>Incident Information</h2><div class="body"><div class="grid">'+input("cad","CAD / Incident Number",state.cad,true)+input("date","Incident Date",state.date,true)+input("time","Dispatch Time",state.time,true)+select("shift","Shift",state.shift,["A","B","C"],true)+input("location","Location",state.location,true)+select("incidentType","Primary Incident Type",state.incidentType,incidentOptions(state.type),true,"full")+'</div></div></div>';
+if(state.step===1)h+=quickCapture();else if(state.step===2)h+=details();else if(state.step===3)h+=review();else h+=official();
+document.getElementById("app").innerHTML=h;wire();persist()}
+function incidentOptions(type){return type==="medical"?["Medical / Illness","Medical / Injury","Cardiac","Respiratory","Overdose","Other"]:type==="mva"?["Motor Vehicle Collision","MVA — Injury","MVA — No Injury","Vehicle Fire"]:type==="fire"?["Structure Fire","Outside Fire","Vehicle Fire","Brush / Wildland Fire"]:type==="alarm"?["Fire Alarm / Investigation","Smoke Alarm","CO Alarm","False Alarm"]:["Public Service","Citizen Assist","Wires Down","Water Problem","Other"]}
+function quickCapture(){let t=state.type;let h='<div class="card capture"><h2>QUICK CAPTURE — Get the critical information first</h2><div class="body"><div class="notice">The goal is to let the crew document the important information immediately, then finish the less urgent details later. You should not have to complete the entire NERIS report before saving the patient/refusal information.</div>';
+if(t==="medical"||t==="mva"){h+='<div id="patients">'+(state.patients.length?state.patients.map((p,i)=>patientCard(p,i,true)).join(""):'<div class="hint">No patient added yet. If there is no patient, continue without adding one.</div>')+'</div><button class="secondary" onclick="addPatient()">+ Add Patient</button>'}
+if(t==="mva")h+='<div class="grid" style="margin-top:14px">'+input("vehicles","Vehicles Involved",state.vehicles||"1")+select("extrication","Extrication Required?",state.extrication||"No",["No","Yes","Unknown"])+select("sceneSafety","Scene Safety Established?",state.sceneSafety||"Yes",["Yes","No"])+area("sceneNotes","Quick Scene Notes",state.sceneNotes||"","full")+'</div>';
+if(t==="fire")h+='<div class="grid">'+select("fireCondition","Arrival Condition",state.fireCondition||"Smoke Showing",["No Smoke/Fire Showing","Smoke Showing","Smoke and Fire Showing","Fire Out Upon Arrival"])+select("fireLocation","Fire Location",state.fireLocation||"Structure",["Structure","Outside","Vehicle"])+select("action","Action Taken",state.action||"Investigated",["Investigated","Fire Suppression","Rescue","No Action Taken"])+area("quickNotes","Quick Fire Notes",state.quickNotes||"","full")+'</div>';
+if(t==="alarm")h+='<div class="grid">'+select("alarmResult","Alarm Result",state.alarmResult||"No Fire Found",["No Fire Found","Fire Found","False Alarm","System Problem","Unable to Determine"])+select("action","Action Taken",state.action||"Investigated",["Investigated","No Action Taken"])+area("quickNotes","Quick Alarm Notes",state.quickNotes||"","full")+'</div>';
+if(t==="public")h+=area("quickNotes","What did you do on the call?",state.quickNotes||"","full");
+h+='<div class="saveState">Nothing here is sent anywhere. Save Draft stores this test only in this browser.</div></div></div>';
+h+='<div class="actions"><div><button class="secondary" onclick="saveDraft()">Save Draft</button></div><div class="right"><button class="primary" onclick="nextFromQuick()">Save & Continue</button></div></div>';return h}
+function patientCard(p,i,quick){return '<div class="patient"><div class="patient-head"><strong>Patient '+(i+1)+'</strong><span>'+((p.name||"New patient"))+'</span><span class="grow"></span><button class="danger" onclick="removePatient('+i+')">Remove</button></div><div class="grid">'+input("pname"+i,"Patient Name",p.name||"",false)+select("psex"+i,"Sex",p.sex||"",["","Male","Female","Other","Unknown"])+input("page"+i,"Age",p.age||"")+select("pcare"+i,"Was patient care provided?",p.care||"",["","Yes","No"])+select("pcomplaint"+i,"Chief Complaint",p.complaint||"",["","Chest Pain","Difficulty Breathing","Illness","Injury","Unresponsive","Other"])+select("pinjury"+i,"Injury",p.injury||"",["","None","Minor","Moderate","Serious","Other"])+select("pdisp"+i,"Disposition",p.disposition||"",["","Transported","Refused Care / Transport","Released to Another Agency","No Patient Contact","Other"])+area("pnotes"+i,"Patient Notes",p.notes||"","full");
+if(p.disposition==="Refused Care / Transport")h+= '<div class="full"><div class="notice">Refusal appears immediately because the disposition is Refused Care / Transport.</div><div class="grid">'+input("rdate"+i,"Refusal Date / Time",p.refusalTime||"")+select("rcap"+i,"Patient Capacity",p.capacity||"",["","Appears Capable","Questionable","Unable to Determine"])+area("rreason"+i,"Refusal / Risk Explanation",p.refusalReason||"","full")+'</div></div>';
+h+='</div></div>'}
+function details(){let h='<div class="card"><h2>DETAILS — Finish the incident after the critical work is captured</h2><div class="body"><div class="notice">This is where the full report grows based on what happened. You should never see irrelevant sections.</div>';
+if(state.type==="medical"||state.type==="mva"){h+='<h3>Patient Care</h3>'+(state.patients.length?state.patients.map((p,i)=>patientDetail(p,i)).join(""):'<div class="hint">No patients recorded.</div>');h+='<button class="secondary" onclick="addPatient()">+ Add Patient</button>'}
+if(state.type==="mva")h+='<div class="grid" style="margin-top:14px">'+input("vehicles","Vehicles Involved",state.vehicles||"1")+select("extrication","Extrication Required?",state.extrication||"No",["No","Yes","Unknown"])+area("sceneNotes","Collision / Scene Details",state.sceneNotes||"","full")+'</div>';
+if(state.type==="fire")h+='<div class="grid">'+select("fireDamage","Damage",state.fireDamage||"Unknown",["No Damage","Minor","Moderate","Major","Unknown"])+select("cause","Fire Cause",state.cause||"Unable to be Determined",["Operating Equipment","Electrical","Cooking","Smoking Materials","Incendiary","Act Of Nature","Other","Unable to be Determined"])+select("water","Water Supply",state.water||"Hydrant",["Hydrant","Tank Water","Shuttle","Other"])+select("investigation","Investigation Required?",state.investigation||"No",["Yes","No"])+area("detailNotes","Fire Details",state.detailNotes||"","full")+'</div>';
+if(state.type==="alarm")h+='<div class="grid">'+select("alarmResult","Alarm Result",state.alarmResult||"No Fire Found",["No Fire Found","Fire Found","False Alarm","System Problem","Unable to Determine"])+select("investigation","Investigation Required?",state.investigation||"No",["Yes","No"])+area("detailNotes","Alarm Details",state.detailNotes||"","full")+'</div>';
+if(state.type==="public")h+=area("detailNotes","Response Details",state.detailNotes||"","full");
+h+=area("narrative","Narrative",state.narrative||"","full")+'</div></div><div class="actions"><button class="secondary" onclick="go(1)">← Back to Quick Capture</button><div class="right"><button class="secondary" onclick="saveDraft()">Save Draft</button><button class="primary" onclick="go(3)">Review Report →</button></div></div>';return h}
+function patientDetail(p,i){return '<div class="patient"><div class="patient-head"><strong>Patient '+(i+1)+'</strong><span>'+esc(p.name||"Unnamed")+'</span><span class="grow"></span></div><div class="grid">'+select("pcare"+i,"Was patient care provided?",p.care||"",["","Yes","No"])+select("pdisp"+i,"Disposition",p.disposition||"",["","Transported","Refused Care / Transport","Released to Another Agency","No Patient Contact","Other"])+input("chief"+i,"Chief Complaint",p.complaint||"")+input("injuryDetail"+i,"Injury",p.injury||"")+area("treat"+i,"Treatment / Interventions",p.treatment||"","full")+'<div class="full"><strong style="font-size:12px">Vitals</strong><div class="grid" style="margin-top:8px">'+input("vtime"+i,"Time",p.vtime||"")+input("bp"+i,"Blood Pressure",p.bp||"")+input("pulse"+i,"Pulse",p.pulse||"")+input("resp"+i,"Respirations",p.resp||"")+input("spo2"+i,"SpO₂",p.spo2||"")+input("gcs"+i,"GCS",p.gcs||"")+'</div></div></div></div>'}
+function review(){let checks=[];checks.push(["Incident number and location captured",!!state.cad&&!!state.location]);checks.push(["Dispatch date/time captured",!!state.date&&!!state.time]);if(state.type==="medical"||state.type==="mva"){checks.push(["Patient status documented",state.patients.length>0||state.type==="mva"]);state.patients.forEach((p,i)=>checks.push(["Patient "+(i+1)+" disposition documented",!!p.disposition]));}checks.push(["Narrative entered",!!state.narrative.trim()]);let h='<div class="card"><h2>REVIEW BEFORE FINISH</h2><div class="body"><div class="notice">The system should tell the firefighter exactly what is missing. NERIS terminology stays behind the scenes.</div>';h+=checks.map(c=>'<div class="check"><span class="dot '+(c[1]?'':'warn')+'"></span><div><b>'+esc(c[0])+'</b><div class="hint">'+(c[1]?'Complete':'Needs attention')+'</div></div></div>').join("");h+='</div></div><div class="actions"><button class="secondary" onclick="go(2)">← Edit Details</button><div class="right"><button class="secondary" onclick="saveDraft()">Save Draft</button><button class="green" onclick="finishDemo()">Validate & Finish</button></div></div>';return h}
+function official(){return '<div class="review-controls" style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px"><button class="secondary" onclick="go(3)">← Back to Review</button><button class="primary" onclick="window.print()">Print / Save PDF</button></div>'+paper()}
+function paper(){let t=types[state.type],p=state.patients[0];let cells='<div class="cell"><span class="label">CAD / Incident Number</span><span class="value">'+esc(state.cad)+'</span></div><div class="cell"><span class="label">Incident Date / Time</span><span class="value">'+esc(state.date+" · "+state.time)+'</span></div><div class="cell"><span class="label">Call Type</span><span class="value">'+esc(state.callType)+'</span></div><div class="cell"><span class="label">Primary Incident Type</span><span class="value">'+esc(state.incidentType)+'</span></div><div class="cell wide"><span class="label">Location</span><span class="value">'+esc(state.location)+'</span></div><div class="cell"><span class="label">Shift</span><span class="value">'+esc(state.shift)+'</span></div>';let out='<div class="paper"><div class="paperHead"><div class="logo">JFD<br>CROSS<br>&amp; SEAL</div><div><h1>JASPER FIRE DEPARTMENT</h1><div style="font-size:9px;color:#64748b">10 18th Street East · Jasper, Alabama 35501 · 205-221-8509</div><div class="red">INCIDENT REPORT · '+esc(t.title.toUpperCase())+'</div></div></div><section><h3>INCIDENT INFORMATION</h3><div class="cells">'+cells+'</div></section>';
+if(state.type==="medical"||state.type==="mva"){state.patients.forEach((p,i)=>{out+='<section><h3>PATIENT '+(i+1)+' — PATIENT CARE</h3><div class="cells"><div class="cell"><span class="label">Patient</span><span class="value">'+esc(p.name||"—")+'</span></div><div class="cell"><span class="label">Age / Sex</span><span class="value">'+esc((p.age||"—")+" · "+(p.sex||"—"))+'</span></div><div class="cell"><span class="label">Chief Complaint</span><span class="value">'+esc(p.complaint||"—")+'</span></div><div class="cell"><span class="label">Disposition</span><span class="value">'+esc(p.disposition||"—")+'</span></div><div class="cell wide"><span class="label">Treatment / Interventions</span><span class="value">'+esc(p.treatment||"—")+'</span></div></div></section>'})}
+if(state.type==="mva")out+='<section><h3>MVA / SCENE DETAILS</h3><div class="cells"><div class="cell"><span class="label">Vehicles Involved</span><span class="value">'+esc(state.vehicles||"—")+'</span></div><div class="cell"><span class="label">Extrication</span><span class="value">'+esc(state.extrication||"—")+'</span></div><div class="cell wide"><span class="label">Scene Details</span><span class="value">'+esc(state.sceneNotes||"—")+'</span></div></div></section>';
+if(state.type==="fire")out+='<section><h3>FIRE DETAILS</h3><div class="cells"><div class="cell"><span class="label">Arrival Condition</span><span class="value">'+esc(state.fireCondition||"—")+'</span></div><div class="cell"><span class="label">Damage</span><span class="value">'+esc(state.fireDamage||"—")+'</span></div><div class="cell"><span class="label">Cause</span><span class="value">'+esc(state.cause||"—")+'</span></div><div class="cell"><span class="label">Water Supply</span><span class="value">'+esc(state.water||"—")+'</span></div></div></section>';
+if(state.type==="alarm"||state.type==="public")out+='<section><h3>RESPONSE DETAILS</h3><div class="narr">'+esc(state.detailNotes||state.quickNotes||"—")+'</div></section>';
+out+='<section><h3>NARRATIVE</h3><div class="narr">'+esc(state.narrative||"—")+'</div></section><div class="footer"><span>JFD RMS · Jasper Fire Department</span><span>'+esc(state.cad)+' · Official Report</span></div></div>';return out}
+function wire(){document.querySelectorAll("input,select,textarea").forEach(e=>{e.addEventListener("change",capture);e.addEventListener("blur",capture)})}
+function capture(){saveCommon();if(state.type==="mva"||state.type==="medical"){state.patients.forEach((p,i)=>{p.name=document.getElementById("pname"+i)?.value??p.name;p.age=document.getElementById("page"+i)?.value??p.age;p.sex=document.getElementById("psex"+i)?.value??p.sex;p.care=document.getElementById("pcare"+i)?.value??p.care;p.complaint=document.getElementById("pcomplaint"+i)?.value??p.complaint;p.injury=document.getElementById("pinjury"+i)?.value??p.injury;p.disposition=document.getElementById("pdisp"+i)?.value??p.disposition;p.notes=document.getElementById("pnotes"+i)?.value??p.notes;p.treatment=document.getElementById("treat"+i)?.value??p.treatment;p.vtime=document.getElementById("vtime"+i)?.value??p.vtime;p.bp=document.getElementById("bp"+i)?.value??p.bp;p.pulse=document.getElementById("pulse"+i)?.value??p.pulse;p.resp=document.getElementById("resp"+i)?.value??p.resp;p.spo2=document.getElementById("spo2"+i)?.value??p.spo2;p.gcs=document.getElementById("gcs"+i)?.value??p.gcs;p.refusalTime=document.getElementById("rdate"+i)?.value??p.refusalTime;p.capacity=document.getElementById("rcap"+i)?.value??p.capacity;p.refusalReason=document.getElementById("rreason"+i)?.value??p.refusalReason})}
+["vehicles","extrication","sceneSafety","sceneNotes","fireCondition","fireLocation","fireDamage","cause","water","investigation","alarmResult","action","quickNotes","detailNotes","narrative"].forEach(id=>{const e=document.getElementById(id);if(e)state[id]=e.value});persist()}
+function saveDraft(){capture();state.saved=true;persist();render()}
+function addPatient(){capture();state.patients.push({});state.saved=false;render()}
+function removePatient(i){capture();state.patients.splice(i,1);render()}
+function nextFromQuick(){capture();state.saved=true;state.step=2;render()}
+function go(n){capture();state.step=n;render()}
+function finishDemo(){capture();state.saved=true;state.step=4;render()}
+render();
+</script>
 </body>
 </html>
