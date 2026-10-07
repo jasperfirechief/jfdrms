@@ -114,14 +114,19 @@ function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&l
 function addOtherInput(id,label){const w=$(id);const row=document.createElement('div');row.className='other-item';row.innerHTML='<input placeholder="Describe '+esc(label)+'"> <button type="button" class="danger" onclick="this.parentElement.remove()">Remove</button>';w.insertBefore(row,w.querySelector('button'))}
 function initCombos(root=document){
  root.querySelectorAll('input[data-combo-list]').forEach(inp=>{
-  if(inp.closest('.combo'))return;
   const dl=$(inp.dataset.comboList);if(!dl)return;
-  const wrap=inp.closest(".combo")||document.createElement("div");wrap.className="combo";if(!inp.closest(".combo")){inp.parentNode.insertBefore(wrap,inp);wrap.appendChild(inp);}
-  const menu=document.createElement("div");menu.className="combo-menu";menu.setAttribute('role','listbox');wrap.appendChild(menu);
-  const opts=()=>Array.from(dl.querySelectorAll('option')).map(o=>o.value||o.textContent);
-  const render=()=>{const q=inp.value.trim().toLowerCase();const items=opts().filter(x=>!q||x.toLowerCase().includes(q));menu.innerHTML=items.length?items.map(x=>'<div class="combo-option" data-value="'+esc(x)+'">'+esc(x)+'</div>').join(''):'<div class="combo-empty">No matching options</div>';menu.querySelectorAll('.combo-option').forEach(o=>o.onmousedown=e=>{e.preventDefault();inp.value=o.dataset.value;inp.dispatchEvent(new Event('input',{bubbles:true}));inp.dispatchEvent(new Event('change',{bubbles:true}));render();wrap.classList.add('open');});};
-  const open=()=>{render();wrap.classList.add('open')};const close=()=>wrap.classList.remove('open');
-  inp.setAttribute('role','combobox');inp.setAttribute('aria-autocomplete','list');inp.addEventListener('focus',open);inp.addEventListener('click',open);inp.addEventListener('input',open);inp.addEventListener('keydown',e=>{if(e.key==='Escape')close();if(e.key==='ArrowDown'){e.preventDefault();open()}});
+  let wrap=inp.closest('.combo');
+  if(!wrap){wrap=document.createElement('div');wrap.className='combo';inp.parentNode.insertBefore(wrap,inp);wrap.appendChild(inp);}
+  let menu=wrap.querySelector('.combo-menu');
+  if(!menu){menu=document.createElement('div');menu.className='combo-menu';menu.setAttribute('role','listbox');wrap.appendChild(menu);}
+  if(inp.dataset.comboInitialized==='true')return;
+  inp.dataset.comboInitialized='true';
+  const opts=()=>Array.from(dl.querySelectorAll('option')).map(o=>o.value||o.textContent).filter(Boolean);
+  const render=()=>{const q=inp.value.trim().toLowerCase();const items=opts().filter(x=>!q||x.toLowerCase().includes(q));menu.innerHTML=items.length?items.map(x=>'<div class="combo-option" role="option" data-value="'+esc(x)+'">'+esc(x)+'</div>').join(''):'<div class="combo-empty">No matching options</div>';menu.querySelectorAll('.combo-option').forEach(o=>o.onmousedown=e=>{e.preventDefault();inp.value=o.dataset.value;inp.dispatchEvent(new Event('input',{bubbles:true}));inp.dispatchEvent(new Event('change',{bubbles:true}));render();wrap.classList.add('open');});};
+  const open=()=>{render();wrap.classList.add('open');inp.setAttribute('aria-expanded','true')};
+  const close=()=>{wrap.classList.remove('open');inp.setAttribute('aria-expanded','false')};
+  inp.setAttribute('role','combobox');inp.setAttribute('aria-autocomplete','list');inp.setAttribute('aria-expanded','false');
+  inp.addEventListener('focus',open);inp.addEventListener('click',open);inp.addEventListener('input',open);inp.addEventListener('keydown',e=>{if(e.key==='Escape')close();if(e.key==='ArrowDown'){e.preventDefault();open()}});
   document.addEventListener('mousedown',e=>{if(!wrap.contains(e.target))close()});
  });
 }
