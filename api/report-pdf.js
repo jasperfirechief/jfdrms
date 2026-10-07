@@ -1,5 +1,5 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import { JFD_LOGO_JPG } from "./jfd-logo-data.js";
+
 
 const SUPABASE_URL="https://audgtwcctdoiptuekqvn.supabase.co";
 const SUPABASE_KEY="sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz";
@@ -49,7 +49,7 @@ export async function makePdf(incident={},reports=[]){
  const reg=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
  const W=612,H=792,m=40,usable=W-(m*2),bottom=48,headerH=92;
  const F={reg,bold},NAVY=rgb(.08,.14,.22),RED=rgb(.62,.04,.04),SLATE=rgb(.34,.39,.45),LIGHT=rgb(.94,.96,.98),MID=rgb(.78,.82,.87),WHITE=rgb(1,1,1);
- const jfdLogo=await pdf.embedJpg(Buffer.from(JFD_LOGO_JPG,"base64"));
+ const jfdLogo=null;
 
 
  let page,y,pageNo=0;
