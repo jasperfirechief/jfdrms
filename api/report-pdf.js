@@ -163,7 +163,7 @@ let page,y,pageNo=0;
  
  const callType=String(fd.rCall||fd.rCallType||incident.type||"").trim();
  const primaryType=String(fd.rPrimaryIncidentType||fd.primary_incident_type||fd.rIncidentType||"").toUpperCase();
- const isMva=/\\bMVA\\b|MOTOR[_ ]VEHICLE|COLLISION|CRASH/.test((callType+" "+primaryType).toUpperCase());
+ const isMva=/\bMVA\b|MOTOR[_ ]VEHICLE|COLLISION|CRASH/.test((callType+" "+primaryType).toUpperCase());
  const isFireLike=!isMva && /FIRE|STRUCTURE|ALARM|SMOKE|EXPLOS|WILDFIRE/.test((callType+" "+primaryType).toUpperCase());
  const hasVal=v=>v!==undefined&&v!==null&&String(v).trim()!==""&&String(v).trim()!=="—";
  const firstVal=(...vs)=>vs.find(hasVal);
