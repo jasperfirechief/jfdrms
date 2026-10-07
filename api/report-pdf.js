@@ -1,5 +1,5 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import { JFD_LOGO_PNG } from "./jfd-logo-data.js";
+import { JFD_LOGO_JPG } from "./jfd-logo-data.js";
 
 
 const SUPABASE_URL="https://audgtwcctdoiptuekqvn.supabase.co";
@@ -44,8 +44,76 @@ const centralTimeParts=v=>{if(!v)return null;const s=String(v).trim();const wall
 const date=v=>{const p=centralDateParts(v);return p?p.month+"/"+p.day+"/"+p.year:String(v??"")};
 const time=v=>{const p=centralTimeParts(v);return p?p.hour+":"+p.minute:String(v??"")};
 
+function mvaReportData(incident={},reports=[]){
+ const fire=(reports||[]).find(r=>String(r?.report_type||"").startsWith("fire_"));
+ const d=fire?.data||{};
+ const call=String(d.rCallType||d.rCall||incident.call_type||incident.type||"").trim().toUpperCase();
+ const primary=String(d.rPrimaryIncidentType||d.rIncidentType||"").toUpperCase();
+ return {d, isMva:/\\bMVA\\b|MOTOR[_ ]VEHICLE|COLLISION|CRASH/.test(call+" "+primary)};
+}
+async function makeMvaPdf(incident={},reports=[]){
+ const {d}=mvaReportData(incident,reports);
+ const pdf=await PDFDocument.create();
+ const reg=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
+ const W=612,H=792,m=40,usable=W-2*m,bottom=50,F={reg,bold};
+ const NAVY=rgb(.08,.14,.22),RED=rgb(.62,.04,.04),SLATE=rgb(.34,.39,.45),LIGHT=rgb(.94,.96,.98),MID=rgb(.78,.82,.87),WHITE=rgb(1,1,1);
+ const logo=await pdf.embedJpg(Buffer.from(JFD_LOGO_JPG,"base64"));
+ const logoDims=logo.scaleToFit(64,48);
+ let page,y,pageNo=0,currentTitle="MOTOR VEHICLE ACCIDENT REPORT";
+ const clean=v=>String(v??"").replace(/\\s+/g," ").trim();
+ const has=v=>v!==undefined&&v!==null&&clean(v)!==""&&clean(v)!=="—";
+ const first=(...v)=>v.find(has);
+ const pretty=v=>{
+   if(!has(v))return "—";
+   if(typeof v==="boolean")return v?"Yes":"No";
+   if(Array.isArray(v))return v.length?v.map(pretty).filter(x=>x!=="—").join(", ")||"—":"—";
+   if(typeof v==="object")return Object.entries(v).filter(([,x])=>has(x)).map(([k,x])=>k.replace(/([a-z])([A-Z])/g,"$1 $2").replace(/[_-]+/g," ").replace(/\\b\\w/g,c=>c.toUpperCase())+": "+pretty(x)).join(" • ")||"—";
+   return clean(v).replace(/\\|\\|/g," / ").replace(/_/g," ");
+ };
+ const dateText=v=>{if(!has(v))return "—";const s=clean(v),m=s.match(/^(\\d{4})-(\\d{2})-(\\d{2})/);return m?m[2]+"/"+m[3]+"/"+m[1]:s};
+ const timeText=v=>{if(!has(v))return "—";const s=clean(v),m=s.match(/T(\\d{2}):(\\d{2})/);return m?m[1]+":"+m[2]:s};
+ const wrap=(v,font,size,max)=>{const words=String(v??"").split(/\\s+/).filter(Boolean),out=[];let line="";for(const w of words){const n=line?line+" "+w:w;if(line&&font.widthOfTextAtSize(n,size)>max){out.push(line);line=w}else line=n}if(line)out.push(line);return out.length?out:["—"]};
+ const footer=()=>{page.drawLine({start:{x:m,y:35},end:{x:W-m,y:35},thickness:.6,color:MID});page.drawText("JFD RMS • Jasper Fire Department",{x:m,y:23,font:reg,size:7,color:SLATE});page.drawText("Page "+pageNo,{x:W-m-42,y:23,font:reg,size:7,color:SLATE});};
+ const newPage=()=>{page=pdf.addPage([W,H]);pageNo++;page.drawRectangle({x:0,y:H-70,width:W,height:70,color:WHITE});page.drawImage(logo,{x:m,y:H-60+(48-logoDims.height)/2,width:logoDims.width,height:logoDims.height});page.drawText("JASPER FIRE DEPARTMENT",{x:m+78,y:H-27,font:bold,size:15,color:NAVY});page.drawText("10 18th Street East · Jasper, Alabama 35501 · 205-221-8509",{x:m+78,y:H-41,font:reg,size:7.5,color:SLATE});page.drawText(currentTitle,{x:m+78,y:H-56,font:bold,size:10,color:RED});page.drawLine({start:{x:m,y:H-70},end:{x:W-m,y:H-70},thickness:1,color:MID});y=H-92;};
+ const ensure=n=>{if(y-n<bottom){footer();newPage();}};
+ const section=title=>{ensure(32);page.drawRectangle({x:m,y:y-20,width:usable,height:22,color:LIGHT,borderWidth:.5,borderColor:MID});page.drawText(title.toUpperCase(),{x:m+9,y:y-14,font:bold,size:8.5,color:NAVY});y-=30;};
+ const field=(label,value)=>{const lines=wrap(pretty(value),reg,8.2,usable-166),h=Math.max(20,lines.length*11+7);ensure(h+2);page.drawText(label,{x:m+7,y:y-12,font:bold,size:7.4,color:SLATE});lines.forEach((ln,i)=>page.drawText(ln,{x:m+160,y:y-12-i*11,font:reg,size:8.2,color:NAVY}));page.drawLine({start:{x:m,y:y-h},end:{x:m+usable,y:y-h},thickness:.35,color:MID});y-=h;};
+ const two=(a,b)=>{const gap=12,col=(usable-gap)/2,lw=102;const draw=(x,z)=>{const ls=wrap(pretty(z[1]),reg,8,col-lw-12),h=Math.max(21,ls.length*10.5+7);return{x,ls,h,label:z[0]}};const A=draw(m,a),B=draw(m+col+gap,b),h=Math.max(A.h,B.h);ensure(h+2);for(const q of [A,B]){page.drawRectangle({x:q.x,y:y-h,width:col,height:h,borderWidth:.35,borderColor:MID});page.drawText(q.label,{x:q.x+7,y:y-12,font:bold,size:7.1,color:SLATE});q.ls.forEach((ln,i)=>page.drawText(ln,{x:q.x+lw,y:y-12-i*10.5,font:reg,size:8,color:NAVY}));}y-=h+4;};
+ const units=[];const seen=new Map();
+ for(const r of reports||[]){for(const u of (Array.isArray(r?.data?.responding_apparatus)?r.data.responding_apparatus:[])){const key=String(u?.apparatus_id??u?.unit_number??"");if(!key)continue;if(!seen.has(key))seen.set(key,{...u,crew:Array.isArray(u.crew)?u.crew.slice():[]});else{const p=seen.get(key);p.times={...(p.times||{}),...(u.times||{})};if((!p.crew||!p.crew.length)&&Array.isArray(u.crew))p.crew=u.crew.slice();} }} units.push(...seen.values());
+ const responseTable=()=>{section("Response / Apparatus");if(!units.length){field("Responding Apparatus","None recorded");return;}const cols=[76,68,104,112,112,88],xs=[m,m+76,m+144,m+248,m+360,m+472],labs=["Unit","Station","Crew","Dispatch","Response","Disposition"];ensure(35);page.drawRectangle({x:m,y:y-23,width:usable,height:23,color:NAVY});labs.forEach((s,i)=>page.drawText(s,{x:xs[i]+5,y:y-15,font:bold,size:6.8,color:WHITE}));y-=23;for(const u of units){const z=u.times||{},crew=Array.isArray(u.crew)?u.crew.map(x=>typeof x==="object"?(x.name||x.full_name||x.role||"") : x).filter(Boolean).join(", "):u.crew;const vals=[u.unit_number||u.unit,u.station,crew,timeText(z.dispatch),[z.enroute&&("En route "+timeText(z.enroute)),z.on_scene&&("On scene "+timeText(z.on_scene))].filter(Boolean).join(" • "),[z.cancelled&&("Cancelled "+timeText(z.cancelled)),(z.in_service||z.clear)&&("In service "+timeText(z.in_service||z.clear))].filter(Boolean).join(" • ")];const ls=vals.map((v,i)=>wrap(pretty(v),reg,7,cols[i]-10)),rows=Math.max(...ls.map(x=>x.length)),rh=Math.max(20,rows*9+8);ensure(rh+2);page.drawRectangle({x:m,y:y-rh,width:usable,height:rh,borderWidth:.35,borderColor:MID});ls.forEach((arr,i)=>arr.forEach((ln,j)=>page.drawText(ln,{x:xs[i]+5,y:y-12-j*9,font:reg,size:7,color:NAVY})));y-=rh;}};
+ newPage();
+ section("Incident Information");
+ two(["CAD / Incident Number",first(d.rCad,incident.cad)],["Incident Date",dateText(first(d.rDate,incident.incident_date,incident.dispatch_time))]);
+ two(["Primary Incident Type",first(d.rPrimaryIncidentType,d.rIncidentType,incident.type)],["Call Type",first(d.rCallType,d.rCall,incident.call_type,incident.type)]);
+ field("Location",first(d.rLocation,incident.location));
+ two(["Location Type",d.rLocationType],["Shift",first(d.rShift,incident.shift)]);
+ field("Completed By",first(d.rCompletedBy,d.completedBy,d.report_completed_by));
+ const narrative=first(d.rNarrative,incident.narrative);
+ if(has(narrative)){section("Narrative");field("Narrative",narrative);}
+ responseTable();
+ newPage();
+ section("MVA / Scene Details");
+ two(["Latitude",first(d.rLatitude,incident.latitude)],["Longitude",first(d.rLongitude,incident.longitude)]);
+ two(["Primary Use",d.rPrimaryUse],["Location In Use",d.rLocationInUse]);
+ two(["People Present",d.rPeoplePresent],["Used As Intended",d.rUsedAsIntended]);
+ two(["Action Taken",d.action_taken],["No Action Taken",d.no_action_taken]);
+ const incidentTypes=first(d.incident_types,d.rPrimaryIncidentType);
+ field("Incident Type(s)",incidentTypes);
+ if((Array.isArray(d.vehicles)&&d.vehicles.length)||has(d.rVehicle1)||has(d.rMake1)||has(d.rModel1)||has(d.rYear1)){section("Vehicles Involved");(d.vehicles||[]).forEach((v,i)=>{field("Vehicle "+(i+1),[v.year,v.make,v.model,v.vehicle,v.description].filter(has).join(" "));if(has(v.owner)||has(v.owner_name)||has(v.insurance)||has(v.insurance_company))two(["Owner",first(v.owner,v.owner_name)],["Insurance",first(v.insurance,v.insurance_company)]);if(has(v.vin)||has(v.license)||has(v.license_plate))field("License / VIN",first(v.vin,v.license,v.license_plate));});}
+ const hazards=Array.isArray(d.hazards)?d.hazards:[],exposures=Array.isArray(d.exposures)?d.exposures:[],casualties=Array.isArray(d.casualties)?d.casualties:[];
+ if(hazards.length||exposures.length||casualties.length||has(d.rHazmat)){section("Scene Conditions / Outcomes");if(hazards.length||has(d.rHazmat))field("Hazards",first(d.hazards,d.rHazmat));if(exposures.length)field("Exposures",d.exposures);if(casualties.length)field("Casualties / Rescues",d.casualties);}
+ const aids=[...(Array.isArray(d.aid_records)?d.aid_records:[]),...(Array.isArray(d.nonfd_aid_records)?d.nonfd_aid_records:[])];if(aids.length)field("Mutual Aid / Other Agencies",aids);
+ if(Array.isArray(d.additional_personnel)&&d.additional_personnel.length)field("Additional Personnel",d.additional_personnel);
+ two(["Injuries",first(d.injuries_count,incident.injuries_count,0)],["Fatalities",first(d.fatalities_count,incident.fatalities_count,0)]);
+ if(has(d.rDispatchIncidentNumber)||has(d.jasper_validation_version)){section("Record / NERIS Identification");if(has(d.rDispatchIncidentNumber))field("Dispatch Incident Number",d.rDispatchIncidentNumber);if(has(d.jasper_validation_version))field("Jasper Validation Version",d.jasper_validation_version);}
+ footer();
+ return pdf.save({objectsPerTick:Infinity});
+}
 export async function makePdf(incident={},reports=[]){
  const startedAt=Date.now();
+ const mva=mvaReportData(incident,reports);
+ if(mva.isMva)return makeMvaPdf(incident,reports);
  const pdf=await PDFDocument.create();
  const reg=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
  const W=612,H=792,m=40,usable=W-(m*2),bottom=48,headerH=92;
@@ -69,7 +137,7 @@ let page,y,pageNo=0;
    for(const word of words){const next=line?line+" "+word:word;if(font.widthOfTextAtSize(next,size)>maxWidth&&line){lines.push(line);line=word}else line=next}
    if(line)lines.push(line);return lines.length?lines:["—"];
  };
- const logo=await pdf.embedPng(Buffer.from(JFD_LOGO_PNG,"base64"));
+ const logo=await pdf.embedJpg(Buffer.from(JFD_LOGO_JPG,"base64"));
  const logoDims=logo.scaleToFit(58,50);
  const drawHeader=title=>{
    page.drawRectangle({x:0,y:H-70,width:W,height:70,color:WHITE});
