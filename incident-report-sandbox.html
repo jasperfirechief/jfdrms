@@ -197,4 +197,12 @@ $('date').value=new Date().toISOString().slice(0,10);$('completedAt').value=new 
 <datalist id="dispositions"><option>Treated / Released</option><option>Transported</option><option>Refused Care / Transport</option><option>Other</option></datalist>
 <datalist id="complaints"><option value="Chest Pain">Chest Pain</option><option>Shortness of Breath</option><option>Fall</option><option>Altered Mental Status</option><option>Weakness</option><option>Injury</option><option>Other</option></datalist>
 <datalist id="injuries"><option>None</option><option>Head Injury</option><option>Extremity Injury</option><option>Chest Injury</option><option>Abdominal Injury</option><option>Burn</option><option>Other</option></datalist>
+<script>
+/* Final dropdown bootstrap: the datalists are declared after the main script,
+   so populate them again after they exist, then initialize every combo. */
+populateNerisDatalists();
+initCombos(document);
+renderMutualAid();
+renderSecondaryIncidentTypes();
+</script>
 </body></html>
