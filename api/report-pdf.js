@@ -696,6 +696,17 @@ function crc32(buf){let table=crc32.table;if(!table){table=crc32.table=new Uint3
 function zipStore(entries){const locals=[],central=[];let offset=0;for(const entry of entries){const name=Buffer.from(String(entry.name),"utf8"),data=Buffer.from(entry.data),crc=crc32(data),lh=Buffer.alloc(30);lh.writeUInt32LE(0x04034b50,0);lh.writeUInt16LE(20,4);lh.writeUInt16LE(0x800,6);lh.writeUInt32LE(crc,14);lh.writeUInt32LE(data.length,18);lh.writeUInt32LE(data.length,22);lh.writeUInt16LE(name.length,26);locals.push(lh,name,data);const ch=Buffer.alloc(46);ch.writeUInt32LE(0x02014b50,0);ch.writeUInt16LE(20,4);ch.writeUInt16LE(20,6);ch.writeUInt16LE(0x800,8);ch.writeUInt32LE(crc,16);ch.writeUInt32LE(data.length,20);ch.writeUInt32LE(data.length,24);ch.writeUInt16LE(name.length,28);ch.writeUInt32LE(offset,42);central.push(ch,name);offset+=lh.length+name.length+data.length;}const body=Buffer.concat(locals),cd=Buffer.concat(central),end=Buffer.alloc(22);end.writeUInt32LE(0x06054b50,0);end.writeUInt16LE(entries.length,8);end.writeUInt16LE(entries.length,10);end.writeUInt32LE(cd.length,12);end.writeUInt32LE(body.length,16);return Buffer.concat([body,cd,end]);}
 async function makeIncidentPdfs(incident,reports){const out=[];for(let i=0;i<reports.length;i++){const r=reports[i],pdf=await makePdf(incident,[r]),kind=r?.data?.rUnifiedIncidentReport?"Incident Report":r?.data?.rUnifiedIncidentReport?"Incident Report":String(r?.report_type||"").startsWith("pcr_")?"Patient Care Report":"Fire Incident Report";out.push({pdf,name:String(i+1).padStart(2,"0")+"_"+kind.replace(/[^A-Za-z0-9_-]+/g,"_")+".pdf"});}return out;}
 
+async function makeCombinedIncidentPdf(incident,reports){
+ const combined=await PDFDocument.create();
+ for(const report of reports||[]){
+  const bytes=await makePdf(incident,[report]);
+  const source=await PDFDocument.load(bytes);
+  const pages=await combined.copyPages(source,source.getPageIndices());
+  pages.forEach(page=>combined.addPage(page));
+ }
+ return combined.save({objectsPerTick:Infinity});
+}
+
 export default async function handler(req,res){
  if(req.method!=="POST")return res.status(405).json({ok:false,error:"Method not allowed"});
  try{
@@ -713,6 +724,13 @@ export default async function handler(req,res){
     res.setHeader("Cache-Control","no-store, no-cache, must-revalidate");res.setHeader("Content-Type","application/pdf");res.setHeader("Content-Length",String(pdf.length));res.setHeader("Content-Disposition",'attachment; filename="JFD Administrative Report.pdf"');return res.status(200).end(Buffer.from(pdf));
   }
   const incident=body.incident||{},reports=Array.isArray(body.reports)?body.reports:[];
+  if(body.action==="download_incident"){
+    if(!reports.length)return res.status(400).json({ok:false,error:"No saved reports are available for this incident."});
+    const pdf=await makeCombinedIncidentPdf(incident,reports);
+    const safeCad=String(incident.cad||"incident").replace(/[^A-Za-z0-9_-]+/g,"_");
+    res.setHeader("Cache-Control","no-store, no-cache, must-revalidate");res.setHeader("Content-Type","application/pdf");res.setHeader("Content-Length",String(pdf.length));res.setHeader("Content-Disposition",'attachment; filename="'+safeCad+' - JFD Incident Package.pdf"');
+    return res.status(200).end(Buffer.from(pdf));
+  }
   if(body.action==="download_all"){
     if(!reports.length)return res.status(400).json({ok:false,error:"No saved reports are available for this incident."});
     const generated=await makeIncidentPdfs(incident,reports),zip=zipStore(generated.map(x=>({name:x.name,data:x.pdf})));
