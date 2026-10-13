@@ -110,7 +110,31 @@ async function makeMvaPdf(incident={},reports=[]){
  footer();
  return pdf.save({objectsPerTick:Infinity});
 }
+
+async function makeSandboxIncidentPdf(incident={},report={}){
+ const d=report?.data?.sandboxRecord||{};
+ const pdf=await PDFDocument.create(),reg=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
+ const W=612,H=792,m=42,ink=rgb(.10,.15,.22),red=rgb(.58,.05,.08),muted=rgb(.38,.42,.48),light=rgb(.94,.96,.98);
+ let page,y,pageNo=0;
+ const newPage=()=>{page=pdf.addPage([W,H]);pageNo++;y=H-46;page.drawRectangle({x:0,y:H-8,width:W,height:8,color:red});page.drawText("JASPER FIRE DEPARTMENT",{x:m,y:y-8,size:16,font:bold,color:ink});page.drawText("10 18th Street East · Jasper, Alabama 35501 · 205-221-8509",{x:m,y:y-25,size:8,font:reg,color:muted});page.drawText("INCIDENT REPORT",{x:m,y:y-52,size:13,font:bold,color:red});page.drawLine({start:{x:m,y:y-60},end:{x:W-m,y:y-60},thickness:1,color:red});y-=78;};
+ const clean=v=>String(v??"").replace(/\s+/g," ").trim();
+ const title=v=>String(v||"").replace(/([a-z])([A-Z])/g,"$1 $2").replace(/[_-]+/g," ").replace(/\b\w/g,c=>c.toUpperCase());
+ const wrap=(v,max=90)=>{const words=clean(v).split(/\s+/),out=[];let line="";for(const word of words){if((line+" "+word).trim().length>max&&line){out.push(line);line=word}else line=(line+" "+word).trim()}if(line)out.push(line);return out.length?out:["—"]};
+ const section=name=>{if(y<86)newPage();page.drawRectangle({x:m,y:y-18,width:W-2*m,height:19,color:light});page.drawText(name.toUpperCase(),{x:m+7,y:y-12,size:9,font:bold,color:ink});y-=29;};
+ const field=(label,value)=>{if(value===null||value===undefined||value==="")return;const lines=wrap(Array.isArray(value)?value.map(x=>typeof x==="object"?JSON.stringify(x):x).join("; "):value);const lab=title(label)+":";for(let n=0;n<lines.length;n++){if(y<50)newPage();if(n===0){page.drawText(lab,{x:m+3,y,size:8.5,font:bold,color:ink});page.drawText(lines[n].slice(0,94),{x:m+130,y,size:8.5,font:reg,color:ink});}else page.drawText(lines[n].slice(0,120),{x:m+130,y,size:8.5,font:reg,color:ink});y-=12;}y-=3;};
+ const walk=(obj,prefix="")=>{if(obj===null||obj===undefined||obj==="")return;if(Array.isArray(obj)){if(!obj.length)return;obj.forEach((v,i)=>{if(v&&typeof v==="object")walk(v,(prefix?prefix+" ":"")+"Entry "+(i+1));else field((prefix||"Item")+" "+(i+1),v)});return;}if(typeof obj==="object"){Object.entries(obj).forEach(([k,v])=>{if(k==="sameAsOwner"&&v===false)return;walk(v,(prefix?prefix+" ":"")+title(k));});return;}field(prefix||"Value",obj===true?"Yes":obj===false?"No":obj);};
+ newPage();
+ const inc=d.incident||{};section("Incident Information");field("CAD / Incident Number",inc.cad||incident.cad);field("Incident Date",inc.date);field("Shift",inc.shift);field("Call Type",inc.callType);field("Primary Incident Type",inc.primaryIncidentType);field("Secondary Incident Types",inc.secondaryIncidentTypes);field("Location",inc.location||incident.location);field("Location Type",inc.locationType);
+ const groups=[["Location / Property Details",d.locationDetails],["Times",d.times],["Response / Apparatus / Mutual Aid",d.response],["People",d.people],["Patients",d.patients],["Vehicles",d.vehicles],["Casualties",d.casualties],["Exposures",d.exposures],["Hazards / Hazmat",d.hazards],["Mitigation / Protective Actions",d.mitigationProtectiveActions],["Hazmat Exposure Consequences",d.hazmatExposureConsequences],["Rescues / Evacuations",d.rescues],["Actions / Tactics",d.actions]];
+ for(const [name,value] of groups){if(value&&((Array.isArray(value)&&value.length)||(typeof value==="object"&&!Array.isArray(value)&&Object.values(value).some(v=>v!==""&&v!==null&&v!==undefined))||typeof value!=="object")){section(name);walk(value);}}
+ if(d.narrative){section("Narrative");wrap(d.narrative,110).forEach(line=>{if(y<50)newPage();page.drawText(line.slice(0,120),{x:m+3,y,size:9,font:reg,color:ink});y-=13;});}
+ for(const p of pdf.getPages()){p.drawLine({start:{x:m,y:32},end:{x:W-m,y:32},thickness:.5,color:rgb(.78,.82,.87)});p.drawText("Jasper Fire Department · Official Incident Record",{x:m,y:19,size:7,font:reg,color:muted});p.drawText("Page "+(pdf.getPages().indexOf(p)+1),{x:W-m-35,y:19,size:7,font:reg,color:muted});}
+ return pdf.save({objectsPerTick:Infinity});
+}
+
 export async function makePdf(incident={},reports=[]){
+ const sandboxReport=(reports||[]).find(r=>r?.data?.sandboxRecord);
+ if(sandboxReport)return makeSandboxIncidentPdf(incident,sandboxReport);
  const startedAt=Date.now();
  const mva=mvaReportData(incident,reports);
  if(mva.isMva&&!(reports||[]).some(r=>r?.data?.rUnifiedIncidentReport))return makeMvaPdf(incident,reports);
@@ -468,7 +492,7 @@ async function makeArchivePdf(kind,data){
 }
 function crc32(buf){let table=crc32.table;if(!table){table=crc32.table=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?(0xedb88320^(c>>>1)):(c>>>1);table[n]=c>>>0;}}let crc=0xffffffff;for(const b of buf)crc=table[(crc^b)&255]^(crc>>>8);return(crc^0xffffffff)>>>0;}
 function zipStore(entries){const locals=[],central=[];let offset=0;for(const entry of entries){const name=Buffer.from(String(entry.name),"utf8"),data=Buffer.from(entry.data),crc=crc32(data),lh=Buffer.alloc(30);lh.writeUInt32LE(0x04034b50,0);lh.writeUInt16LE(20,4);lh.writeUInt16LE(0x800,6);lh.writeUInt32LE(crc,14);lh.writeUInt32LE(data.length,18);lh.writeUInt32LE(data.length,22);lh.writeUInt16LE(name.length,26);locals.push(lh,name,data);const ch=Buffer.alloc(46);ch.writeUInt32LE(0x02014b50,0);ch.writeUInt16LE(20,4);ch.writeUInt16LE(20,6);ch.writeUInt16LE(0x800,8);ch.writeUInt32LE(crc,16);ch.writeUInt32LE(data.length,20);ch.writeUInt32LE(data.length,24);ch.writeUInt16LE(name.length,28);ch.writeUInt32LE(offset,42);central.push(ch,name);offset+=lh.length+name.length+data.length;}const body=Buffer.concat(locals),cd=Buffer.concat(central),end=Buffer.alloc(22);end.writeUInt32LE(0x06054b50,0);end.writeUInt16LE(entries.length,8);end.writeUInt16LE(entries.length,10);end.writeUInt32LE(cd.length,12);end.writeUInt32LE(body.length,16);return Buffer.concat([body,cd,end]);}
-async function makeIncidentPdfs(incident,reports){const out=[];for(let i=0;i<reports.length;i++){const r=reports[i],pdf=await makePdf(incident,[r]),kind=r?.data?.rUnifiedIncidentReport?"Incident Report":String(r?.report_type||"").startsWith("pcr_")?"Patient Care Report":"Fire Incident Report";out.push({pdf,name:String(i+1).padStart(2,"0")+"_"+kind.replace(/[^A-Za-z0-9_-]+/g,"_")+".pdf"});}return out;}
+async function makeIncidentPdfs(incident,reports){const out=[];for(let i=0;i<reports.length;i++){const r=reports[i],pdf=await makePdf(incident,[r]),kind=r?.data?.rUnifiedIncidentReport?"Incident Report":r?.data?.rUnifiedIncidentReport?"Incident Report":String(r?.report_type||"").startsWith("pcr_")?"Patient Care Report":"Fire Incident Report";out.push({pdf,name:String(i+1).padStart(2,"0")+"_"+kind.replace(/[^A-Za-z0-9_-]+/g,"_")+".pdf"});}return out;}
 
 export default async function handler(req,res){
  if(req.method!=="POST")return res.status(405).json({ok:false,error:"Method not allowed"});
