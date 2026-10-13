@@ -1063,11 +1063,22 @@ function reportResponseUnitRow(u){
   const crewHtml=isUnassigned?renderUnassignedCrewSelect(crew):'<div class="text-xs mt-2"><b>Crew:</b> <span data-report-crew-label>'+esc(reportCrewLabel(crew))+'</span></div>';
   return '<div class="report-response-unit border rounded-xl p-3 bg-white" data-report-response-selected="true" data-apparatus-id="'+apId+'" data-crew="'+esc(JSON.stringify(crew))+'" data-unassigned="'+(isUnassigned?'true':'false')+'"><div class="flex justify-between gap-3 items-start"><div><b>'+esc(unitName)+'</b><div class="text-xs text-slate-500">'+(isUnassigned?'Unassigned Apparatus':esc(u.station_snapshot||""))+'</div></div><button type="button" onclick="removeReportApparatus('+apId+')" class="text-red-600 font-bold text-sm">Remove</button></div>'+crewHtml+'<p class="text-xs font-bold text-red-700 mt-3">Military time required. Dispatch is pre-populated from CAD and remains editable.</p><div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-2">'+event("Dispatch","dispatch",di,true)+event("En Route","enroute",en,false)+event("On Scene","on_scene",on,false)+event("Cancelled","cancelled",ca,false)+event("In Service","in_service",cl,false)+'</div></div>';
 }
+function reportStaffingShift(){
+  const value=String($("rShift")?.value||$("staffShift")?.value||"").trim().toUpperCase();
+  return ["A","B","C"].includes(value)?value:"A";
+}
 async function loadShiftReportAssignments(date){
-  const staff=await db.from("daily_staffing").select("staffing_id").eq("staffing_date",date).eq("shift","daily").maybeSingle();
-  if(staff.error)throw staff.error;
-  if(!staff.data)return [];
-  const q=await db.from("daily_app_assignments").select("assignment_id,station_id,apparatus_id,daily_personnel_assignments(personnel_id,assignment_role,personnel(id,first_name,last_name,role,shift))").eq("staffing_id",staff.data.staffing_id);
+  const shift=reportStaffingShift();
+  const base=String(date||$("rDate")?.value||today()).slice(0,10);
+  const previous=new Date(base+"T12:00:00Z");previous.setUTCDate(previous.getUTCDate()-1);
+  let staffing=null;
+  for(const staffingDate of [base,previous.toISOString().slice(0,10)]){
+    const staff=await db.from("daily_staffing").select("staffing_id").eq("staffing_date",staffingDate).eq("shift",shift).maybeSingle();
+    if(staff.error)throw staff.error;
+    if(staff.data){staffing=staff.data;break;}
+  }
+  if(!staffing)return [];
+  const q=await db.from("daily_app_assignments").select("assignment_id,station_id,apparatus_id,daily_personnel_assignments(personnel_id,assignment_role,personnel(id,first_name,last_name,role,shift))").eq("staffing_id",staffing.staffing_id);
   if(q.error)throw q.error;
   return q.data||[];
 }
@@ -1228,12 +1239,8 @@ async function refreshReportApparatusCrews(dateOverride){
   const date=dateOverride||$("rDate")?.value||today();
   const rows=[...document.querySelectorAll(".report-response-unit")];
   if(!rows.length){await refreshOffDutyPersonnel(date);return}
-  const staff=await db.from("daily_staffing").select("staffing_id").eq("staffing_date",date).eq("shift","daily").maybeSingle();
   let assignments=[];
-  if(!staff.error&&staff.data){
-    const q=await db.from("daily_app_assignments").select("assignment_id,station_id,apparatus_id,daily_personnel_assignments(assignment_id,personnel_id,assignment_role,personnel(id,first_name,last_name,role,shift))").eq("staffing_id",staff.data.staffing_id);
-    if(!q.error)assignments=q.data||[];
-  }
+  try{assignments=await loadShiftReportAssignments(date)}catch(e){console.error("Unable to refresh report apparatus crews",e)}
   rows.forEach(row=>{
     const apId=Number(row.dataset.apparatusId);
     const fixed=JFD_FIXED_RESPONSE_UNITS.find(x=>Number(x.apparatus_id)===apId);
@@ -1249,11 +1256,7 @@ async function refreshReportApparatusCrews(dateOverride){
 async function refreshOffDutyPersonnel(dateOverride,onDutyIds=[]){
   const date=dateOverride||$("rDate")?.value||today();
   if(!onDutyIds.length){
-    const staff=await db.from("daily_staffing").select("staffing_id").eq("staffing_date",date).eq("shift","daily").maybeSingle();
-    if(!staff.error&&staff.data){
-      const q=await db.from("daily_personnel_assignments").select("personnel_id,daily_app_assignments!inner(staffing_id)").eq("daily_app_assignments.staffing_id",staff.data.staffing_id);
-      if(!q.error)onDutyIds=(q.data||[]).map(x=>Number(x.personnel_id));
-    }
+    try{const assignments=await loadShiftReportAssignments(date);onDutyIds=assignments.flatMap(a=>a.daily_personnel_assignments||[]).map(p=>Number(p.personnel_id));}catch(e){console.error("Unable to load on-duty personnel for report",e)}
   }
   const existing=[...document.querySelectorAll("[data-report-person]:checked")].map(x=>Number(x.dataset.reportPerson));
   const container=$("reportOffDutyPersonnel");if(!container)return;
@@ -2065,6 +2068,7 @@ function bindReportForm(kind){
   form.addEventListener("change",autosave);
   form.addEventListener("input",()=>{jfdUpdateNerisRequirements?.();jfdUpdateConditionalReportSections?.()});
   form.addEventListener("change",()=>{jfdUpdateNerisRequirements?.();jfdUpdateConditionalReportSections?.()});
+  bindReportTimeNormalization();
 }
 function toDateTimeLocal(v){if(!v)return "";const d=new Date(v);if(Number.isNaN(d.getTime()))return "";const p=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes());}
 async function loadIncidents(){
