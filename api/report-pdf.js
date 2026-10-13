@@ -59,7 +59,7 @@ async function makeMvaPdf(incident={},reports=[]){
  const NAVY=rgb(.08,.14,.22),RED=rgb(.62,.04,.04),SLATE=rgb(.34,.39,.45),LIGHT=rgb(.94,.96,.98),MID=rgb(.78,.82,.87),WHITE=rgb(1,1,1);
  const logo=await pdf.embedJpg(Buffer.from(JFD_LOGO_JPG,"base64"));
  const logoDims=logo.scaleToFit(64,48);
- let page,y,pageNo=0,currentTitle="MOTOR VEHICLE ACCIDENT REPORT";
+ let page,y,pageNo=0,currentTitle=d?.rUnifiedIncidentReport?"INCIDENT REPORT":"MOTOR VEHICLE ACCIDENT REPORT";
  const clean=v=>String(v??"").replace(/\\s+/g," ").trim();
  const has=v=>v!==undefined&&v!==null&&clean(v)!==""&&clean(v)!=="—";
  const first=(...v)=>v.find(has);
