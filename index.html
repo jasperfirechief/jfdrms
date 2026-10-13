@@ -1316,12 +1316,9 @@ function openIncidentReportFromChooser(kind){
 
 function newReport(){
   if(profile?.app_role!=="admin")return alert("Only administrators can access the Reports page and standalone reports.");
-  const m=ensureReportModal();m.dataset.incidentId="";m.dataset.cad="";m.dataset.standalone="1";m.classList.remove("hiddenx");
-  $("reportModalTitle").textContent="Create Report";$("reportModalSub").textContent="Select a report type";
+  const m=ensureReportModal();m.dataset.incidentId="";m.dataset.cad="";m.dataset.standalone="1";m.dataset.reportId="";m.classList.remove("hiddenx");
   $("reportIncidentBanner")?.classList.add("hiddenx");
-  $("incidentReportForm").classList.add("hiddenx");
-  $("reportChooser").classList.remove("hiddenx");
-  $("reportChooser").innerHTML='<div class="max-w-4xl mx-auto"><h3 class="text-xl font-black mb-2">Choose a report</h3><p class="text-sm text-slate-500 mb-5">Create a new report. Incident and CAD information can be added manually.</p><div class="grid md:grid-cols-2 gap-4"><button type="button" onclick="openIncidentReportFromChooser(\'fire\')" class="border-2 border-slate-200 hover:border-red-500 rounded-2xl p-6 text-left"><div class="font-black text-lg">Fire Incident Report</div><div class="text-sm text-slate-500 mt-1">Document a fire, alarm, hazard, MVA, or other fire incident.</div></button><button type="button" onclick="openIncidentReportFromChooser(\'pcr\')" class="border-2 border-slate-200 hover:border-blue-500 rounded-2xl p-6 text-left"><div class="font-black text-lg">Patient Care Report</div><div class="text-sm text-slate-500 mt-1">Document patient assessment, treatment, vitals, transport, or refusal.</div></button></div></div>';
+  return window.jfdOpenGeneralReport({cad:"",type:"",location:"",dispatch_time:"",latitude:"",longitude:""},{},[]);
 }
 function startStandaloneReport(kind){
   try{
