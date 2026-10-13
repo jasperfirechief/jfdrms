@@ -113,7 +113,7 @@ async function makeMvaPdf(incident={},reports=[]){
 export async function makePdf(incident={},reports=[]){
  const startedAt=Date.now();
  const mva=mvaReportData(incident,reports);
- if(mva.isMva)return makeMvaPdf(incident,reports);
+ if(mva.isMva&&!(reports||[]).some(r=>r?.data?.rUnifiedIncidentReport))return makeMvaPdf(incident,reports);
  const pdf=await PDFDocument.create();
  const reg=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
  const W=612,H=792,m=40,usable=W-(m*2),bottom=48,headerH=92;
