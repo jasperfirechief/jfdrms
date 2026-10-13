@@ -61,5 +61,5 @@
   $("reportChooser").innerHTML='<div class="max-w-4xl mx-auto"><h3 class="text-xl font-black mb-2">Incident Report</h3><p class="text-sm text-slate-500 mb-5">Available CAD information will be pre-populated. Conditional sections appear for fire, medical, MVA, rescue, hazards, and other incidents.</p><button type="button" onclick="jfdOpenGeneralReport(window._jfdChooserIncident||{},window._jfdChooserDetails||{},window._jfdChooserUnits||[])" class="w-full border-2 border-slate-200 hover:border-red-500 rounded-2xl p-6 text-left"><div class="font-black text-lg">Open Incident Report</div><div class="text-sm text-slate-500 mt-1">One report for the incident, with the applicable sections shown as you complete it.</div></button></div>';
   };
   
-  window.newReport=function(){if(!canOps())return alert("You must be on duty.");const m=ensureReportModal();m.dataset.incidentId="";m.dataset.cad="";m.dataset.standalone="1";m.classList.remove("hiddenx");window.renderReportChooser({},{},[]);};
+  window.newReport=function(){if(!canOps())return alert("You must be on duty.");const m=ensureReportModal();m.dataset.incidentId="";m.dataset.cad="";m.dataset.standalone="1";m.dataset.reportId="";m.classList.remove("hiddenx");window.renderReportChooser({},{},[]);};
 })();
