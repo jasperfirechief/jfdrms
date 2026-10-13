@@ -2005,10 +2005,12 @@ async function downloadIncidentPdf(cad,reportId){
 async function emailIncidentPdf(cad,reportId){
   try{
     const {incident,report}=await getIncidentReportForPdf(cad,reportId);
+    const reports=Array.isArray(incident.reports)?incident.reports.filter(r=>r&&r.report_type):[report];
+    if(!reports.length)throw new Error("No saved reports are available for this incident.");
     const session=(await db.auth.getSession()).data?.session;if(!session)throw new Error("Authentication required.");
-    const resp=await fetch("/api/report-pdf",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({action:"email",incident,reports:[report]})});
+    const resp=await fetch("/api/report-pdf",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({action:"email_incident",incident,reports})});
     let b={};try{b=await resp.json()}catch{}if(!resp.ok||!b.ok)throw new Error(b.error||"PDF email failed.");
-    alert("PDF emailed successfully.");return b;
+    alert("Complete incident PDF emailed successfully.");return b;
   }catch(e){console.error("emailIncidentPdf failed:",e);alert("Unable to email PDF: "+(e?.message||String(e)));return {ok:false,error:e?.message||String(e)}}
 }
 async function generateIncidentPdf(cad,reportId){
