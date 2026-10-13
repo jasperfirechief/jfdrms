@@ -1525,11 +1525,11 @@ async function editSavedReport(cad,reportId){
     if(ur.error)return alert(ur.error.message);
     const reports=Array.isArray(i.reports)?i.reports:[],rep=reports.find(x=>String(x?.report_id||"")===String(reportId||""));
     if(!rep)return alert("Saved report not found.");
-    const kind=String(rep.report_type||"").startsWith("pcr_")?"pcr":"fire";
+    const kind=rep.data?.rUnifiedIncidentReport?"general":String(rep.report_type||"").startsWith("pcr_")?"pcr":"fire";
     const modal=ensureReportModal();
     modal.dataset.incidentId=String(d.incident_id||"");modal.dataset.cad=String(i.cad||cad);modal.dataset.standalone="";modal.dataset.reportId=String(rep.report_id||"");
     modal.classList.remove("hiddenx");
-    await openIncidentReportForm(kind,i,d,ur.data||[]);
+    if(kind==="general")await window.jfdOpenGeneralReport(i,d,ur.data||[]);else await openIncidentReportForm(kind,i,d,ur.data||[]);
     window.currentReportKind=kind;
     window.applyPreviousReportValues(rep.data||{});
     modal.dataset.reportId=String(rep.report_id||"");
@@ -1569,7 +1569,7 @@ async function openSavedReport(cad,reportId){
   try{
     const r=await db.from("incidents").select("*,incident_details(*)").eq("cad",cad).maybeSingle();if(r.error||!r.data)return alert(r.error?.message||"Incident not found.");
     const i=r.data,reports=Array.isArray(i.reports)?i.reports:[],rep=reports.find(x=>String(x?.report_id||"")===String(reportId||""));if(!rep)return alert("Saved report not found.");const dd=await db.from("incident_details").select("status").eq("cad",cad).maybeSingle();if(["awaiting_neris","complete"].includes(String(dd.data?.status||""))&&rep.status==="draft")return alert("This incident has been finished and can no longer be edited.");
-    const kind=String(rep.report_type||"").startsWith("pcr_")?"pcr":"fire",title=kind==="pcr"?"Patient Care Report":"Fire Incident Report",statusLabel={draft:"Draft",complete:"Completed",ready_for_neris:"Awaiting NERIS Review",submitted_to_neris:"Submitted to NERIS"}[rep.status]||humanReportKey(rep.status||"Saved"),m=ensureSavedReportViewer(),d=rep.data||{};
+    const kind=String(rep.report_type||"").startsWith("pcr_")?"pcr":"fire",title=rep.data?.rUnifiedIncidentReport?"Incident Report":kind==="pcr"?"Patient Care Report":"Fire Incident Report",statusLabel={draft:"Draft",complete:"Completed",ready_for_neris:"Awaiting NERIS Review",submitted_to_neris:"Submitted to NERIS"}[rep.status]||humanReportKey(rep.status||"Saved"),m=ensureSavedReportViewer(),d=rep.data||{};
     $("savedReportViewerTitle").textContent=title;$("savedReportViewerSub").textContent="CAD "+(i.cad||"")+" · "+(i.location||"Location not provided");
     const canEdit=rep.status==="draft",isAdmin=profile?.app_role==="admin",reviewIndex=reports.findIndex(x=>String(x?.report_id||"")===String(reportId||"")),actions=$("savedReportViewerActions");
     actions.innerHTML='<span class="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 font-bold text-sm">'+esc(statusLabel)+'</span>'+(canEdit?'<button type="button" data-edit-cad="'+esc(cad)+'" data-edit-report-id="'+esc(reportId)+'" onclick="window.editSavedReport(this.dataset.editCad,this.dataset.editReportId)" class="bg-slate-950 text-white px-4 py-2 rounded-lg font-bold">Edit Report</button>':"")+(isAdmin&&rep.status==="ready_for_neris"?'<button type="button" onclick="window.adminSubmitReport('+JSON.stringify(cad)+','+JSON.stringify(reviewIndex)+')" class="bg-amber-600 text-white px-4 py-2 rounded-lg font-bold">Submit to NERIS</button>':"")+(isAdmin?'<button type="button" onclick="window.downloadIncidentPdf('+JSON.stringify(cad)+','+JSON.stringify(reportId)+')" class="bg-blue-700 text-white px-4 py-2 rounded-lg font-bold">Download PDF</button><button type="button" onclick="window.emailIncidentPdf('+JSON.stringify(cad)+','+JSON.stringify(reportId)+')" class="bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold">Email PDF</button><button type="button" onclick="window.adminDeleteReportFromButton({dataset:{cad:'+JSON.stringify(cad)+',reportId:'+JSON.stringify(reportId)+'}})" class="bg-red-600 text-white px-4 py-2 rounded-lg font-bold">Delete</button>':"")+'<button type="button" onclick="window.closeSavedReportViewer()" class="border px-4 py-2 rounded-lg font-bold">Close</button>';
@@ -1590,7 +1590,7 @@ async function fetchAllIncidentsForReports(){
   while(true){const r=await db.from("incidents").select("cad,type,location,dispatch_time,updated_at,reports").order("updated_at",{ascending:false}).range(from,from+pageSize-1);if(r.error)throw new Error(r.error.message);const page=r.data||[];rows.push(...page);if(page.length<pageSize)break;from+=pageSize;}
   return rows;
 }
-function reportTypeLabel(rep){return String(rep?.report_type||"").startsWith("pcr_")?"Patient Care Report":"Fire Incident Report";}
+function reportTypeLabel(rep){return rep?.data?.rUnifiedIncidentReport?"Incident Report":String(rep?.report_type||"").startsWith("pcr_")?"Patient Care Report":"Fire Incident Report";}
 function reportStatusLabel(status){return ({draft:"Draft",complete:"Completed",ready_for_neris:"Awaiting NERIS Review",submitted_to_neris:"Submitted to NERIS"}[status]||humanReportKey(status||"Saved"));}
 function reportsHome(){
  const rows=window._jfdReportRows||[],c={draft:0,fire:0,pcr:0,ready_for_neris:0,submitted_to_neris:0},readyIncidentCads=new Set();
@@ -1901,7 +1901,7 @@ async function submitReportToNeris(data,incidentId,explicitAdminReview=false){
 async function saveReportDraft(kind,silent=false){
   const form=$("incidentReportForm");if(!form)return;
   const data=collectReportFormData(),m=$("reportModal"),incidentId=Number(m?.dataset.incidentId||0)||null;
-    const reportType=kind==="fire"?"fire_neris_v2":"pcr_neris_v2";
+    const reportType=kind==="pcr"?"pcr_neris_v2":"fire_neris_v2";
   const editingId=String(m?.dataset.reportId||"").trim();
   const report={report_id:editingId||crypto.randomUUID(),report_type:reportType,status:"draft",data,updated_at:new Date().toISOString(),created_by:me?.id||null};
   if(incidentId){
@@ -2540,11 +2540,11 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     // Do not enforce conditional NERIS module fields while collecting the report.
     // The RMS preserves optional/departmental information, while the NERIS review/API
     // gate enforces only the minimum fields applicable to the incident.
-    if(window.currentReportKind==="pcr"){data.patients=collectPatients();data.rNarrative=(data.patients||[]).map(p=>p.narrative).filter(Boolean).join("\n\n");}
+    if(["pcr","general"].includes(window.currentReportKind)){data.patients=collectPatients();if(window.currentReportKind==="pcr")data.rNarrative=(data.patients||[]).map(p=>p.narrative).filter(Boolean).join("\n\n");}
     data.incident_types=[data.rPrimaryIncidentType,...[...document.querySelectorAll("[id^='rIncidentType_']")].map(x=>x.value).filter(Boolean)];
     data.action_taken=$("rActionTaken")?.checked===true;data.no_action_taken=$("rNoActionTaken")?.checked===true;
     data.actions_taken=[...document.querySelectorAll("input[name='rActionsTaken']:checked")].map(x=>x.value);
-    data.exposures=window.jfdRepeats?.exposures||[];data.casualties=window.jfdRepeats?.casualties||[];data.vehicles=window.jfdRepeats?.vehicles||[];data.hazards=window.jfdRepeats?.hazards||[];data.rescues=window.jfdRepeats?.rescues||[];
+    data.exposures=window.jfdRepeats?.exposures||[];data.casualties=window.jfdRepeats?.casualties||[];data.vehicles=window.jfdRepeats?.vehicles||[];data.hazards=window.jfdRepeats?.hazards||[];data.rescues=window.jfdRepeats?.rescues||[];data.rescues=window.jfdRepeats?.rescues||[];
     data.aid_records=[...(window.jfdAids?.fd||[])];data.nonfd_aid_records=[...(window.jfdAids?.nonfd||[])];
     data.jasper_validation_version="2026-09-30-neris-minimum";
     return data;
@@ -2562,7 +2562,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     });
     if(data.rNerisType&&!$("rPrimaryIncidentType")?.value&&$("rPrimaryIncidentType")){$("rPrimaryIncidentType").value=String(data.rNerisType);$("rPrimaryIncidentType").dispatchEvent(new Event("change",{bubbles:true}));}
     if(data.rIncidentType&&!$("rPrimaryIncidentType")?.value&&$("rPrimaryIncidentType")){$("rPrimaryIncidentType").value=String(data.rIncidentType);$("rPrimaryIncidentType").dispatchEvent(new Event("change",{bubbles:true}));}
-    if(window.currentReportKind==="pcr"){window.jfdRenderPatients(data.patients||[])}
+    if(["pcr","general"].includes(window.currentReportKind)){window.jfdRenderPatients(data.patients||[])}
     window.jfdIncidentTypes=(data.incident_types||[]).slice(1);window.jfdRenderIncidentTypes?.();
     window.jfdAids={fd:data.aid_records||[],nonfd:data.nonfd_aid_records||[]};window.jfdRenderAids?.();
     window.jfdRepeats={exposures:data.exposures||[],casualties:data.casualties||[],vehicles:data.vehicles||[],hazards:data.hazards||[],rescues:data.rescues||[]};
@@ -2578,8 +2578,8 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     else if(new Date(data.rCallArrival)>new Date(data.rCallAnswered)||new Date(data.rCallAnswered)>new Date(data.rCallCreate))errors.push("Call times must be Call Arrival ≤ Call Answered ≤ Call Create.");
     if(!(data.responding_apparatus||[]).some(x=>x.unit_number))errors.push("At least one responding department unit is required.");
     if(!data.rNarrative)errors.push("Narrative is required.");
-    if(window.currentReportKind==="pcr"){
-      if(!(data.patients||[]).length)errors.push("At least one patient is required for a PCR.");
+    if(window.currentReportKind==="pcr"||(window.currentReportKind==="general"&&Array.isArray(data.patients)&&data.patients.length)){
+      if(window.currentReportKind==="pcr"&&!(data.patients||[]).length)errors.push("At least one patient is required for a PCR.");
       (data.patients||[]).forEach((p,i)=>{
         if(!p.name)errors.push("Patient "+(i+1)+": patient name is required.");
         if(!p.chief)errors.push("Patient "+(i+1)+": chief complaint is required.");
