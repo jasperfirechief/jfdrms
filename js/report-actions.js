@@ -5,7 +5,7 @@ async function fetchIncidentPdfBlob(cad,reportId){
   const r=await db.from("incidents").select("*,incident_details(*)").eq("cad",cad).maybeSingle();
   if(r.error||!r.data)throw new Error(r.error?.message||"Incident not found.");
   const allReports=Array.isArray(r.data.reports)?r.data.reports:[];
-  const reports=reportId?allReports.filter(x=>String(x?.report_id||"")===String(reportId)):allReports;
+  const reports=allReports;
   if(!reports.length)throw new Error("No saved report data is available for this incident yet.");
   const session=(await db.auth.getSession()).data?.session;if(!session)throw new Error("Authentication required.");const resp=await fetch("/api/report-pdf",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({action:"download",incident:r.data,reports})});
   if(!resp.ok){let b={};try{b=await resp.json()}catch{}throw new Error(b.error||"PDF generation failed.");}
