@@ -2169,7 +2169,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       field("rDispatchIncidentNumber","Dispatch Incident Number",iForResponse?.dispatch_incident_number||iForResponse?.cad||"","text","",true)+field("rCallArrival","Call Arrival",localDateTime(iForResponse?.call_arrival||iForResponse?.dispatch_time),"datetime-local","",true)+
       field("rCallAnswered","Call Answered",localDateTime(iForResponse?.call_answered||iForResponse?.dispatch_time),"datetime-local","",true)+
       field("rCallCreate","Call Create",localDateTime(iForResponse?.call_create||iForResponse?.dispatch_time),"datetime-local","",true)+
-      field("rDispatch","Dispatch Time",String(localDateTime(iForResponse?.dispatch_time)||"").split("T")[1]?.slice(0,5)||"","time")+
+      field("rDispatch","Dispatch Time",jfdExtractClock(iForResponse?.dispatch_time),"time")+
       '</div>');
     const response=card("Response",'<p class="text-xs text-slate-500 mb-3">Select the apparatus that actually responded. CAD/Active911 does not automatically select response units.</p><div class="grid md:grid-cols-2 gap-2">'+checks+'</div><div id="jfdUnitRows" class="space-y-2 mt-3"><p class="text-sm text-slate-500">Select responding apparatus above.</p></div><div class="mt-3 flex flex-wrap gap-2">'+btn("Refresh Crew","refreshReportApparatusCrews($('rDate')?.value||today())","primary")+'</div><div class="mt-4 border-t pt-4"><div id="reportOffDutyPersonnel">'+renderOffDutyPersonnel([])+'</div></div>');
     return dispatch+response;
