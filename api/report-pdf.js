@@ -113,25 +113,226 @@ async function makeMvaPdf(incident={},reports=[]){
 
 async function makeSandboxIncidentPdf(incident={},report={}){
  const d=report?.data?.sandboxRecord||{};
- const pdf=await PDFDocument.create(),reg=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
- const W=612,H=792,m=42,ink=rgb(.10,.15,.22),red=rgb(.58,.05,.08),muted=rgb(.38,.42,.48),light=rgb(.94,.96,.98);
+ const pdf=await PDFDocument.create();
+ const reg=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
+ const W=612,H=792,m=42,usable=W-2*m,bottom=54;
+ const ink=rgb(.10,.15,.22),red=rgb(.58,.05,.08),muted=rgb(.38,.42,.48),light=rgb(.94,.96,.98),line=rgb(.82,.85,.89),white=rgb(1,1,1);
+ const logo=await pdf.embedJpg(Buffer.from(JFD_LOGO_JPG,"base64")),logoDims=logo.scaleToFit(48,42);
  let page,y,pageNo=0;
- const newPage=()=>{page=pdf.addPage([W,H]);pageNo++;y=H-46;page.drawRectangle({x:0,y:H-8,width:W,height:8,color:red});page.drawText("JASPER FIRE DEPARTMENT",{x:m,y:y-8,size:16,font:bold,color:ink});page.drawText("10 18th Street East · Jasper, Alabama 35501 · 205-221-8509",{x:m,y:y-25,size:8,font:reg,color:muted});page.drawText("INCIDENT REPORT",{x:m,y:y-52,size:13,font:bold,color:red});page.drawLine({start:{x:m,y:y-60},end:{x:W-m,y:y-60},thickness:1,color:red});y-=78;};
  const clean=v=>String(v??"").replace(/\s+/g," ").trim();
- const title=v=>String(v||"").replace(/([a-z])([A-Z])/g,"$1 $2").replace(/[_-]+/g," ").replace(/\b\w/g,c=>c.toUpperCase());
- const wrap=(v,max=90)=>{const words=clean(v).split(/\s+/),out=[];let line="";for(const word of words){if((line+" "+word).trim().length>max&&line){out.push(line);line=word}else line=(line+" "+word).trim()}if(line)out.push(line);return out.length?out:["—"]};
- const section=name=>{if(y<86)newPage();page.drawRectangle({x:m,y:y-18,width:W-2*m,height:19,color:light});page.drawText(name.toUpperCase(),{x:m+7,y:y-12,size:9,font:bold,color:ink});y-=29;};
- const field=(label,value)=>{if(value===null||value===undefined||value==="")return;const lines=wrap(Array.isArray(value)?value.map(x=>typeof x==="object"?JSON.stringify(x):x).join("; "):value);const lab=title(label)+":";for(let n=0;n<lines.length;n++){if(y<50)newPage();if(n===0){page.drawText(lab,{x:m+3,y,size:8.5,font:bold,color:ink});page.drawText(lines[n].slice(0,94),{x:m+130,y,size:8.5,font:reg,color:ink});}else page.drawText(lines[n].slice(0,120),{x:m+130,y,size:8.5,font:reg,color:ink});y-=12;}y-=3;};
- const walk=(obj,prefix="")=>{if(obj===null||obj===undefined||obj==="")return;if(Array.isArray(obj)){if(!obj.length)return;obj.forEach((v,i)=>{if(v&&typeof v==="object")walk(v,(prefix?prefix+" ":"")+"Entry "+(i+1));else field((prefix||"Item")+" "+(i+1),v)});return;}if(typeof obj==="object"){Object.entries(obj).forEach(([k,v])=>{if(k==="sameAsOwner"&&v===false)return;walk(v,(prefix?prefix+" ":"")+title(k));});return;}field(prefix||"Value",obj===true?"Yes":obj===false?"No":obj);};
+ const has=v=>v!==undefined&&v!==null&&clean(v)!==""&&clean(v)!=="—";
+ const first=(...xs)=>xs.find(has);
+ const labelOf=k=>clean(k).replace(/([a-z])([A-Z])/g,"$1 $2").replace(/[_-]+/g," ").replace(/\b\w/g,c=>c.toUpperCase());
+ const human=v=>{
+   if(v===undefined||v===null||v==="")return "";
+   if(typeof v==="boolean")return v?"Yes":"No";
+   if(Array.isArray(v))return v.map(human).filter(Boolean).join(", ");
+   if(typeof v==="object")return "";
+   return clean(v).replace(/\|\|/g," / ").replace(/_/g," ").replace(/\s*\/\s*/g," / ");
+ };
+ const prettyType=v=>human(v).replace(/\b[a-z]+(?: [a-z]+)*\b/gi,word=>word.split(" ").map(w=>w.length<=3&&w===w.toUpperCase()?w:w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(" "));
+ const wrap=(v,font,size,maxWidth)=>{
+   const words=String(v??"").split(/\s+/).filter(Boolean),out=[];let row="";
+   for(const word of words){const next=row?row+" "+word:word;if(row&&font.widthOfTextAtSize(next,size)>maxWidth){out.push(row);row=word}else row=next}
+   if(row)out.push(row);return out.length?out:[""];
+ };
+ const newPage=()=>{
+   page=pdf.addPage([W,H]);pageNo++;
+   page.drawRectangle({x:0,y:H-8,width:W,height:8,color:red});
+   page.drawImage(logo,{x:m,y:H-57+(42-logoDims.height)/2,width:logoDims.width,height:logoDims.height});
+   page.drawText("JASPER FIRE DEPARTMENT",{x:m+60,y:H-27,size:15,font:bold,color:ink});
+   page.drawText("10 18th Street East · Jasper, Alabama 35501 · 205-221-8509",{x:m+60,y:H-41,size:7.5,font:reg,color:muted});
+   page.drawText("INCIDENT REPORT",{x:m+60,y:H-56,size:10,font:bold,color:red});
+   page.drawLine({start:{x:m,y:H-70},end:{x:W-m,y:H-70},thickness:1,color:red});
+   y=H-91;
+ };
+ const ensure=need=>{if(y-need<bottom)newPage()};
+ const section=name=>{
+   ensure(32);
+   page.drawRectangle({x:m,y:y-19,width:usable,height:21,color:light});
+   page.drawText(String(name).toUpperCase(),{x:m+8,y:y-13,size:8.2,font:bold,color:ink});
+   y-=27;
+ };
+ const field=(label,value,opts={})=>{
+   const text=opts.raw?clean(value):human(value);
+   if(!has(text))return;
+   const labelW=opts.labelW||142,fs=opts.size||8.2,lh=opts.lineHeight||10.5;
+   const lines=wrap(text,reg,fs,usable-labelW-12),h=Math.max(18,lines.length*lh+6);
+   ensure(h+2);
+   page.drawText(String(label),{x:m+6,y:y-11,size:7.3,font:bold,color:muted});
+   lines.forEach((ln,i)=>page.drawText(ln,{x:m+labelW,y:y-11-i*lh,size:fs,font:reg,color:ink}));
+   page.drawLine({start:{x:m,y:y-h},end:{x:m+usable,y:y-h},thickness:.35,color:line});
+   y-=h;
+ };
+ const two=(a,b)=>{
+   const gap=10,col=(usable-gap)/2,labelW=82,fs=7.8,lh=10;
+   const make=(x,item)=>{const value=human(item[1]);if(!has(value))return null;const lines=wrap(value,reg,fs,col-labelW-10);return{x,label:item[0],lines,h:Math.max(20,lines.length*lh+7)}};
+   const A=make(m,a),B=make(m+col+gap,b);if(!A&&!B)return;
+   const h=Math.max(A?.h||0,B?.h||0);ensure(h+2);
+   for(const q of [A,B])if(q){page.drawRectangle({x:q.x,y:y-h,width:col,height:h,borderWidth:.35,borderColor:line});page.drawText(q.label,{x:q.x+6,y:y-12,size:6.8,font:bold,color:muted});q.lines.forEach((ln,i)=>page.drawText(ln,{x:q.x+labelW,y:y-12-i*lh,size:fs,font:reg,color:ink}));}
+   y-=h+4;
+ };
+ const table=(headers,rows,widths)=>{
+   rows=rows.filter(row=>row.some(has));if(!rows.length)return;
+   const xs=[m];for(let i=0;i<widths.length;i++)xs.push(xs[i]+widths[i]);
+   const drawHeader=()=>{page.drawRectangle({x:m,y:y-21,width:usable,height:21,color:ink});headers.forEach((h,i)=>page.drawText(h,{x:xs[i]+4,y:y-13,size:6.6,font:bold,color:white}));y-=21};
+   ensure(30);drawHeader();
+   for(const row of rows){
+     const lines=row.map((v,i)=>wrap(human(v),reg,7,widths[i]-8));
+     const count=Math.max(1,...lines.map(x=>x.length)),rh=Math.max(20,count*8.7+7);
+     ensure(rh+22);if(y===H-91)drawHeader();
+     page.drawRectangle({x:m,y:y-rh,width:usable,height:rh,borderWidth:.35,borderColor:line});
+     lines.forEach((arr,i)=>arr.forEach((txt,j)=>page.drawText(txt,{x:xs[i]+4,y:y-11-j*8.7,size:7,font:reg,color:ink})));
+     y-=rh;
+   }
+   y-=5;
+ };
+ const personName=p=>{
+   if(typeof p==="string")return p;
+   if(!p||typeof p!=="object")return "";
+   return first(p.name,p.full_name,[p.first_name,p.last_name].filter(Boolean).join(" "),p.personnel_name,p.display_name,p.label)||"";
+ };
+ const asEntries=v=>Array.isArray(v)?v.filter(x=>x&&typeof x==="object"): [];
+ const countSummary=(items,singular)=>items.length?items.length+" "+(items.length===1?singular:singular+"s"):"";
  newPage();
- const inc=d.incident||{};section("Incident Information");field("CAD / Incident Number",inc.cad||incident.cad);field("Incident Date",inc.date);field("Shift",inc.shift);field("Call Type",inc.callType);field("Primary Incident Type",inc.primaryIncidentType);field("Secondary Incident Types",inc.secondaryIncidentTypes);field("Location",inc.location||incident.location);field("Location Type",inc.locationType);
- const groups=[["Location / Property Details",d.locationDetails],["Times",d.times],["Response / Apparatus / Mutual Aid",d.response],["People",d.people],["Patients",d.patients],["Vehicles",d.vehicles],["Casualties",d.casualties],["Exposures",d.exposures],["Hazards / Hazmat",d.hazards],["Mitigation / Protective Actions",d.mitigationProtectiveActions],["Hazmat Exposure Consequences",d.hazmatExposureConsequences],["Rescues / Evacuations",d.rescues],["Actions / Tactics",d.actions]];
- for(const [name,value] of groups){if(value&&((Array.isArray(value)&&value.length)||(typeof value==="object"&&!Array.isArray(value)&&Object.values(value).some(v=>v!==""&&v!==null&&v!==undefined))||typeof value!=="object")){section(name);walk(value);}}
- if(d.narrative){section("Narrative");wrap(d.narrative,110).forEach(line=>{if(y<50)newPage();page.drawText(line.slice(0,120),{x:m+3,y,size:9,font:reg,color:ink});y-=13;});}
- for(const p of pdf.getPages()){p.drawLine({start:{x:m,y:32},end:{x:W-m,y:32},thickness:.5,color:rgb(.78,.82,.87)});p.drawText("Jasper Fire Department · Official Incident Record",{x:m,y:19,size:7,font:reg,color:muted});p.drawText("Page "+(pdf.getPages().indexOf(p)+1),{x:W-m-35,y:19,size:7,font:reg,color:muted});}
+ const inc=d.incident||{};
+ section("Incident Information");
+ two(["CAD / Incident Number",first(inc.cad,incident.cad)],["Incident Date",first(inc.date,incident.incident_date)]);
+ two(["Shift",inc.shift],["Call Type",inc.callType]);
+ field("Primary Incident Type",prettyType(inc.primaryIncidentType));
+ if(Array.isArray(inc.secondaryIncidentTypes)&&inc.secondaryIncidentTypes.length)field("Secondary Incident Types",inc.secondaryIncidentTypes.map(prettyType).join("; "));
+ field("Incident Location",first(inc.location,incident.location));
+ two(["Location Type",inc.locationType],["Report Status",first(d.status,report.status)]);
+ const times=d.times||{};
+ if(Object.values(times).some(has)){
+   section("Dispatch & Incident Times");
+   two(["Dispatch",times.dispatch],["En Route",times.enRoute]);
+   two(["On Scene",times.onScene],["In Service",times.inService]);
+   if(has(times.cancelled))field("Cancelled",times.cancelled);
+ }
+ const response=d.response||{},units=Array.isArray(response.apparatus)?response.apparatus:[];
+ if(units.length){
+   section("Responding Apparatus");
+   table(["UNIT","STATION","DRIVER","OFFICER"],units.map(u=>[
+     first(u.name,u.unit_number,u.unit),first(u.station_name,u.station),personName(u.driver)||u.driver,personName(u.officer)||u.officer
+   ]),[128,100,125,133]);
+   const unitTimes=units.filter(u=>[u.dispatch,u.enroute,u.onscene,u.service,u.cancelled].some(has));
+   if(unitTimes.length){
+     table(["UNIT","DISPATCH","EN ROUTE","ON SCENE","IN SERVICE / CANCELLED"],unitTimes.map(u=>[
+       first(u.name,u.unit_number,u.unit),u.dispatch,u.enroute,u.onscene,first(u.service,u.cancelled)
+     ]),[100,85,85,85,131]);
+   }
+ }
+ const otherPersonnel=Array.isArray(response.otherPersonnel)?response.otherPersonnel:[];
+ if(otherPersonnel.length){
+   section("Additional Personnel");
+   const names=otherPersonnel.map(personName).filter(Boolean);
+   if(names.length)field("Personnel",names.join(", "));
+ }
+ const aid=response.mutualAid;
+ const aidRows=[];
+ if(Array.isArray(aid))aidRows.push(...aid);
+ else if(aid&&typeof aid==="object"){
+   for(const [kind,list] of Object.entries(aid))if(Array.isArray(list))list.forEach(a=>aidRows.push({...a,_direction:a.direction||kind}));
+ }
+ if(aidRows.length){
+   section("Mutual Aid / Other Agencies");
+   table(["DIRECTION","AGENCY","AID TYPE","DETAILS"],aidRows.map(a=>[
+     first(a.direction,a._direction),first(a.agency,a.name,a.department,a.organization),first(a.typeLabel,a.type,a.aidType),first(a.details,a.description,a.notes)
+   ]),[76,145,112,153]);
+ }
+ const ld=d.locationDetails||{},owner=ld.owner||{},occupant=ld.occupant||{};
+ if(Object.values(ld).some(v=>has(v)||(v&&typeof v==="object"&&Object.values(v).some(has)))){
+   section("Property & Occupant Information");
+   two(["Primary Use",ld.primaryUse],["Secondary Use",ld.secondaryUse]);
+   two(["Location In Use",ld.locationInUse],["People Present",ld.peoplePresent]);
+   two(["Used As Intended",ld.usedAsIntended],["Vacancy",ld.vacancy]);
+   const ownerValues=[owner.name,owner.address,owner.phone,owner.insuranceCompany,owner.insurancePolicy].some(has);
+   if(ownerValues){field("Owner Name",owner.name);field("Owner Address",owner.address);two(["Owner Phone",owner.phone],["Insurance Company",owner.insuranceCompany]);field("Insurance Policy",owner.insurancePolicy);}
+   const occupantValues=[occupant.name,occupant.address,occupant.phone,occupant.insuranceCompany,occupant.insurancePolicy].some(has);
+   if(occupantValues&&!occupant.sameAsOwner){field("Occupant Name",occupant.name);field("Occupant Address",occupant.address);two(["Occupant Phone",occupant.phone],["Insurance Company",occupant.insuranceCompany]);field("Insurance Policy",occupant.insurancePolicy);}
+ }
+ const people=Array.isArray(d.people)?d.people:[],patients=Array.isArray(d.patients)?d.patients:[];
+ if(people.length){section("People Involved");table(["NAME","ROLE","PHONE","ADDRESS"],people.map(p=>[p.name,p.role,p.phone,p.address]),[115,90,105,176]);}
+ if(patients.length){
+   section("Patient Care");
+   patients.forEach((p,i)=>{
+     const name=first(p.name,"Patient "+(i+1));
+     field("Patient",name);
+     two(["Age / Date of Birth",first(p.age,p.dob)],["Sex",p.sex]);
+     field("Chief Complaint",first(p.complaintOther,p.complaint));
+     field("Injury / Medical Complaint",first(p.injuryOther,p.injury));
+     field("Care Provided",p.care);
+     two(["Blood Pressure",p.bp],["Pulse",p.pulse]);
+     two(["Respirations",p.resp],["SpO₂",p.spo2]);
+     if(Array.isArray(p.vitals)&&p.vitals.length)table(["TIME","BP","PULSE","RESPIRATIONS","SPO₂"],p.vitals.map(v=>[v.time,v.bp,v.pulse,v.resp,v.spo2]),[70,95,90,115,121]);
+     field("Patient Narrative",p.narrative);
+     if(i<patients.length-1)y-=5;
+   });
+ }
+ const vehicles=Array.isArray(d.vehicles)?d.vehicles:[];
+ if(vehicles.length){
+   section("Vehicles Involved");
+   table(["YEAR / MAKE / MODEL","LICENSE","VIN","AIRBAG","SEATBELT","EXTRICATION"],vehicles.map(v=>[
+     [v.year,v.make,v.model].filter(has).join(" "),v.license,v.vin,v.airbag,v.seatbelt,v.extrication
+   ]),[132,65,128,67,73,111]);
+   vehicles.forEach((v,i)=>{
+     const details=[["Owner",v.owner],["Insurance Company",v.insurance],["Policy Number",v.policy]].filter(x=>has(x[1]));
+     if(details.length){field("Vehicle "+(i+1)+" Ownership / Insurance","");details.forEach(([k,val])=>field(k,val));}
+   });
+ }
+ const casualties=Array.isArray(d.casualties)?d.casualties:[];
+ if(casualties.length){
+   section("Casualties / Rescues");
+   table(["PERSON TYPE","OUTCOME","ASSOCIATED PATIENT","DESCRIPTION"],casualties.map(c=>[
+     first(c.personTypeLabel,c.personType),first(c.outcomeLabel,c.outcome),c.patient,c.description
+   ]),[100,100,115,150]);
+ }
+ const exposures=Array.isArray(d.exposures)?d.exposures:[];
+ if(exposures.length){
+   section("Exposures");
+   table(["TYPE","ITEM","DAMAGE","LOCATION","PEOPLE DISPLACED"],exposures.map(e=>[
+     first(e.typeLabel,e.type),first(e.itemLabel,e.item),e.damage,e.location,e.displaced
+   ]),[90,90,130,125,130]);
+ }
+ const hazards=Array.isArray(d.hazards)?d.hazards:[];
+ if(hazards.length){
+   section("Hazards / Hazardous Materials");
+   table(["HAZARD / TYPE","MATERIAL","UN / ID","CLASS","AMOUNT","RELEASED"],hazards.map(h=>[
+     first(h.typeLabel,h.type),h.material,h.un,h.class,h.amount,h.released
+   ]),[112,105,65,70,70,143]);
+ }
+ const protective=Array.isArray(d.mitigationProtectiveActions)?d.mitigationProtectiveActions:[];
+ if(protective.length){
+   section("Mitigation / Protective Actions");
+   protective.forEach((a,i)=>{field("Action "+(i+1),first(a.tacticLabel,a.tactic));field("Details",a.details);});
+ }
+ const consequences=Array.isArray(d.hazmatExposureConsequences)?d.hazmatExposureConsequences:[];
+ if(consequences.length){
+   section("Hazmat Exposure Consequences");
+   consequences.forEach((a,i)=>{field("Exposure "+(i+1),first(a.typeLabel,a.type));two(["Exposed Item",a.itemLabel||a.item],["People Affected",a.peopleAffected]);field("Damage / Consequence",first(a.damage,a.consequence));field("Exposure Location",a.location);});
+ }
+ const rescues=Array.isArray(d.rescues)?d.rescues:[];
+ if(rescues.length){
+   section("Rescue / Evacuation");
+   rescues.forEach((r,i)=>{field("Rescue / Evacuation "+(i+1),first(r.typeLabel,r.type));two(["Persons Rescued",r.rescued],["Persons Removed From Danger",r.removed]);two(["Persons Evacuated",r.evacuated],["Persons Sheltered in Place",r.sheltered]);field("Details",r.details);});
+ }
+ const actions=Array.isArray(d.actions)?d.actions:[];
+ if(actions.length){section("Actions / Tactics");field("Actions Taken",actions.map(prettyType).join(", "));}
+ if(has(d.narrative)){
+   section("Incident Narrative");
+   const lines=wrap(d.narrative,reg,9,usable-14),lh=13;
+   for(const ln of lines){ensure(lh+2);page.drawText(ln,{x:m+7,y:y-10,size:9,font:reg,color:ink});y-=lh;}
+ }
+ const completedBy=first(d.completedBy,d.reportCompletedBy,report.completed_by,report.report_by,incident.completed_by);
+ if(has(completedBy)){section("Report Completion");field("Report Completed By",completedBy);}
+ for(const p of pdf.getPages()){
+   p.drawLine({start:{x:m,y:34},end:{x:W-m,y:34},thickness:.5,color:line});
+   p.drawText("Jasper Fire Department · Official Incident Record",{x:m,y:21,size:7,font:reg,color:muted});
+   p.drawText("Page "+(pdf.getPages().indexOf(p)+1),{x:W-m-35,y:21,size:7,font:reg,color:muted});
+ }
  return pdf.save({objectsPerTick:Infinity});
 }
-
 export async function makePdf(incident={},reports=[]){
  const sandboxReport=(reports||[]).find(r=>r?.data?.sandboxRecord);
  if(sandboxReport)return makeSandboxIncidentPdf(incident,sandboxReport);
