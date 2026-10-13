@@ -336,7 +336,18 @@ async function makeSandboxIncidentPdf(incident={},report={}){
 }
 export async function makePdf(incident={},reports=[]){
  const sandboxReport=(reports||[]).find(r=>r?.data?.sandboxRecord);
- if(sandboxReport)return makeSandboxIncidentPdf(incident,sandboxReport);
+ if(sandboxReport){
+    const baseBytes=await makeSandboxIncidentPdf(incident,sandboxReport);
+    const pcrReports=(reports||[]).filter(r=>String(r?.report_type||"").startsWith("pcr_"));
+    if(!pcrReports.length)return baseBytes;
+    const pcrBytes=await makePdf(incident,pcrReports);
+    const basePdf=await PDFDocument.load(baseBytes),pcrPdf=await PDFDocument.load(pcrBytes);
+    const pcrPageIndices=pcrPdf.getPageIndices().slice(2);
+    if(!pcrPageIndices.length)return baseBytes;
+    const pages=await basePdf.copyPages(pcrPdf,pcrPageIndices);
+    pages.forEach(p=>basePdf.addPage(p));
+    return basePdf.save({objectsPerTick:Infinity});
+  }
  const startedAt=Date.now();
  const mva=mvaReportData(incident,reports);
  if(mva.isMva&&!(reports||[]).some(r=>r?.data?.rUnifiedIncidentReport))return makeMvaPdf(incident,reports);
