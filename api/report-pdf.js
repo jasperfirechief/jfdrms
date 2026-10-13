@@ -2,6 +2,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { JFD_LOGO_JPG } from "./jfd-logo-data.js";
 
 
+async function embedJfdLogoSafely(pdf){try{const bytes=Buffer.from(String(JFD_LOGO_JPG||"").replace(/^data:image\/jpeg;base64,/i,"").replace(/\s+/g,""),"base64");if(bytes.length>4&&bytes[0]===255&&bytes[1]===216)return await pdf.embedJpg(bytes);}catch(e){console.warn("JFD logo JPEG could not be embedded:",e?.message||e)}return null;}
 const SUPABASE_URL="https://audgtwcctdoiptuekqvn.supabase.co";
 const SUPABASE_KEY="sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz";
 async function requireAdmin(req){
@@ -57,8 +58,8 @@ async function makeMvaPdf(incident={},reports=[]){
  const reg=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
  const W=612,H=792,m=40,usable=W-2*m,bottom=50,F={reg,bold};
  const NAVY=rgb(.08,.14,.22),RED=rgb(.62,.04,.04),SLATE=rgb(.34,.39,.45),LIGHT=rgb(.94,.96,.98),MID=rgb(.78,.82,.87),WHITE=rgb(1,1,1);
- const logo=await pdf.embedJpg(Buffer.from(JFD_LOGO_JPG,"base64"));
- const logoDims=logo.scaleToFit(64,48);
+ const logo=await embedJfdLogoSafely(pdf);
+ const logoDims=logo?logo.scaleToFit(64,48):{width:0,height:0};
  let page,y,pageNo=0,currentTitle=d?.rUnifiedIncidentReport?"INCIDENT REPORT":"MOTOR VEHICLE ACCIDENT REPORT";
  const clean=v=>String(v??"").replace(/\\s+/g," ").trim();
  const has=v=>v!==undefined&&v!==null&&clean(v)!==""&&clean(v)!=="—";
@@ -74,7 +75,7 @@ async function makeMvaPdf(incident={},reports=[]){
  const timeText=v=>{if(!has(v))return "—";const s=clean(v),m=s.match(/T(\\d{2}):(\\d{2})/);return m?m[1]+":"+m[2]:s};
  const wrap=(v,font,size,max)=>{const words=String(v??"").split(/\\s+/).filter(Boolean),out=[];let line="";for(const w of words){const n=line?line+" "+w:w;if(line&&font.widthOfTextAtSize(n,size)>max){out.push(line);line=w}else line=n}if(line)out.push(line);return out.length?out:["—"]};
  const footer=()=>{page.drawLine({start:{x:m,y:35},end:{x:W-m,y:35},thickness:.6,color:MID});page.drawText("JFD RMS • Jasper Fire Department",{x:m,y:23,font:reg,size:7,color:SLATE});page.drawText("Page "+pageNo,{x:W-m-42,y:23,font:reg,size:7,color:SLATE});};
- const newPage=()=>{page=pdf.addPage([W,H]);pageNo++;page.drawRectangle({x:0,y:H-70,width:W,height:70,color:WHITE});page.drawImage(logo,{x:m,y:H-60+(48-logoDims.height)/2,width:logoDims.width,height:logoDims.height});page.drawText("JASPER FIRE DEPARTMENT",{x:m+78,y:H-27,font:bold,size:15,color:NAVY});page.drawText("10 18th Street East · Jasper, Alabama 35501 · 205-221-8509",{x:m+78,y:H-41,font:reg,size:7.5,color:SLATE});page.drawText(currentTitle,{x:m+78,y:H-56,font:bold,size:10,color:RED});page.drawLine({start:{x:m,y:H-70},end:{x:W-m,y:H-70},thickness:1,color:MID});y=H-92;};
+ const newPage=()=>{page=pdf.addPage([W,H]);pageNo++;page.drawRectangle({x:0,y:H-70,width:W,height:70,color:WHITE});if(logo)page.drawImage(logo,{x:m,y:H-60+(48-logoDims.height)/2,width:logoDims.width,height:logoDims.height});page.drawText("JASPER FIRE DEPARTMENT",{x:m+78,y:H-27,font:bold,size:15,color:NAVY});page.drawText("10 18th Street East · Jasper, Alabama 35501 · 205-221-8509",{x:m+78,y:H-41,font:reg,size:7.5,color:SLATE});page.drawText(currentTitle,{x:m+78,y:H-56,font:bold,size:10,color:RED});page.drawLine({start:{x:m,y:H-70},end:{x:W-m,y:H-70},thickness:1,color:MID});y=H-92;};
  const ensure=n=>{if(y-n<bottom){footer();newPage();}};
  const section=title=>{ensure(32);page.drawRectangle({x:m,y:y-20,width:usable,height:22,color:LIGHT,borderWidth:.5,borderColor:MID});page.drawText(title.toUpperCase(),{x:m+9,y:y-14,font:bold,size:8.5,color:NAVY});y-=30;};
  const field=(label,value)=>{const lines=wrap(pretty(value),reg,8.2,usable-166),h=Math.max(20,lines.length*11+7);ensure(h+2);page.drawText(label,{x:m+7,y:y-12,font:bold,size:7.4,color:SLATE});lines.forEach((ln,i)=>page.drawText(ln,{x:m+160,y:y-12-i*11,font:reg,size:8.2,color:NAVY}));page.drawLine({start:{x:m,y:y-h},end:{x:m+usable,y:y-h},thickness:.35,color:MID});y-=h;};
@@ -117,7 +118,7 @@ async function makeSandboxIncidentPdf(incident={},report={}){
  const reg=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
  const W=612,H=792,m=42,usable=W-2*m,bottom=54;
  const ink=rgb(.10,.15,.22),red=rgb(.58,.05,.08),muted=rgb(.38,.42,.48),light=rgb(.94,.96,.98),line=rgb(.82,.85,.89),white=rgb(1,1,1);
- const logo=await pdf.embedJpg(Buffer.from(JFD_LOGO_JPG,"base64")),logoDims=logo.scaleToFit(48,42);
+ const logo=await embedJfdLogoSafely(pdf),logoDims=logo?logo.scaleToFit(48,42):{width:0,height:0};
  let page,y,pageNo=0;
  const clean=v=>String(v??"").replace(/\s+/g," ").trim();
  const has=v=>v!==undefined&&v!==null&&clean(v)!==""&&clean(v)!=="—";
@@ -139,7 +140,7 @@ async function makeSandboxIncidentPdf(incident={},report={}){
  const newPage=()=>{
    page=pdf.addPage([W,H]);pageNo++;
    page.drawRectangle({x:0,y:H-8,width:W,height:8,color:red});
-   page.drawImage(logo,{x:m,y:H-57+(42-logoDims.height)/2,width:logoDims.width,height:logoDims.height});
+   if(logo)page.drawImage(logo,{x:m,y:H-57+(42-logoDims.height)/2,width:logoDims.width,height:logoDims.height});
    page.drawText("JASPER FIRE DEPARTMENT",{x:m+60,y:H-27,size:15,font:bold,color:ink});
    page.drawText("10 18th Street East · Jasper, Alabama 35501 · 205-221-8509",{x:m+60,y:H-41,size:7.5,font:reg,color:muted});
    page.drawText("INCIDENT REPORT",{x:m+60,y:H-56,size:10,font:bold,color:red});
@@ -362,11 +363,11 @@ let page,y,pageNo=0;
    for(const word of words){const next=line?line+" "+word:word;if(font.widthOfTextAtSize(next,size)>maxWidth&&line){lines.push(line);line=word}else line=next}
    if(line)lines.push(line);return lines.length?lines:["—"];
  };
- const logo=await pdf.embedJpg(Buffer.from(JFD_LOGO_JPG,"base64"));
- const logoDims=logo.scaleToFit(58,50);
+ const logo=await embedJfdLogoSafely(pdf);
+ const logoDims=logo?logo.scaleToFit(58,50):{width:0,height:0};
  const drawHeader=title=>{
    page.drawRectangle({x:0,y:H-70,width:W,height:70,color:WHITE});
-   page.drawImage(logo,{x:m,y:H-61+((50-logoDims.height)/2),width:logoDims.width,height:logoDims.height});
+   if(logo)page.drawImage(logo,{x:m,y:H-61+((50-logoDims.height)/2),width:logoDims.width,height:logoDims.height});
    page.drawText("JASPER FIRE DEPARTMENT",{x:m+72,y:H-27,font:F.bold,size:15,color:NAVY});
    page.drawText("10 18th Street East · Jasper, Alabama 35501 · 205-221-8509",{x:m+72,y:H-41,font:F.reg,size:7.5,color:SLATE});
    page.drawText(title,{x:m+72,y:H-56,font:F.bold,size:10,color:RED});
