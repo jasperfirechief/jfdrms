@@ -439,7 +439,7 @@ let page,y,pageNo=0;
  const fire=(reports||[]).filter(r=>String(r?.report_type||"").startsWith("fire_"));
  const pcr=(reports||[]).filter(r=>String(r?.report_type||"").startsWith("pcr_"));
  const fd=fire[0]?.data||{};
- const patients=(reports||[]).flatMap(r=>{const d=r?.data||{};if(Array.isArray(d.patients)&&d.patients.length)return d.patients;return String(r?.report_type||\"\").startsWith(\"pcr_\")?[d]:[];});
+ const patients=(reports||[]).flatMap(r=>{const d=r?.data||{};if(Array.isArray(d.patients)&&d.patients.length)return d.patients;return String(r?.report_type||"").startsWith("pcr_")?[d]:[];});
  const unitMap=new Map();
   for(const r of (reports||[])){
     const arr=Array.isArray(r?.data?.responding_apparatus)?r.data.responding_apparatus:[];
