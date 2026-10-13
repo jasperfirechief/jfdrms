@@ -1993,11 +1993,13 @@ async function getIncidentReportForPdf(cad,reportId){
 async function downloadIncidentPdf(cad,reportId){
   try{
     const {incident,report}=await getIncidentReportForPdf(cad,reportId);
+    const reports=Array.isArray(incident.reports)?incident.reports.filter(r=>r&&r.report_type):[report];
+    if(!reports.length)throw new Error("No saved reports are available for this incident.");
     const session=(await db.auth.getSession()).data?.session;if(!session)throw new Error("Authentication required.");
-    const resp=await fetch("/api/report-pdf",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({action:"download",incident,reports:[report]})});
+    const resp=await fetch("/api/report-pdf",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({action:"download_incident",incident,reports})});
     if(!resp.ok){let b={};try{b=await resp.json()}catch{}throw new Error(b.error||"PDF generation failed.");}
-    const blob=await resp.blob(),url=URL.createObjectURL(blob),a=document.createElement("a"),kind=String(report.report_type||"").startsWith("pcr_")?"Patient Care Report":"Fire Incident Report";
-    a.href=url;a.download=String(cad||"incident")+" - "+kind+".pdf";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);return {ok:true};
+    const blob=await resp.blob(),url=URL.createObjectURL(blob),a=document.createElement("a");
+    a.href=url;a.download=String(cad||"incident")+" - JFD Incident Package.pdf";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);return {ok:true};
   }catch(e){console.error("downloadIncidentPdf failed:",e);alert("Unable to download PDF: "+(e?.message||String(e)));return {ok:false,error:e?.message||String(e)}}
 }
 async function emailIncidentPdf(cad,reportId){
@@ -2012,8 +2014,10 @@ async function emailIncidentPdf(cad,reportId){
 async function generateIncidentPdf(cad,reportId){
   try{
     const {incident,report}=await getIncidentReportForPdf(cad,reportId);
+    const reports=Array.isArray(incident.reports)?incident.reports.filter(r=>r&&r.report_type):[report];
+    if(!reports.length)throw new Error("No saved reports are available for this incident.");
     const session=(await db.auth.getSession()).data?.session;if(!session)throw new Error("Authentication required.");
-    const resp=await fetch("/api/report-pdf",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({action:"download",incident,reports:[report]})});
+    const resp=await fetch("/api/report-pdf",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({action:"download_incident",incident,reports})});
     if(!resp.ok){let b={};try{b=await resp.json()}catch{}throw new Error(b.error||"PDF generation failed.");}
     const blob=await resp.blob(),url=URL.createObjectURL(blob);window.open(url,"_blank","noopener");setTimeout(()=>URL.revokeObjectURL(url),60000);return {ok:true};
   }catch(e){console.error("generateIncidentPdf failed:",e);alert("Unable to open PDF: "+(e?.message||String(e)));return {ok:false,error:e?.message||String(e)}}
