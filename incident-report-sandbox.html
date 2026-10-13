@@ -221,4 +221,44 @@ initCombos(document);
 renderMutualAid();
 renderSecondaryIncidentTypes();
 </script>
+
+<script id="jfdPermanentRmsHydration">
+window.jfdSandboxValidateRecord=function(){return validate();};
+window.addEventListener("message",function(ev){
+ if(ev.origin!==location.origin||!ev.data||ev.data.type!=="JFD_RMS_INIT")return;
+ const msg=ev.data,inc=msg.incident||{},det=msg.details||{},prior=msg.prior||null, saved=prior?.data?.sandboxRecord||null;
+ const base=saved?.incident||{};
+ const set=(id,v)=>{const e=$(id);if(e&&v!==undefined&&v!==null)e.value=String(v);};
+ const data=saved||{};
+ const incident=data.incident||{};
+ const detail=data.locationDetails||{};
+ const times=data.times||{};
+ set("cad",incident.cad||inc.cad||"");set("date",incident.date||String(inc.dispatch_time||"").slice(0,10)||new Date().toISOString().slice(0,10));
+ set("shift",incident.shift||det.shift||"");set("call",incident.callType||inc.type||"");set("type",incident.primaryIncidentType||det.primary_incident_type||"");
+ set("location",incident.location||inc.location||"");set("locationType",incident.locationType||det.location_type||"");
+ set("primaryUse",detail.primaryUse||det.primary_use||"");set("secondaryUse",detail.secondaryUse||det.secondary_use||"");set("locationInUse",detail.locationInUse||"");set("usedAsIntended",detail.usedAsIntended||"");set("vacancy",detail.vacancy||"");set("peoplePresent",detail.peoplePresent||"");
+ set("ownerName",detail.owner?.name||"");set("ownerAddress",detail.owner?.address||"");set("ownerPhone",detail.owner?.phone||"");
+ set("occupantName",detail.occupant?.name||"");set("occupantAddress",detail.occupant?.address||"");set("occupantPhone",detail.occupant?.phone||"");
+ if($("occupantSameOwner"))$("occupantSameOwner").checked=!!detail.occupant?.sameAsOwner;
+ set("dispatch",times.dispatch||inc.dispatch_time||"");set("enroute",times.enRoute||"");set("onscene",times.onScene||"");set("service",times.inService||"");set("cancelled",times.cancelled||"");set("narrative",data.narrative||"");
+ const replace=(target,src)=>{target.splice(0,target.length,...(Array.isArray(src)?src:[]));};
+ replace(secondaryIncidentTypes,data.incident?.secondaryIncidentTypes||[]);
+ replace(apparatus,data.response?.apparatus||[]);
+ replace(vehicles,data.vehicles||[]);
+ replace(patients,data.patients||[]);
+ replace(people,data.people||[]);
+ replace(casualties,data.casualties||[]);
+ replace(exposures,data.exposures||[]);
+ replace(hazmats,data.hazards||[]);
+ replace(mitigationEntries,data.mitigationProtectiveActions||[]);
+ replace(hazmatConsequenceEntries,data.hazmatExposureConsequences||[]);
+ replace(rescueEntries,data.rescues||[]);
+ replace(mutualAid.fd,data.response?.mutualAid?.fd||[]);
+ replace(mutualAid.nonfd,data.response?.mutualAid?.nonfd||[]);
+ ["mva","fire","hazmat"].forEach(k=>$(k)?.classList.toggle("show",!!data.conditional?.[k]));
+ renderSecondaryIncidentTypes();renderApparatus();renderVehicles();renderPeople();renderMutualAid();renderHazmat();renderMitigationEntries();renderHazmatConsequences();renderCasualties();renderExposures();renderRescues();renderOffDuty();update();
+ if($("saveStatus"))$("saveStatus").textContent=prior?"Loaded saved RMS draft":"Incident details loaded from JFD RMS";
+});
+</script>
+
 </body></html>
