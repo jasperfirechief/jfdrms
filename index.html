@@ -2544,7 +2544,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     data.incident_types=[data.rPrimaryIncidentType,...[...document.querySelectorAll("[id^='rIncidentType_']")].map(x=>x.value).filter(Boolean)];
     data.action_taken=$("rActionTaken")?.checked===true;data.no_action_taken=$("rNoActionTaken")?.checked===true;
     data.actions_taken=[...document.querySelectorAll("input[name='rActionsTaken']:checked")].map(x=>x.value);
-    data.exposures=window.jfdRepeats?.exposures||[];data.casualties=window.jfdRepeats?.casualties||[];data.vehicles=window.jfdRepeats?.vehicles||[];data.hazards=window.jfdRepeats?.hazards||[];data.rescues=window.jfdRepeats?.rescues||[];data.rescues=window.jfdRepeats?.rescues||[];
+    data.exposures=window.jfdRepeats?.exposures||[];data.casualties=window.jfdRepeats?.casualties||[];data.vehicles=window.jfdRepeats?.vehicles||[];data.hazards=window.jfdRepeats?.hazards||[];data.rescues=window.jfdRepeats?.rescues||[];
     data.aid_records=[...(window.jfdAids?.fd||[])];data.nonfd_aid_records=[...(window.jfdAids?.nonfd||[])];
     data.jasper_validation_version="2026-09-30-neris-minimum";
     return data;
