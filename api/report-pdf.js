@@ -252,7 +252,7 @@ let page,y,pageNo=0;
    fd.rActionTaken,fd.action_taken,fd.rNoActionTaken,fd.no_action_taken,fd.rActionsTaken,fd.actions_taken
  ].some(hasVal);
  const hasFindings=[fd.rCause,fd.cause,fd.rDamageType,fd.damage_type,fd.rDamageEstimate,fd.damage_estimate,fd.rFloor,fd.floor_of_origin,fd.rRoom,fd.room_type].some(hasVal);
- const hasExposure=[fd.exposures,fd.casualties,fd.hazards,fd.rHazmat].some(hasVal);
+ const hasExposure=[fd.exposures,fd.casualties,fd.hazards,fd.rescues,fd.rHazmat].some(hasVal);
  const hasInsurance=[fd.rInsuranceCompany,fd.rOwnerInsurance,fd.rOccInsurance,fd.insurance_company,fd.rInsurancePhone,fd.insurance_phone,fd.rInsurancePolicy,fd.insurance_policy,fd.rDamageType,fd.damage_type,fd.rDamageEstimate,fd.damage_estimate].some(hasVal);
 
  currentTitle=fd.rUnifiedIncidentReport?"INCIDENT REPORT":isMva?"MOTOR VEHICLE ACCIDENT REPORT":"FIRE INCIDENT REPORT";newPage(currentTitle);
@@ -324,7 +324,8 @@ let page,y,pageNo=0;
  if(hasExposure){
    section("Exposures / Casualties / Hazards");
    if(hasVal(fd.exposures))field("Exposures",fd.exposures);
-   if(hasVal(fd.casualties))field("Casualties / Rescues",fd.casualties);
+   if(hasVal(fd.casualties))field("Casualties",fd.casualties);
+   if(hasVal(fd.rescues))field("Rescues / Evacuations",fd.rescues);
    if(hasVal(fd.hazards)||hasVal(fd.rHazmat))field("Hazards / HAZMAT",firstVal(fd.hazards,fd.rHazmat));
  }
 
@@ -345,13 +346,13 @@ let page,y,pageNo=0;
    field("Person Completing Report",firstVal(fd.rCompletedBy,fd.completedBy,fd.report_completed_by));
  }
 
- const hasPcrRecords=pcr.length>0 && patients.length>0;
+ const hasPcrRecords=patients.length>0;
  if(hasPcrRecords){
    for(let i=0;i<patients.length;i++){
      const p=patients[i]||{};
      const isRefusal=!!(p.refusedCare||p.refusedTransport||p.minorRefusal||p.refusal||p.refusalType);
      const refusalType=p.refusalType||[p.refusedCare?"Refused Care":"",p.refusedTransport?"Refused Transport":"",p.minorRefusal?"Minor Refusal":""].filter(Boolean).join(", ")||"Patient Refusal";
-     currentTitle="PATIENT CARE REPORT";newPage(currentTitle);
+     currentTitle=fd.rUnifiedIncidentReport?"INCIDENT REPORT":"PATIENT CARE REPORT";newPage(currentTitle);
      section("Patient Care / Disposition Summary");
      twoCol(["Incident / CAD",firstVal(incident.cad,fd.rCad)],["Incident Date",dateText(firstVal(fd.rDate,incident.dispatch_time))]);
      field("Incident Location",firstVal(fd.rLocation,incident.location));
