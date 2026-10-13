@@ -215,12 +215,12 @@ async function makeSandboxIncidentPdf(incident={},report={}){
    section("Responding Apparatus");
    table(["UNIT","STATION","DRIVER","OFFICER"],units.map(u=>[
      first(u.name,u.unit_number,u.unit),first(u.station_name,u.station),personName(u.driver)||u.driver,personName(u.officer)||u.officer
-   ]),[128,100,125,133]);
+   ]),[128,100,125,175]);
    const unitTimes=units.filter(u=>[u.dispatch,u.enroute,u.onscene,u.service,u.cancelled].some(has));
    if(unitTimes.length){
      table(["UNIT","DISPATCH","EN ROUTE","ON SCENE","IN SERVICE / CANCELLED"],unitTimes.map(u=>[
        first(u.name,u.unit_number,u.unit),u.dispatch,u.enroute,u.onscene,first(u.service,u.cancelled)
-     ]),[100,85,85,85,131]);
+     ]),[100,85,85,85,173]);
    }
  }
  const otherPersonnel=Array.isArray(response.otherPersonnel)?response.otherPersonnel:[];
@@ -239,7 +239,7 @@ async function makeSandboxIncidentPdf(incident={},report={}){
    section("Mutual Aid / Other Agencies");
    table(["DIRECTION","AGENCY","AID TYPE","DETAILS"],aidRows.map(a=>[
      first(a.direction,a._direction),first(a.agency,a.name,a.department,a.organization),first(a.typeLabel,a.type,a.aidType),first(a.details,a.description,a.notes)
-   ]),[76,145,112,153]);
+   ]),[76,145,112,195]);
  }
  const ld=d.locationDetails||{},owner=ld.owner||{},occupant=ld.occupant||{};
  if(Object.values(ld).some(v=>has(v)||(v&&typeof v==="object"&&Object.values(v).some(has)))){
@@ -253,7 +253,7 @@ async function makeSandboxIncidentPdf(incident={},report={}){
    if(occupantValues&&!occupant.sameAsOwner){field("Occupant Name",occupant.name);field("Occupant Address",occupant.address);two(["Occupant Phone",occupant.phone],["Insurance Company",occupant.insuranceCompany]);field("Insurance Policy",occupant.insurancePolicy);}
  }
  const people=Array.isArray(d.people)?d.people:[],patients=Array.isArray(d.patients)?d.patients:[];
- if(people.length){section("People Involved");table(["NAME","ROLE","PHONE","ADDRESS"],people.map(p=>[p.name,p.role,p.phone,p.address]),[115,90,105,176]);}
+ if(people.length){section("People Involved");table(["NAME","ROLE","PHONE","ADDRESS"],people.map(p=>[p.name,p.role,p.phone,p.address]),[115,90,105,218]);}
  if(patients.length){
    section("Patient Care");
    patients.forEach((p,i)=>{
@@ -265,7 +265,7 @@ async function makeSandboxIncidentPdf(incident={},report={}){
      field("Care Provided",p.care);
      two(["Blood Pressure",p.bp],["Pulse",p.pulse]);
      two(["Respirations",p.resp],["SpO₂",p.spo2]);
-     if(Array.isArray(p.vitals)&&p.vitals.length)table(["TIME","BP","PULSE","RESPIRATIONS","SPO₂"],p.vitals.map(v=>[v.time,v.bp,v.pulse,v.resp,v.spo2]),[70,95,90,115,121]);
+     if(Array.isArray(p.vitals)&&p.vitals.length)table(["TIME","BP","PULSE","RESPIRATIONS","SPO₂"],p.vitals.map(v=>[v.time,v.bp,v.pulse,v.resp,v.spo2]),[70,95,90,115,158]);
      field("Patient Narrative",p.narrative);
      if(i<patients.length-1)y-=5;
    });
@@ -275,7 +275,7 @@ async function makeSandboxIncidentPdf(incident={},report={}){
    section("Vehicles Involved");
    table(["YEAR / MAKE / MODEL","LICENSE","VIN","AIRBAG","SEATBELT","EXTRICATION"],vehicles.map(v=>[
      [v.year,v.make,v.model].filter(has).join(" "),v.license,v.vin,v.airbag,v.seatbelt,v.extrication
-   ]),[132,65,128,67,73,111]);
+   ]),[110,54,110,64,72,118]);
    vehicles.forEach((v,i)=>{
      const details=[["Owner",v.owner],["Insurance Company",v.insurance],["Policy Number",v.policy]].filter(x=>has(x[1]));
      if(details.length){field("Vehicle "+(i+1)+" Ownership / Insurance","");details.forEach(([k,val])=>field(k,val));}
@@ -286,21 +286,21 @@ async function makeSandboxIncidentPdf(incident={},report={}){
    section("Casualties / Rescues");
    table(["PERSON TYPE","OUTCOME","ASSOCIATED PATIENT","DESCRIPTION"],casualties.map(c=>[
      first(c.personTypeLabel,c.personType),first(c.outcomeLabel,c.outcome),c.patient,c.description
-   ]),[100,100,115,150]);
+   ]),[100,100,115,213]);
  }
  const exposures=Array.isArray(d.exposures)?d.exposures:[];
  if(exposures.length){
    section("Exposures");
    table(["TYPE","ITEM","DAMAGE","LOCATION","PEOPLE DISPLACED"],exposures.map(e=>[
      first(e.typeLabel,e.type),first(e.itemLabel,e.item),e.damage,e.location,e.displaced
-   ]),[90,90,130,125,130]);
+   ]),[70,75,115,115,153]);
  }
  const hazards=Array.isArray(d.hazards)?d.hazards:[];
  if(hazards.length){
    section("Hazards / Hazardous Materials");
    table(["HAZARD / TYPE","MATERIAL","UN / ID","CLASS","AMOUNT","RELEASED"],hazards.map(h=>[
      first(h.typeLabel,h.type),h.material,h.un,h.class,h.amount,h.released
-   ]),[112,105,65,70,70,143]);
+   ]),[100,95,60,65,65,143]);
  }
  const protective=Array.isArray(d.mitigationProtectiveActions)?d.mitigationProtectiveActions:[];
  if(protective.length){
