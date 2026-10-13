@@ -165,7 +165,7 @@ function assignCrewMember(el){const ui=Number(el.dataset.crewUnit),ci=Number(el.
 function assignCrewRole(el){const ui=Number(el.dataset.crewUnit),ci=Number(el.dataset.crewIndex),target=apparatus[ui]?.crew?.[ci];if(!target)return;target.role=el.value;syncUnitRoles(apparatus[ui]);renderApparatus();update()}
 function removeCrewMember(ui,ci){apparatus[ui]?.crew?.splice(ci,1);if(apparatus[ui])syncUnitRoles(apparatus[ui]);renderApparatus();renderOtherPersonnel();update()}
 
-function jfdParseTime24(value){const v=String(value||"").trim();if(!v)return "";let m=v.match(/(?:^|[T\s])(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?$/i);if(!m)m=v.match(/^(\d{1,2}):(\d{2})$/);if(!m){const digits=v.match(/^(\d{3,4})$/);m=digits?[v,v.length===3?v.slice(0,1):v.slice(0,2),v.slice(-2)]:null}if(!m)return v;const h=Number(m[1]),min=Number(m[2]);if(h>23||min>59)return v;return String(h).padStart(2,"0")+":"+String(min).padStart(2,"0")}
+function jfdParseTime24(value){const v=String(value||"").trim();if(!v)return "";let m=v.match(/(?:^|[T\s])(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}(?::?\d{2})?)?$/i);if(!m)m=v.match(/^(\d{1,2}):(\d{2})$/);if(!m){const digits=v.match(/^(\d{3,4})$/);m=digits?[v,v.length===3?v.slice(0,1):v.slice(0,2),v.slice(-2)]:null}if(!m)return v;const h=Number(m[1]),min=Number(m[2]);if(h>23||min>59)return v;return String(h).padStart(2,"0")+":"+String(min).padStart(2,"0")}
 function normalizeTimeField(el){if(!el)return;const normalized=jfdParseTime24(el.value);if(normalized!==el.value)el.value=normalized}
 function renderUnitCard(a,ui){
  const crew=Array.isArray(a.crew)?a.crew:[];
