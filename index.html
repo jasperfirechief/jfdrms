@@ -1394,7 +1394,7 @@ async function createIncidentReport(id){
   }
   const ur=await db.from("incident_units").select("*").eq("incident_id",incidentId).order("incident_unit_id");
   if(ur.error)return alert(ur.error.message);
-  const m=ensureReportModal();m.dataset.incidentId=String(incidentId);m.dataset.cad=String(r.cad||dr.data?.cad||"");m.dataset.standalone="";m.classList.remove("hiddenx");
+  const m=ensureReportModal();m.dataset.incidentId=String(incidentId);m.dataset.cad=String(r.cad||dr.data?.cad||"");m.dataset.standalone="";m.dataset.reportId="";m.classList.remove("hiddenx");
   renderReportChooser(r,dr.data,ur.data||[]);
 }
 async function createIncidentReportByCad(cad){
