@@ -45,18 +45,20 @@
     ids.forEach(id=>$(id)?.classList.remove("hiddenx"));
     ["rSmokePresence","rFireAlarm","rOtherAlarm","rSuppression"].forEach(id=>{const e=$(id);if(e)e.required=isStructure});
     const cooking=$("rCookingSuppression");if(cooking)cooking.required=/CONFINED_COOKING_APPLIANCE_FIRE/.test(v);
-    $("reportModalTitle").textContent=!g?"Fire Incident Report":g.key==="ems"?"Patient Care Report":g.title+" Incident Report";
+    $("reportModalTitle").textContent="Incident Report";
   };
   window.jfdOpenGeneralReport=async function(i,d,units){window.currentReportKind="general";$("reportChooser").classList.add("hiddenx");$("incidentReportForm").classList.remove("hiddenx");$("incidentReportForm").innerHTML=form(i,d,{shift:$("staffShift")?.value||""},units);bindReportForm("general");$("rCall")?.addEventListener("change",()=>window.jfdRenderTypeModules());$("rPrimaryIncidentType")?.addEventListener("change",()=>window.jfdRenderTypeModules());try{await refreshReportApparatusCrews(iDateForReport(i?.dispatch_time))}catch(e){}window.jfdRenderTypeModules();};
   window.jfdChooseExactIncidentType=function(){const v=$("jfdChooserNerisType")?.value;if(!v)return alert("Select a primary NERIS incident type first.");const m=$("reportModal"),id=m?.dataset.incidentId||"",cad=m?.dataset.cad||"";if(!id){const i={cad:"",type:"",location:"",dispatch_time:"",latitude:"",longitude:""};const d={primary_incident_type:v};jfdOpenGeneralReport(i,d,[]);$("rPrimaryIncidentType").value=v;window.jfdRenderTypeModules();return;}Promise.all([db.from("incidents").select("*").eq("cad",cad).maybeSingle(),db.from("incident_details").select("*").eq("incident_id",id).maybeSingle(),db.from("incident_units").select("*").eq("incident_id",id).order("incident_unit_id")]).then(async r=>{if(r[0].error||!r[0].data)return alert(r[0].error?.message||"Incident not found.");const d={...(r[1].data||{}),primary_incident_type:v};await jfdOpenGeneralReport(r[0].data,d,r[2].data||[]);$("rPrimaryIncidentType").value=v;window.jfdRenderTypeModules();});};
   window.jfdChooseGroup=function(key){const g=groups.find(x=>x.key===key)||groups[0];const hit=NERIS_INCIDENT_TYPES.find(x=>g.test.test(String(x.value||x)));if(hit){$("jfdChooserNerisType").value=hit.value;window.jfdChooseExactIncidentType();}else alert("Choose an exact NERIS incident type from the list.");};
   window.renderReportChooser=function(i,d,units){
+  window._jfdChooserIncident=i||{};window._jfdChooserDetails=d||{};window._jfdChooserUnits=units||[];
   setReportIncidentContext(i,d);
   $("reportModalTitle").textContent="Create Report";
-  $("reportModalSub").textContent=(i?.location||"")+(i?.cad?" · CAD "+i.cad:"")+" · Select a report type";
+  $("reportModalSub").textContent=(i?.location||"")+(i?.cad?" · CAD "+i.cad:"")+" · Complete the incident report";
   $("incidentReportForm").classList.add("hiddenx");
   $("reportChooser").classList.remove("hiddenx");
-  $("reportChooser").innerHTML='<div class="max-w-4xl mx-auto"><h3 class="text-xl font-black mb-2">Choose a report</h3><p class="text-sm text-slate-500 mb-5">Available CAD information will be pre-populated. Missing information can be entered manually.</p><div class="grid md:grid-cols-2 gap-4"><button type="button" onclick="openIncidentReportFromChooser(\'fire\')" class="border-2 border-slate-200 hover:border-red-500 rounded-2xl p-6 text-left"><div class="font-black text-lg">Fire Incident Report</div></button><button type="button" onclick="openIncidentReportFromChooser(\'pcr\')" class="border-2 border-slate-200 hover:border-blue-500 rounded-2xl p-6 text-left"><div class="font-black text-lg">Patient Care Report</div></button></div></div>';
-};
+  $("reportChooser").innerHTML='<div class="max-w-4xl mx-auto"><h3 class="text-xl font-black mb-2">Incident Report</h3><p class="text-sm text-slate-500 mb-5">Available CAD information will be pre-populated. Conditional sections appear for fire, medical, MVA, rescue, hazards, and other incidents.</p><button type="button" onclick="jfdOpenGeneralReport(window._jfdChooserIncident||{},window._jfdChooserDetails||{},window._jfdChooserUnits||[])" class="w-full border-2 border-slate-200 hover:border-red-500 rounded-2xl p-6 text-left"><div class="font-black text-lg">Open Incident Report</div><div class="text-sm text-slate-500 mt-1">One report for the incident, with the applicable sections shown as you complete it.</div></button></div>';
+  };
+  
   window.newReport=function(){if(!canOps())return alert("You must be on duty.");const m=ensureReportModal();m.dataset.incidentId="";m.dataset.cad="";m.dataset.standalone="1";m.classList.remove("hiddenx");window.renderReportChooser({},{},[]);};
 })();
