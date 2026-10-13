@@ -59,7 +59,7 @@ async function makeMvaPdf(incident={},reports=[]){
  const NAVY=rgb(.08,.14,.22),RED=rgb(.62,.04,.04),SLATE=rgb(.34,.39,.45),LIGHT=rgb(.94,.96,.98),MID=rgb(.78,.82,.87),WHITE=rgb(1,1,1);
  const logo=await pdf.embedJpg(Buffer.from(JFD_LOGO_JPG,"base64"));
  const logoDims=logo.scaleToFit(64,48);
- let page,y,pageNo=0,currentTitle="MOTOR VEHICLE ACCIDENT REPORT";
+ let page,y,pageNo=0,currentTitle=d?.rUnifiedIncidentReport?"INCIDENT REPORT":"MOTOR VEHICLE ACCIDENT REPORT";
  const clean=v=>String(v??"").replace(/\\s+/g," ").trim();
  const has=v=>v!==undefined&&v!==null&&clean(v)!==""&&clean(v)!=="—";
  const first=(...v)=>v.find(has);
@@ -113,7 +113,7 @@ async function makeMvaPdf(incident={},reports=[]){
 export async function makePdf(incident={},reports=[]){
  const startedAt=Date.now();
  const mva=mvaReportData(incident,reports);
- if(mva.isMva)return makeMvaPdf(incident,reports);
+ if(mva.isMva&&!(reports||[]).some(r=>r?.data?.rUnifiedIncidentReport))return makeMvaPdf(incident,reports);
  const pdf=await PDFDocument.create();
  const reg=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
  const W=612,H=792,m=40,usable=W-(m*2),bottom=48,headerH=92;
@@ -213,7 +213,7 @@ let page,y,pageNo=0;
  const fire=(reports||[]).filter(r=>String(r?.report_type||"").startsWith("fire_"));
  const pcr=(reports||[]).filter(r=>String(r?.report_type||"").startsWith("pcr_"));
  const fd=fire[0]?.data||{};
- const patients=pcr.flatMap(r=>Array.isArray(r?.data?.patients)?r.data.patients:[]);
+ const patients=(reports||[]).flatMap(r=>Array.isArray(r?.data?.patients)?r.data.patients:[]);
  const unitMap=new Map();
   for(const r of (reports||[])){
     const arr=Array.isArray(r?.data?.responding_apparatus)?r.data.responding_apparatus:[];
@@ -252,10 +252,10 @@ let page,y,pageNo=0;
    fd.rActionTaken,fd.action_taken,fd.rNoActionTaken,fd.no_action_taken,fd.rActionsTaken,fd.actions_taken
  ].some(hasVal);
  const hasFindings=[fd.rCause,fd.cause,fd.rDamageType,fd.damage_type,fd.rDamageEstimate,fd.damage_estimate,fd.rFloor,fd.floor_of_origin,fd.rRoom,fd.room_type].some(hasVal);
- const hasExposure=[fd.exposures,fd.casualties,fd.hazards,fd.rHazmat].some(hasVal);
+ const hasExposure=[fd.exposures,fd.casualties,fd.hazards,fd.rescues,fd.rHazmat].some(hasVal);
  const hasInsurance=[fd.rInsuranceCompany,fd.rOwnerInsurance,fd.rOccInsurance,fd.insurance_company,fd.rInsurancePhone,fd.insurance_phone,fd.rInsurancePolicy,fd.insurance_policy,fd.rDamageType,fd.damage_type,fd.rDamageEstimate,fd.damage_estimate].some(hasVal);
 
- currentTitle=isMva?"MOTOR VEHICLE ACCIDENT REPORT":"FIRE INCIDENT REPORT";newPage(currentTitle);
+ currentTitle=fd.rUnifiedIncidentReport?"INCIDENT REPORT":isMva?"MOTOR VEHICLE ACCIDENT REPORT":"FIRE INCIDENT REPORT";newPage(currentTitle);
  section("Incident Summary");
  twoCol(["Incident / CAD Number",firstVal(incident.cad,fd.rCad)],["Incident Date",dateText(firstVal(fd.rDate,incident.dispatch_time,incident.incident_date))]);
  field("Incident Location",firstVal(fd.rLocation,incident.location));
@@ -324,7 +324,8 @@ let page,y,pageNo=0;
  if(hasExposure){
    section("Exposures / Casualties / Hazards");
    if(hasVal(fd.exposures))field("Exposures",fd.exposures);
-   if(hasVal(fd.casualties))field("Casualties / Rescues",fd.casualties);
+   if(hasVal(fd.casualties))field("Casualties",fd.casualties);
+   if(hasVal(fd.rescues))field("Rescues / Evacuations",fd.rescues);
    if(hasVal(fd.hazards)||hasVal(fd.rHazmat))field("Hazards / HAZMAT",firstVal(fd.hazards,fd.rHazmat));
  }
 
@@ -345,13 +346,13 @@ let page,y,pageNo=0;
    field("Person Completing Report",firstVal(fd.rCompletedBy,fd.completedBy,fd.report_completed_by));
  }
 
- const hasPcrRecords=pcr.length>0 && patients.length>0;
+ const hasPcrRecords=patients.length>0;
  if(hasPcrRecords){
    for(let i=0;i<patients.length;i++){
      const p=patients[i]||{};
      const isRefusal=!!(p.refusedCare||p.refusedTransport||p.minorRefusal||p.refusal||p.refusalType);
      const refusalType=p.refusalType||[p.refusedCare?"Refused Care":"",p.refusedTransport?"Refused Transport":"",p.minorRefusal?"Minor Refusal":""].filter(Boolean).join(", ")||"Patient Refusal";
-     currentTitle="PATIENT CARE REPORT";newPage(currentTitle);
+     currentTitle=fd.rUnifiedIncidentReport?"INCIDENT REPORT":"PATIENT CARE REPORT";newPage(currentTitle);
      section("Patient Care / Disposition Summary");
      twoCol(["Incident / CAD",firstVal(incident.cad,fd.rCad)],["Incident Date",dateText(firstVal(fd.rDate,incident.dispatch_time))]);
      field("Incident Location",firstVal(fd.rLocation,incident.location));
@@ -467,7 +468,7 @@ async function makeArchivePdf(kind,data){
 }
 function crc32(buf){let table=crc32.table;if(!table){table=crc32.table=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?(0xedb88320^(c>>>1)):(c>>>1);table[n]=c>>>0;}}let crc=0xffffffff;for(const b of buf)crc=table[(crc^b)&255]^(crc>>>8);return(crc^0xffffffff)>>>0;}
 function zipStore(entries){const locals=[],central=[];let offset=0;for(const entry of entries){const name=Buffer.from(String(entry.name),"utf8"),data=Buffer.from(entry.data),crc=crc32(data),lh=Buffer.alloc(30);lh.writeUInt32LE(0x04034b50,0);lh.writeUInt16LE(20,4);lh.writeUInt16LE(0x800,6);lh.writeUInt32LE(crc,14);lh.writeUInt32LE(data.length,18);lh.writeUInt32LE(data.length,22);lh.writeUInt16LE(name.length,26);locals.push(lh,name,data);const ch=Buffer.alloc(46);ch.writeUInt32LE(0x02014b50,0);ch.writeUInt16LE(20,4);ch.writeUInt16LE(20,6);ch.writeUInt16LE(0x800,8);ch.writeUInt32LE(crc,16);ch.writeUInt32LE(data.length,20);ch.writeUInt32LE(data.length,24);ch.writeUInt16LE(name.length,28);ch.writeUInt32LE(offset,42);central.push(ch,name);offset+=lh.length+name.length+data.length;}const body=Buffer.concat(locals),cd=Buffer.concat(central),end=Buffer.alloc(22);end.writeUInt32LE(0x06054b50,0);end.writeUInt16LE(entries.length,8);end.writeUInt16LE(entries.length,10);end.writeUInt32LE(cd.length,12);end.writeUInt32LE(body.length,16);return Buffer.concat([body,cd,end]);}
-async function makeIncidentPdfs(incident,reports){const out=[];for(let i=0;i<reports.length;i++){const r=reports[i],pdf=await makePdf(incident,[r]),kind=String(r?.report_type||"").startsWith("pcr_")?"Patient Care Report":"Fire Incident Report";out.push({pdf,name:String(i+1).padStart(2,"0")+"_"+kind.replace(/[^A-Za-z0-9_-]+/g,"_")+".pdf"});}return out;}
+async function makeIncidentPdfs(incident,reports){const out=[];for(let i=0;i<reports.length;i++){const r=reports[i],pdf=await makePdf(incident,[r]),kind=r?.data?.rUnifiedIncidentReport?"Incident Report":String(r?.report_type||"").startsWith("pcr_")?"Patient Care Report":"Fire Incident Report";out.push({pdf,name:String(i+1).padStart(2,"0")+"_"+kind.replace(/[^A-Za-z0-9_-]+/g,"_")+".pdf"});}return out;}
 
 export default async function handler(req,res){
  if(req.method!=="POST")return res.status(405).json({ok:false,error:"Method not allowed"});
