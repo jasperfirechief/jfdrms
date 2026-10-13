@@ -1039,9 +1039,13 @@ function reportCrewLabel(crew){
   return c.map(x=>x?.name||"").filter(Boolean).join(", ")||"Crew not assigned";
 }
 function renderUnassignedCrewSelect(crew=[]){
-  const chosen=new Set((crew||[]).map(x=>Number(x?.id)).filter(Number.isFinite));
-  const opts=personnel.filter(p=>p.active!==false).sort((a,b)=>(a.last_name||"").localeCompare(b.last_name||"")).map(p=>'<option value="'+Number(p.id)+'" '+(chosen.has(Number(p.id))?'selected':'')+'>'+esc((p.first_name||"")+" "+(p.last_name||""))+'</option>').join("");
-  return '<label class="text-xs font-bold block mt-3">Crew <span class="text-slate-500 font-normal">Select personnel in response</span><select multiple size="5" data-unassigned-crew class="w-full border rounded p-2 mt-1 bg-white">'+(opts||'<option disabled>No active personnel available</option>')+'</select></label>';
+  const selected=new Map((crew||[]).map(x=>[Number(x?.id),String(x?.assignment_role||x?.role||"Firefighter")]));
+  const active=personnel.filter(p=>p.active!==false).sort((a,b)=>(a.last_name||"").localeCompare(b.last_name||""));
+  const rows=active.map(p=>{
+    const id=Number(p.id),role=selected.get(id)||"Firefighter";
+    return '<div class="flex flex-wrap items-center gap-2 border rounded-lg p-2"><label class="flex items-center gap-2 flex-1 min-w-[150px]"><input type="checkbox" data-unassigned-person value="'+id+'" '+(selected.has(id)?'checked':'')+' class="h-4 w-4"><span>'+esc((p.first_name||"")+" "+(p.last_name||""))+'</span></label><select data-unassigned-role="'+id+'" class="border rounded p-1 text-sm bg-white" aria-label="Assignment for '+esc((p.first_name||"")+" "+(p.last_name||""))+'"><option value="Firefighter" '+(role==="Firefighter"?'selected':'')+'>Firefighter</option><option value="Driver" '+(role==="Driver"?'selected':'')+'>Driver</option><option value="Officer" '+(role==="Officer"?'selected':'')+'>Officer</option><option value="Medic" '+(role==="Medic"?'selected':'')+'>Medic</option><option value="Other" '+(role==="Other"?'selected':'')+'>Other</option></select></div>';
+  }).join("");
+  return '<div class="text-xs font-bold block mt-3">Incident Crew <span class="text-slate-500 font-normal">Select personnel and assign their role</span><div data-unassigned-crew class="space-y-2 mt-2">'+(rows||'<p class="text-sm text-slate-500 font-normal">No active personnel available.</p>')+'</div></div>';
 }
 function reportResponseSection(unitRows=[]){
   const selected=new Set();
@@ -1118,35 +1122,43 @@ function updateUnassignedReportApparatusCount(){
   const label=$("reportUnassignedCount");if(label)label.textContent=count+" selected";
 }
 function bindUnassignedCrew(el){
-  const sel=el?.querySelector("[data-unassigned-crew]");if(!sel||sel.dataset.bound==="1")return;
-  sel.dataset.bound="1";
-  sel.addEventListener("change",e=>{
-    const chosenIds=[...e.target.selectedOptions].map(o=>Number(o.value));
-    const crew=chosenIds.map(id=>{const p=personnel.find(x=>Number(x.id)===id);return p?{id,name:(p.first_name||"")+" "+(p.last_name||""),role:p.role||""}:null}).filter(Boolean);
-    el.dataset.crew=JSON.stringify(crew);
-    // An on-duty member can temporarily move to this apparatus for this incident.
-    // Remove selected members from every other responding apparatus in this report,
-    // while leaving their daily staffing assignment unchanged.
+  const host=el?.querySelector("[data-unassigned-crew]");if(!host||host.dataset.bound==="1")return;
+  host.dataset.bound="1";
+  const sync=()=>{
+    const chosen=[...host.querySelectorAll("[data-unassigned-person]:checked")].map(cb=>{
+      const id=Number(cb.value),p=personnel.find(x=>Number(x.id)===id),role=host.querySelector('[data-unassigned-role="'+id+'"]')?.value||"Firefighter";
+      return p?{id,name:(p.first_name||"")+" "+(p.last_name||""),role,assignment_role:role.toLowerCase()}:null;
+    }).filter(Boolean);
+    // Allow no more than one driver and one officer on this incident apparatus.
+    for(const role of ["Driver","Officer"]){
+      const matches=chosen.filter(x=>x.role===role);
+      matches.slice(1).forEach(x=>{
+        const select=host.querySelector('[data-unassigned-role="'+Number(x.id)+'"]');
+        if(select)select.value="Firefighter";
+        x.role="Firefighter";x.assignment_role="firefighter";
+      });
+    }
+    el.dataset.crew=JSON.stringify(chosen);
     document.querySelectorAll(".report-response-unit").forEach(other=>{
       if(other===el)return;
+      const chosenIds=chosen.map(x=>Number(x.id));
       const otherCrew=JSON.parse(other.dataset.crew||"[]");
-      const original=JSON.parse(other.dataset.originalCrew||other.dataset.crew||"[]");
       const filtered=otherCrew.filter(x=>!chosenIds.includes(Number(x.id)));
       other.dataset.crew=JSON.stringify(filtered);
       const label=other.querySelector("[data-report-crew-label]");if(label)label.textContent=reportCrewLabel(filtered);
-      const otherSel=other.querySelector("[data-unassigned-crew]");
-      if(otherSel) [...otherSel.options].forEach(o=>{if(chosenIds.includes(Number(o.value)))o.selected=false});
-      if(!other.dataset.unassigned)other.dataset.crewOriginal=JSON.stringify(original);
+      other.querySelectorAll("[data-unassigned-person]").forEach(cb=>{if(chosenIds.includes(Number(cb.value)))cb.checked=false});
+      if(other.dataset.unassigned==="true"){
+        const otherHost=other.querySelector("[data-unassigned-crew]");
+        const oc=[...(otherHost?.querySelectorAll("[data-unassigned-person]:checked")||[])].map(cb=>{
+          const id=Number(cb.value),p=personnel.find(x=>Number(x.id)===id),role=otherHost.querySelector('[data-unassigned-role="'+id+'"]')?.value||"Firefighter";
+          return p?{id,name:(p.first_name||"")+" "+(p.last_name||""),role,assignment_role:role.toLowerCase()}:null;
+        }).filter(Boolean);
+        other.dataset.crew=JSON.stringify(oc);
+      }
     });
-    // A person may temporarily crew only one unassigned apparatus in this incident.
-    document.querySelectorAll(".report-response-unit[data-unassigned='true']").forEach(other=>{
-      if(other===el)return;
-      const os=other.querySelector("[data-unassigned-crew]");
-      if(os)[...os.options].forEach(o=>{if(chosenIds.includes(Number(o.value)))o.selected=false});
-      const oc=[...(os?.selectedOptions||[])].map(o=>{const p=personnel.find(x=>Number(x.id)===Number(o.value));return p?{id:Number(p.id),name:(p.first_name||"")+" "+(p.last_name||""),role:p.role||""}:null}).filter(Boolean);
-      other.dataset.crew=JSON.stringify(oc);
-    });
-  });
+  };
+  host.addEventListener("change",sync);
+  sync();
 }
 function toggleUnassignedReportApparatus(id,checked){
   const host=$("reportUnassignedCrewSelections"),responseBox=$("reportResponseUnits");if(!host||!responseBox)return;
