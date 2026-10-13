@@ -2536,7 +2536,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       try{crew=JSON.parse(row.dataset.crew||"[]")}catch{}
       return {apparatus_id:apId,unit_number:name,times,crew};
     }).filter(x=>x.unit_number);
-    data.additional_personnel=[...document.querySelectorAll("[data-report-person]:checked")].map(x=>Number(x.dataset.reportPerson));
+    data.additional_personnel=[...document.querySelectorAll("[data-report-person]:checked")].map(x=>Number(x.dataset.reportPerson));data.rOccupantSameAsOwner=$("rOccupantSameAsOwner")?.checked===true;
     // Do not enforce conditional NERIS module fields while collecting the report.
     // The RMS preserves optional/departmental information, while the NERIS review/API
     // gate enforces only the minimum fields applicable to the incident.
@@ -2560,6 +2560,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       else if(el.tagName==="SELECT"){const exists=[...el.options].some(o=>o.value===String(v));if(exists){el.value=String(v);el.dispatchEvent(new Event("change",{bubbles:true}));}}
       else if(String(v)!=="")el.value=String(v);
     });
+    if($("rOccupantSameAsOwner"))$("rOccupantSameAsOwner").checked=!!data.rOccupantSameAsOwner;
     if(data.rNerisType&&!$("rPrimaryIncidentType")?.value&&$("rPrimaryIncidentType")){$("rPrimaryIncidentType").value=String(data.rNerisType);$("rPrimaryIncidentType").dispatchEvent(new Event("change",{bubbles:true}));}
     if(data.rIncidentType&&!$("rPrimaryIncidentType")?.value&&$("rPrimaryIncidentType")){$("rPrimaryIncidentType").value=String(data.rIncidentType);$("rPrimaryIncidentType").dispatchEvent(new Event("change",{bubbles:true}));}
     if(["pcr","general"].includes(window.currentReportKind)){window.jfdRenderPatients(data.patients||[])}
@@ -2578,8 +2579,9 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     else if(new Date(data.rCallArrival)>new Date(data.rCallAnswered)||new Date(data.rCallAnswered)>new Date(data.rCallCreate))errors.push("Call times must be Call Arrival ≤ Call Answered ≤ Call Create.");
     if(!(data.responding_apparatus||[]).some(x=>x.unit_number))errors.push("At least one responding department unit is required.");
     if(!data.rNarrative)errors.push("Narrative is required.");
-    if(window.currentReportKind==="pcr"||(window.currentReportKind==="general"&&Array.isArray(data.patients)&&data.patients.length)){
-      if(window.currentReportKind==="pcr"&&!(data.patients||[]).length)errors.push("At least one patient is required for a PCR.");
+    const generalMedical=window.currentReportKind==="general"&&String(data.rPrimaryIncidentType||"").startsWith("MEDICAL|");
+    if(window.currentReportKind==="pcr"||(window.currentReportKind==="general"&&Array.isArray(data.patients)&&data.patients.length)||generalMedical){
+      if((window.currentReportKind==="pcr"||generalMedical)&&!(data.patients||[]).length)errors.push("At least one patient is required for a medical incident report.");
       (data.patients||[]).forEach((p,i)=>{
         if(!p.name)errors.push("Patient "+(i+1)+": patient name is required.");
         if(!p.chief)errors.push("Patient "+(i+1)+": chief complaint is required.");
@@ -2629,7 +2631,7 @@ async function searchAdminIncidentReports(){
       const narrative=x.d.rNarrative||x.d.narrative||"";
       const call=x.d.rCall||x.i.type||"";
       const location=x.i.location||x.d.rLocation||"Location not provided";
-      return '<div class="border rounded-xl p-4 bg-white"><div class="flex flex-wrap justify-between gap-3"><div class="min-w-0 flex-1"><div class="font-black">'+esc(x.isPcr?"Patient Care Report":"Fire Incident Report")+' <span class="font-normal text-slate-500">· '+esc(x.rep.status||"")+'</span></div><div class="grid md:grid-cols-2 gap-x-6 gap-y-1 text-sm mt-2"><div><b>CAD:</b> '+esc(x.i.cad||x.d.rCad||"Not recorded")+'</div><div><b>Call Type:</b> '+esc(call||"Not recorded")+'</div><div><b>Date:</b> '+esc(x.date||"Not recorded")+'</div><div><b>Dispatch:</b> '+esc(x.i.dispatch_time||x.d.rCallCreate||"Not recorded")+'</div><div class="md:col-span-2"><b>Location:</b> '+esc(location)+'</div><div><b>Completed By:</b> '+esc(x.d.rCompletedBy||"Not recorded")+'</div><div><b>Report ID:</b> '+esc(x.rep.report_id||"Not recorded")+'</div></div>'+ (narrative?'<div class="text-sm mt-2"><b>Narrative:</b> '+esc(narrative)+'</div>':"")+'</div><div class="flex flex-wrap gap-2"><button type="button" data-cad="'+esc(x.i.cad||"")+'" data-report-id="'+esc(x.rep.report_id||"")+'" onclick="window.openSavedReportFromButton(this)" class="bg-slate-950 text-white px-3 py-2 rounded font-bold text-sm">Open</button><button type="button" data-cad="'+esc(x.i.cad||"")+'" data-report-id="'+esc(x.rep.report_id||"")+'" onclick="window.downloadIncidentPdf(this.dataset.cad,this.dataset.reportId)" class="bg-blue-700 text-white px-3 py-2 rounded font-bold text-sm">PDF</button><button type="button" data-cad="'+esc(x.i.cad||"")+'" data-report-id="'+esc(x.rep.report_id||"")+'" onclick="window.emailIncidentPdf(this.dataset.cad,this.dataset.reportId)" class="bg-emerald-700 text-white px-3 py-2 rounded font-bold text-sm">Email PDF</button></div></div></div>';
+      return '<div class="border rounded-xl p-4 bg-white"><div class="flex flex-wrap justify-between gap-3"><div class="min-w-0 flex-1"><div class="font-black">'+esc(x.rep.data?.rUnifiedIncidentReport?"Incident Report":x.isPcr?"Patient Care Report":"Fire Incident Report")+' <span class="font-normal text-slate-500">· '+esc(x.rep.status||"")+'</span></div><div class="grid md:grid-cols-2 gap-x-6 gap-y-1 text-sm mt-2"><div><b>CAD:</b> '+esc(x.i.cad||x.d.rCad||"Not recorded")+'</div><div><b>Call Type:</b> '+esc(call||"Not recorded")+'</div><div><b>Date:</b> '+esc(x.date||"Not recorded")+'</div><div><b>Dispatch:</b> '+esc(x.i.dispatch_time||x.d.rCallCreate||"Not recorded")+'</div><div class="md:col-span-2"><b>Location:</b> '+esc(location)+'</div><div><b>Completed By:</b> '+esc(x.d.rCompletedBy||"Not recorded")+'</div><div><b>Report ID:</b> '+esc(x.rep.report_id||"Not recorded")+'</div></div>'+ (narrative?'<div class="text-sm mt-2"><b>Narrative:</b> '+esc(narrative)+'</div>':"")+'</div><div class="flex flex-wrap gap-2"><button type="button" data-cad="'+esc(x.i.cad||"")+'" data-report-id="'+esc(x.rep.report_id||"")+'" onclick="window.openSavedReportFromButton(this)" class="bg-slate-950 text-white px-3 py-2 rounded font-bold text-sm">Open</button><button type="button" data-cad="'+esc(x.i.cad||"")+'" data-report-id="'+esc(x.rep.report_id||"")+'" onclick="window.downloadIncidentPdf(this.dataset.cad,this.dataset.reportId)" class="bg-blue-700 text-white px-3 py-2 rounded font-bold text-sm">PDF</button><button type="button" data-cad="'+esc(x.i.cad||"")+'" data-report-id="'+esc(x.rep.report_id||"")+'" onclick="window.emailIncidentPdf(this.dataset.cad,this.dataset.reportId)" class="bg-emerald-700 text-white px-3 py-2 rounded font-bold text-sm">Email PDF</button></div></div></div>';
     }).join(""):'<div class="card p-4 text-sm text-slate-500">No incident reports matched those criteria.</div>';
   }catch(e){el.innerHTML='<div class="card p-4 text-red-600">'+esc(e?.message||String(e))+'</div>'}
 }
