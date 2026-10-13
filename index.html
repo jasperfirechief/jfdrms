@@ -2058,6 +2058,22 @@ async function addAnotherReportToIncident(kind){
     renderReportChooser(r.data,d,ur.data||[]);
   }catch(e){alert(e?.message||String(e))}
 }
+function bindReportTimeNormalization(){
+  const dispatch=$("rDispatch");
+  if(dispatch&&dispatch.dataset.jfdNormalizeTime!=="1"){
+    dispatch.dataset.jfdNormalizeTime="1";
+    dispatch.type="text";dispatch.inputMode="numeric";dispatch.placeholder="HH:MM";
+    const normalize=()=>{const raw=String(dispatch.value||"").trim();if(!raw)return;const t=jfdParseTime24(raw);if(t)dispatch.value=t;};
+    dispatch.addEventListener("blur",normalize);
+    dispatch.addEventListener("change",normalize);
+  }
+  document.querySelectorAll(".report-response-unit [data-report-unit-time]").forEach(el=>{
+    if(el.dataset.jfdNormalizeTime==="1")return;
+    el.dataset.jfdNormalizeTime="1";
+    const normalize=()=>{const raw=String(el.value||"").trim();if(!raw)return;const t=jfdParseTime24(raw);if(t)el.value=t;};
+    el.addEventListener("blur",normalize);el.addEventListener("change",normalize);
+  });
+}
 function bindReportForm(kind){
   window.currentReportKind=kind;
   const form=$("incidentReportForm");if(!form)return;
