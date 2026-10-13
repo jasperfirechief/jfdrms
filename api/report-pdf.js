@@ -731,6 +731,19 @@ export default async function handler(req,res){
     res.setHeader("Cache-Control","no-store, no-cache, must-revalidate");res.setHeader("Content-Type","application/pdf");res.setHeader("Content-Length",String(pdf.length));res.setHeader("Content-Disposition",'attachment; filename="'+safeCad+' - JFD Incident Package.pdf"');
     return res.status(200).end(Buffer.from(pdf));
   }
+  if(body.action==="email_incident"){
+    if(!reports.length)return res.status(400).json({ok:false,error:"No saved reports are available for this incident."});
+    const pdf=await makeCombinedIncidentPdf(incident,reports),key=String(process.env.BREVO_API_KEY||""),from=String(process.env.BREVO_FROM_EMAIL||"");
+    const to=Array.isArray(body.to)?body.to.filter(Boolean):body.to?[body.to]:["firechief@jaspercity.com"];
+    if(!key||!from)return res.status(503).json({ok:false,error:"Report email is not configured in Vercel."});
+    const safeCad=String(incident.cad||"incident").replace(/[^A-Za-z0-9_-]+/g,"_"),name=safeCad+" - JFD Incident Package.pdf";
+    const emailCtl=new AbortController(),emailTimer=setTimeout(()=>emailCtl.abort(),30000);let er;
+    try{er=await fetch("https://api.brevo.com/v3/smtp/email",{method:"POST",headers:{"api-key":key,"Content-Type":"application/json","accept":"application/json"},body:JSON.stringify({sender:{email:from,name:"Jasper Fire Department"},to:to.map(email=>({email})),subject:"Jasper Fire Department Incident Package"+(incident.cad?" - "+incident.cad:""),textContent:"Attached is the combined Jasper Fire Department incident PDF. Each saved report, including Patient Care Reports, appears on its own pages in the same PDF.",attachment:[{content:Buffer.from(pdf).toString("base64"),name}]}),signal:emailCtl.signal})}
+    catch(e){return res.status(502).json({ok:false,error:"Incident PDF email request failed.",details:e?.message||String(e)})}
+    finally{clearTimeout(emailTimer)}
+    const et=await er.text();let ed;try{ed=JSON.parse(et)}catch{ed={raw:et}};if(!er.ok)return res.status(502).json({ok:false,error:"Incident PDF email failed.",details:ed});
+    return res.status(200).json({ok:true,email_id:ed?.messageId||null});
+  }
   if(body.action==="download_all"){
     if(!reports.length)return res.status(400).json({ok:false,error:"No saved reports are available for this incident."});
     const generated=await makeIncidentPdfs(incident,reports),zip=zipStore(generated.map(x=>({name:x.name,data:x.pdf})));
