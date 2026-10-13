@@ -439,7 +439,7 @@ let page,y,pageNo=0;
  const fire=(reports||[]).filter(r=>String(r?.report_type||"").startsWith("fire_"));
  const pcr=(reports||[]).filter(r=>String(r?.report_type||"").startsWith("pcr_"));
  const fd=fire[0]?.data||{};
- const patients=(reports||[]).flatMap(r=>Array.isArray(r?.data?.patients)?r.data.patients:[]);
+ const patients=(reports||[]).flatMap(r=>{const d=r?.data||{};if(Array.isArray(d.patients)&&d.patients.length)return d.patients;return String(r?.report_type||\"\").startsWith(\"pcr_\")?[d]:[];});
  const unitMap=new Map();
   for(const r of (reports||[])){
     const arr=Array.isArray(r?.data?.responding_apparatus)?r.data.responding_apparatus:[];
@@ -578,7 +578,7 @@ let page,y,pageNo=0;
      const p=patients[i]||{};
      const isRefusal=!!(p.refusedCare||p.refusedTransport||p.minorRefusal||p.refusal||p.refusalType);
      const refusalType=p.refusalType||[p.refusedCare?"Refused Care":"",p.refusedTransport?"Refused Transport":"",p.minorRefusal?"Minor Refusal":""].filter(Boolean).join(", ")||"Patient Refusal";
-     currentTitle=fd.rUnifiedIncidentReport?"INCIDENT REPORT":"PATIENT CARE REPORT";newPage(currentTitle);
+     currentTitle="PATIENT CARE REPORT";newPage(currentTitle);
      section("Patient Care / Disposition Summary");
      twoCol(["Incident / CAD",firstVal(incident.cad,fd.rCad)],["Incident Date",dateText(firstVal(fd.rDate,incident.dispatch_time))]);
      field("Incident Location",firstVal(fd.rLocation,incident.location));
