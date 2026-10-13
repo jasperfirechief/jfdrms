@@ -2221,6 +2221,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
         '<div id="'+id+'_transportSection" class="'+(showTransport?"":"hiddenx")+' md:col-span-2 border-t pt-3"><div class="font-black mb-2">Transport / Vehicle</div><div class="grid md:grid-cols-2 gap-3"><label class="text-sm font-semibold">Transport Vehicle / Unit<select id="'+id+'_transportVehicle" class="w-full border rounded p-2 mt-1"><option value="">Select vehicle / unit...</option>'+transportOptions+'<option value="OTHER_AGENCY" '+(p.transportVehicle==="OTHER_AGENCY"?"selected":"")+'>Other agency / ambulance</option></select></label>'+field(id+"_transportAgency","Transporting Agency",p.transportAgency||"")+field(id+"_destination","Destination",p.destination||"")+field(id+"_vehicleMake","Vehicle Make",p.vehicleMake||"")+field(id+"_vehicleModel","Vehicle Model",p.vehicleModel||"")+field(id+"_vehicleYear","Vehicle Year",p.vehicleYear||"","number")+field(id+"_vehicleVin","License / VIN",p.vehicleVin||"")+field(id+"_insurance","Insurance Company",p.insurance||"")+field(id+"_policy","Policy Number",p.policy||"")+field(id+"_expiration","Insurance Expiration",p.expiration||"","date")+'</div></div>'+
         '<label class="block text-sm font-semibold md:col-span-2">Narrative<textarea id="'+id+'_narrative" rows="4" class="w-full border rounded p-2 mt-1">'+esc(p.narrative||p.dispositionNote||"")+'</textarea></label>'+
         patientRefusalHtml(id,{...p,refusedCare:p.refusedCare||careProvided==="no",refusedTransport:p.refusedTransport||disposition==="Patient Refused Transport"}))+
+      '<div class="mt-4 flex flex-wrap justify-end gap-2 border-t pt-3"><button type="button" class="rounded-lg border px-4 py-2 font-bold" onclick="jfdCancelPatient('+index+')">Cancel</button><button type="button" class="rounded-lg border border-slate-300 px-4 py-2 font-bold" onclick="jfdSavePatient('+index+')">Save Patient</button><button type="button" class="rounded-lg bg-red-600 px-4 py-2 font-bold text-white" onclick="jfdAddPatientAndSave('+index+')">+ Add Patient</button></div>'+
       '</article>';
   }
   window.jfdBindSignaturePads=function(){
@@ -2285,6 +2286,17 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   window.jfdPatientState=[];
   window.jfdRenderPatients=function(state){window.jfdPatientState=state||[];const box=$("jfdPatients");if(!box)return;box.innerHTML=(window.jfdPatientState.length?window.jfdPatientState.map(patientCard).join(""):'<div class="rounded-xl border border-dashed p-5 text-sm text-slate-500">No patient started yet.</div>');setTimeout(()=>{jfdBindSignaturePads();jfdSearchableSelects();},0);};
   window.jfdAddPatient=function(p){window.jfdPatientState.push(p||{});jfdRenderPatients(window.jfdPatientState);};
+  window.jfdSavePatient=async function(index){
+    try{window.jfdPatientState=collectPatients();await saveReportDraft("pcr");const card=document.querySelector('[data-patient-card="'+Number(index)+'"]');if(card){card.classList.add("ring-2","ring-emerald-400");setTimeout(()=>card.classList.remove("ring-2","ring-emerald-400"),1800)}return true}catch(e){console.error("Unable to save patient draft",e);alert("Unable to save this patient. Please try again.");return false}
+  };
+  window.jfdAddPatientAndSave=async function(index){
+    const ok=await window.jfdSavePatient(index);if(!ok)return;
+    window.jfdAddPatient({});const card=document.querySelector('[data-patient-card="'+(window.jfdPatientState.length-1)+'"]');card?.scrollIntoView({behavior:"smooth",block:"start"});const first=card?.querySelector('input[id$="_name"]');first?.focus({preventScroll:true});
+  };
+  window.jfdCancelPatient=function(index){
+    const patients=window.jfdPatientState||[];if(patients.length<=1){if(!confirm("Clear this patient form? Unsaved patient details will be removed."))return;window.jfdPatientState=[{}]}else{if(!confirm("Cancel and remove this patient record from the current draft?"))return;window.jfdPatientState=collectPatients();window.jfdPatientState.splice(Number(index),1)}
+    jfdRenderPatients(window.jfdPatientState);
+  };
   window.jfdRemovePatient=function(i){window.jfdPatientState.splice(i,1);jfdRenderPatients(window.jfdPatientState);};
   window.jfdOpenPatientEditor=function(){
     let patients=window.jfdPatientState||[];try{if(typeof collectPatients==="function")patients=collectPatients();window.jfdPatientState=patients}catch{}
