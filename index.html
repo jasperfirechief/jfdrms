@@ -1680,7 +1680,7 @@ function syncReportDispatchFromCad(incident){
   if(!cadDispatch)return;
   const value=localDateTime(cadDispatch);
   const dispatch=$("rDispatch");
-  if(dispatch){dispatch.value=value;dispatch.dispatchEvent(new Event("change",{bubbles:true}));}
+  if(dispatch){dispatch.value=(String(value).match(/T(\\d{2}:\\d{2})/)||[])[1]||"";dispatch.dispatchEvent(new Event("change",{bubbles:true}));}
   const date=(String(value).match(/^(\\d{4}-\\d{2}-\\d{2})/)||[])[1]||"";
   const time=(String(value).match(/T(\\d{2}:\\d{2})/)||[])[1]||"";
   document.querySelectorAll("[data-report-unit-date='dispatch']").forEach(el=>{if(date)el.value=date;});
@@ -1701,7 +1701,13 @@ function applyPreviousReportValues(data){
     if(el.tagName==="SELECT"){
       const exists=[...el.options].some(o=>o.value===String(value));
       if(exists){el.value=String(value);el.dispatchEvent(new Event("change",{bubbles:true}));}
-    }else if(String(value)!=="")el.value=String(value);
+    }else if(String(value)!==""){
+      if(el.id==="rDispatch"){
+        const raw=String(value).trim();
+        const match=raw.match(/(?:T|\\s)(\\d{2}:\\d{2})/);
+        el.value=match?match[1]:(/^\\d{2}:\\d{2}$/.test(raw)?raw:"");
+      }else el.value=String(value);
+    }
   });
 }
 function collectReportFormData(){
@@ -2130,7 +2136,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       field("rDispatchIncidentNumber","Dispatch Incident Number",iForResponse?.dispatch_incident_number||iForResponse?.cad||"","text","",true)+field("rCallArrival","Call Arrival",localDateTime(iForResponse?.call_arrival||iForResponse?.dispatch_time),"datetime-local","",true)+
       field("rCallAnswered","Call Answered",localDateTime(iForResponse?.call_answered||iForResponse?.dispatch_time),"datetime-local","",true)+
       field("rCallCreate","Call Create",localDateTime(iForResponse?.call_create||iForResponse?.dispatch_time),"datetime-local","",true)+
-      field("rDispatch","Dispatch Time",localDateTime(iForResponse?.dispatch_time),"datetime-local")+
+      field("rDispatch","Dispatch Time",String(localDateTime(iForResponse?.dispatch_time)||"").split("T")[1]?.slice(0,5)||"","time")+
       '</div>');
     const response=card("Response",'<p class="text-xs text-slate-500 mb-3">Select the apparatus that actually responded. CAD/Active911 does not automatically select response units.</p><div class="grid md:grid-cols-2 gap-2">'+checks+'</div><div id="jfdUnitRows" class="space-y-2 mt-3"><p class="text-sm text-slate-500">Select responding apparatus above.</p></div><div class="mt-3 flex flex-wrap gap-2">'+btn("Refresh Crew","refreshReportApparatusCrews($('rDate')?.value||today())","primary")+'</div><div class="mt-4 border-t pt-4"><div id="reportOffDutyPersonnel">'+renderOffDutyPersonnel([])+'</div></div>');
     return dispatch+response;
