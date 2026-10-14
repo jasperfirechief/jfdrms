@@ -83,7 +83,7 @@ input,select,textarea{width:100%;border:1px solid #cbd4dd;border-radius:7px;back
 
 </aside></div></main>
 
-<div class="sticky"><div class="sticky-in"><span class="status" id="saveStatus">Not saved</span><div class="actions"><button onclick="saveDraft()">Save Draft</button><button onclick="window.print()">Preview / Print</button><button class="green" onclick="finish()">Validate & Finish</button></div></div></div>
+<div class="sticky"><div class="sticky-in"><span class="status" id="saveStatus">Not saved</span><div class="actions"><button onclick="saveDraft()">Save Draft</button><button class="green" onclick="finish()">Validate &amp; Finish</button></div></div></div>
 
 <div class="modal" id="patientModal"><div class="modal-card"><div class="modal-head"><b>Patient / PCR</b><button type="button" onclick="closePatient()">Close</button></div><form class="modal-form" id="patientForm" onsubmit="event.preventDefault();savePatient()"><div class="fields">
 <div class="field wide"><label class="req">Patient Name</label><input name="name"></div><div class="field"><label>Sex</label><select name="sex"><option value="">Choose</option><option>Female</option><option>Male</option><option>Unknown</option></select></div><div class="field"><label>Age</label><input name="age" type="number" min="0"></div><div class="field"><label>Date of Birth</label><input name="dob" type="date"></div>
