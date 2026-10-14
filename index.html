@@ -539,7 +539,7 @@ async function savePersonnel(){
   if(r.error)return alert(r.error.message);
   const personnelId=Number(r.data?.id||id);
   if(!personnelId)return alert("Personnel was saved, but the login could not be linked.");
-  if(password||!id||data.role==="admin"||!!prior?.auth_user_id||prior?.role!==data.role){
+  if(password||!id||data.role==="admin"||data.role==="officer"||!!prior?.auth_user_id||prior?.role!==data.role){
     let authSession=null;
     const currentSession=await db.auth.getSession();
     authSession=currentSession.data?.session||null;
