@@ -694,7 +694,7 @@ let page,y,pageNo=0;
        if(vitalRows.length){
          section("Vital Signs");
          const headers=["TIME","BP","PULSE","RESP","SpO₂","TEMP","GLUCOSE"];
-         const widths=[56,72,56,56,56,62,90],xs=[m];
+         const widths=[65,78,60,60,62,75,132],xs=[m];
          for(let j=0;j<widths.length;j++)xs.push(xs[j]+widths[j]);
          const drawVitalsHeader=()=>{ensure(28);page.drawRectangle({x:m,y:y-19,width:usable,height:19,color:LIGHT,borderWidth:.4,borderColor:MID});headers.forEach((h,j)=>safeDrawText(page,h,{x:xs[j]+3,y:y-12,font:F.bold,size:6.5,color:NAVY}));y-=19;};
          drawVitalsHeader();
