@@ -303,9 +303,10 @@ async function makeSandboxIncidentPdf(incident={},report={}){
  const casualties=Array.isArray(d.casualties)?d.casualties:[];
  if(casualties.length){
    section("Casualties / Rescues");
-   table(["PERSON TYPE","OUTCOME","ASSOCIATED PATIENT","DESCRIPTION"],casualties.map(c=>[
-     first(c.personTypeLabel,c.personType),first(c.outcomeLabel,c.outcome),c.patient,c.description
-   ]),[100,100,115,213]);
+   // Do not expose patient identities on the initial incident-report pages.
+   table(["PERSON TYPE","OUTCOME","DESCRIPTION"],casualties.map(c=>[
+     first(c.personTypeLabel,c.personType),first(c.outcomeLabel,c.outcome),c.description
+   ]),[120,120,288]);
  }
  const exposures=Array.isArray(d.exposures)?d.exposures:[];
  if(exposures.length){
