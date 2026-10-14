@@ -1952,7 +1952,9 @@ async function saveReportDraft(kind,silent=false){
     }
   }
   if(!silent)alert(editingId?"Draft updated.":"Draft saved.");
-  if(incidentId)await loadIncidents();
+  // Refreshing the incident list is secondary to persistence. A refresh failure must
+  // not turn a verified database save into a reported patient-save failure.
+  if(incidentId){try{await loadIncidents()}catch(refreshError){console.warn("Draft saved, but incident list refresh failed",refreshError)}}
   return report;
 }
 window.jfdCopyOwnerToOccupant=function(checked){if(!checked)return;[["rOwnerName","rOccupantName"],["rOwnerAddress","rOccupantAddress"],["rOwnerPhone","rOccupantPhone"]].forEach(([a,b])=>{const from=$(a),to=$(b);if(from&&to)to.value=from.value;});};
@@ -2302,19 +2304,35 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   window.jfdRenderPatients=function(state){window.jfdPatientState=state||[];const box=$("jfdPatients");if(!box)return;box.innerHTML=(window.jfdPatientState.length?window.jfdPatientState.map(patientCard).join(""):'<div class="rounded-xl border border-dashed p-5 text-sm text-slate-500">No patient started yet.</div>');setTimeout(()=>{jfdBindSignaturePads();jfdSearchableSelects();},0);};
   window.jfdAddPatient=function(p){window.jfdPatientState.push(p||{});jfdRenderPatients(window.jfdPatientState);};
   window.jfdSavePatient=async function(index){
+    const card=document.querySelector('[data-patient-card="'+Number(index)+'"]');
+    let notice=card?.querySelector("[data-patient-saved-notice]");
+    if(card){
+      if(!notice){notice=document.createElement("span");notice.dataset.patientSavedNotice="true";notice.className="ml-2 text-sm font-bold";const heading=card.querySelector("h4");(heading||card).appendChild(notice)}
+      notice.className="ml-2 text-sm font-bold text-blue-700";
+      notice.textContent="Saving patient…";
+    }
     try{
-      window.jfdPatientState=collectPatients();
+      const patients=collectPatients();
+      if(!card)throw new Error("The patient form could not be found. Close and reopen the PCR, then try again.");
+      if(!patients.length)throw new Error("No patient form was found to save.");
+      window.jfdPatientState=patients;
       await saveReportDraft("pcr");
-      const card=document.querySelector('[data-patient-card="'+Number(index)+'"]');
       if(card){
         card.classList.add("ring-2","ring-emerald-400");
-        let notice=card.querySelector("[data-patient-saved-notice]");
-        if(!notice){notice=document.createElement("span");notice.dataset.patientSavedNotice="true";notice.className="ml-2 text-sm font-bold text-emerald-700";const heading=card.querySelector("h4");(heading||card).appendChild(notice)}
-        notice.textContent="Patient saved";
-        setTimeout(()=>{notice?.remove();card.classList.remove("ring-2","ring-emerald-400")},2200);
+        notice=card.querySelector("[data-patient-saved-notice]");
+        if(notice){notice.className="ml-2 text-sm font-bold text-emerald-700";notice.textContent="Patient saved";}
+        setTimeout(()=>{notice?.remove();card.classList.remove("ring-2","ring-emerald-400")},3000);
       }
       return true;
-    }catch(e){console.error("Unable to save patient draft",e);alert("Unable to save this patient. Please try again.");return false}
+    }catch(e){
+      console.error("Unable to save patient draft",e);
+      if(card){
+        notice=card.querySelector("[data-patient-saved-notice]");
+        if(notice){notice.className="ml-2 text-sm font-bold text-red-700";notice.textContent="Save failed";}
+      }
+      alert("Unable to save this patient: "+(e?.message||"Please try again."));
+      return false;
+    }
   };
   window.jfdAddPatientAndSave=async function(index){
     const ok=await window.jfdSavePatient(index);if(!ok)return;
