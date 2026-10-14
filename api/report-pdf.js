@@ -15,9 +15,23 @@ function safeDrawText(page, value, options) {
   return page["drawText"](safePdfText(value), options);
 }
 import { JFD_LOGO_JPG } from "./jfd-logo-data.js";
+import sharp from "sharp";
 
 
-async function embedJfdLogoSafely(pdf){try{const bytes=Buffer.from(String(JFD_LOGO_JPG||"").replace(/^data:image\/jpeg;base64,/i,"").replace(/\s+/g,""),"base64");if(bytes.length>4&&bytes[0]===255&&bytes[1]===216)return await pdf.embedJpg(bytes);}catch(e){console.warn("JFD logo JPEG could not be embedded:",e?.message||e)}return null;}
+async function embedJfdLogoSafely(pdf){
+  try {
+    const encoded=String(JFD_LOGO_JPG||"").replace(/^data:image\\/jpeg;base64,/i,"").replace(/\\s+/g,"");
+    const bytes=Buffer.from(encoded,"base64");
+    if(bytes.length<8)throw new Error("JFD logo image data is empty or incomplete");
+    // Normalize the source image through Sharp so PDF output does not depend on
+    // the original JPEG's color profile, metadata, or encoding quirks.
+    const png=await sharp(bytes).rotate().png().toBuffer();
+    return await pdf.embedPng(png);
+  } catch(e) {
+    console.error("JFD logo could not be normalized for PDF:",e?.message||e);
+    return null;
+  }
+}
 const SUPABASE_URL="https://audgtwcctdoiptuekqvn.supabase.co";
 const SUPABASE_KEY="sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz";
 async function requireAdmin(req){
@@ -357,7 +371,7 @@ export async function makePdf(incident={},reports=[]){
     if(!pcrReports.length)return baseBytes;
     const pcrBytes=await makePdf(incident,pcrReports);
     const basePdf=await PDFDocument.load(baseBytes),pcrPdf=await PDFDocument.load(pcrBytes);
-    const pcrPageIndices=pcrPdf.getPageIndices().slice(2);
+    const pcrPageIndices=pcrPdf.getPageIndices().slice(1);
     if(!pcrPageIndices.length)return baseBytes;
     const pages=await basePdf.copyPages(pcrPdf,pcrPageIndices);
     pages.forEach(p=>basePdf.addPage(p));
