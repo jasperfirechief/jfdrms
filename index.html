@@ -531,13 +531,15 @@ async function savePersonnel(){
   const password=$("pfPassword").value||"";
   if(!data.first_name||!data.last_name||!data.email)return alert("First name, last name, and email are required.");
   const id=Number($("pfId").value||0);
+  let prior=null;
+  if(id){const priorResult=await db.from("personnel").select("role,auth_user_id").eq("id",id).maybeSingle();if(priorResult.error)return alert("Unable to verify the existing personnel role: "+priorResult.error.message);prior=priorResult.data;}
   let r;
   if(id)r=await db.from("personnel").update(data).eq("id",id).select("id").single();
   else r=await db.from("personnel").insert(data).select("id").single();
   if(r.error)return alert(r.error.message);
   const personnelId=Number(r.data?.id||id);
   if(!personnelId)return alert("Personnel was saved, but the login could not be linked.");
-  if(password||data.role==="admin"||!id){
+  if(password||!id||data.role==="admin"||!!prior?.auth_user_id||prior?.role!==data.role){
     let authSession=null;
     const currentSession=await db.auth.getSession();
     authSession=currentSession.data?.session||null;
