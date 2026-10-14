@@ -1059,7 +1059,7 @@ function reportResponseSection(unitRows=[]){
 function reportResponseUnitRow(u){
   const apId=Number(u.apparatus_id||0),ap=reportApparatusById(apId),crew=Array.isArray(u.crew_snapshot)?u.crew_snapshot:(Array.isArray(u.crew)?u.crew:[]);
   const incidentDate=$("rDate")?.value||today();
-  const split=v=>{const p=jfdSplitCentralDateTime(v);return p||{date:incidentDate,time:""}};
+  const split=v=>{const raw=String(v??"").trim();if(/^\d{1,2}:\d{2}$/.test(raw))return {date:incidentDate,time:jfdExtractClock(raw)};const p=jfdSplitCentralDateTime(raw);return {date:p?.date||incidentDate,time:jfdExtractClock(p?.time)||jfdExtractClock(raw)||""};};
   const di=split(u.dispatch_time||u.dispatch_at||$("rDispatch")?.value);
   const en=split(u.enroute_time),on=split(u.on_scene_time),ca=split(u.cancelled_time),cl=split(u.in_service_time);
   const event=(label,key,p,required)=>'<label class="text-xs font-bold">'+label+(required?' <span class="text-red-700">Required</span>':'')+'<div class="grid grid-cols-2 gap-2 mt-1"><input data-report-unit-date="'+key+'" type="date" value="'+esc(p.date||incidentDate)+'" class="w-full border rounded p-2 font-normal"><input data-report-unit-time="'+key+'" type="text" inputmode="numeric" placeholder="HH:MM" value="'+esc(p.time||"")+'" class="w-full border rounded p-2 font-normal" '+(required?'required':'')+'></div></label>';
@@ -1167,7 +1167,7 @@ function toggleUnassignedReportApparatus(id,checked){
   if(checked&&!existing){
     const ap=reportApparatusById(id);if(!ap)return;
     const row=document.createElement("div");
-    row.innerHTML=reportResponseUnitRow({apparatus_id:Number(id),unit_number_snapshot:ap.unit_number,station_snapshot:"Unassigned Apparatus",crew_snapshot:[],unassigned:true,dispatch_time:$("rDispatch")?.value||"",enroute_time:"",on_scene_time:"",cancelled_time:"",in_service_time:""});
+    row.innerHTML=reportResponseUnitRow({apparatus_id:Number(id),unit_number_snapshot:ap.unit_number,station_snapshot:"Unassigned Apparatus",crew_snapshot:[],unassigned:true,dispatch_time:jfdExtractClock($("rDispatch")?.value)||"",enroute_time:"",on_scene_time:"",cancelled_time:"",in_service_time:""});
     const rowEl=row.firstElementChild;
     rowEl.dataset.unassigned="true";
     host.appendChild(rowEl);
@@ -1230,7 +1230,7 @@ function toggleReportApparatus(id,checked){
     const ap=reportApparatusById(id);if(!ap)return;
     box.querySelector("p")?.remove();
     const row=document.createElement("div");
-    row.innerHTML=reportResponseUnitRow({apparatus_id:Number(id),unit_number_snapshot:ap.unit_number,station_snapshot:"",crew_snapshot:ap.crew||[],dispatch_time:$("rDispatch")?.value||"",enroute_time:"",on_scene_time:"",cancelled_time:"",in_service_time:""});
+    row.innerHTML=reportResponseUnitRow({apparatus_id:Number(id),unit_number_snapshot:ap.unit_number,station_snapshot:"",crew_snapshot:ap.crew||[],dispatch_time:jfdExtractClock($("rDispatch")?.value)||"",enroute_time:"",on_scene_time:"",cancelled_time:"",in_service_time:""});
     box.appendChild(row.firstElementChild);
     syncReportUnitTimes(row.firstElementChild);
     refreshReportApparatusCrews($("rDate")?.value);
@@ -1700,7 +1700,7 @@ function syncReportDispatchFromCad(incident){
   if(dispatch){dispatch.value=time;dispatch.dispatchEvent(new Event("change",{bubbles:true}));}
   const date=iDateForReport(cadDispatch)||iDateForReport(value);
   document.querySelectorAll("[data-report-unit-date='dispatch']").forEach(el=>{if(date)el.value=date;});
-  document.querySelectorAll("[data-report-unit-time='dispatch']").forEach(el=>{if(time)el.value=time;});
+  document.querySelectorAll("[data-report-unit-time='dispatch']").forEach(el=>{el.value=jfdExtractClock(time)||"";});
   document.querySelectorAll(".report-response-unit").forEach(row=>{
     const hidden=row.querySelector("[data-report-unit-hidden='dispatch']");
     if(hidden){hidden.value=value;hidden.dispatchEvent(new Event("change",{bubbles:true}));}
