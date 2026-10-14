@@ -20,7 +20,8 @@ import sharp from "sharp";
 
 async function embedJfdLogoSafely(pdf){
   try {
-    const encoded=String(JFD_LOGO_JPG||"").replace(/^data:image\\/jpeg;base64,/i,"").replace(/\\s+/g,"");
+    const raw=String(JFD_LOGO_JPG||"");
+    const encoded=(raw.includes(",")?raw.slice(raw.indexOf(",")+1):raw).replaceAll(" ","").replaceAll("\n","").replaceAll("\r","").replaceAll("\t","");
     const bytes=Buffer.from(encoded,"base64");
     if(bytes.length<8)throw new Error("JFD logo image data is empty or incomplete");
     // Normalize the source image through Sharp so PDF output does not depend on
