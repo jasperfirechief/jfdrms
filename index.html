@@ -188,7 +188,7 @@ const jfdTimeDisplay=v=>{const t=jfdParseTime24(v);return t||""};
 const jfdExtractClock=v=>{const raw=String(v??"").trim();if(!raw)return "";if(/(?:Z|[+-]\d{2}(?::?\d{2})?)$/i.test(raw)){const d=jfdParseDateValue(raw),p=Number.isNaN(d.getTime())?null:jfdCentralParts(d);if(p)return p.hour+":"+p.minute}const m=raw.match(/(?:^|[T\s])(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?(?=$|Z|[+-]\d{2}(?::?\d{2})?$)/i);if(m){const h=Number(m[1]),min=Number(m[2]);if(h<=23&&min<=59)return String(h).padStart(2,"0")+":"+String(min).padStart(2,"0")}return jfdParseTime24(raw)||""};
 const jfdSplitCentralDateTime=v=>{if(!v)return {date:"",time:""};const s=String(v).trim();if(/^\d{4}-\d{2}-\d{2}(?:T|\s)\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(s)){const m=s.match(/^(\d{4}-\d{2}-\d{2})(?:T|\s)(\d{1,2}:\d{2})/);if(m)return {date:m[1],time:jfdExtractClock(m[2])}}if(/(?:Z|[+-]\d{2}(?::?\d{2})?)$/i.test(s)){const d=jfdParseDateValue(s);if(Number.isNaN(d.getTime()))return {date:"",time:""};const p=jfdCentralParts(d);return p?{date:p.year+"-"+p.month+"-"+p.day,time:p.hour+":"+p.minute}:{date:"",time:""}}const d=jfdParseDateValue(s);if(Number.isNaN(d.getTime()))return {date:"",time:""};const p=jfdCentralParts(d);return p?{date:p.year+"-"+p.month+"-"+p.day,time:p.hour+":"+p.minute}:{date:"",time:""}};
 const jfdUpgradeTimeInputs=()=>{document.querySelectorAll('input[type="time"]:not([data-jfd-time-upgraded])').forEach(hidden=>{hidden.dataset.jfdTimeUpgraded="1";hidden.style.display="none";const time=document.createElement("input");time.type="text";time.inputMode="numeric";time.placeholder="HH:MM";time.value=jfdParseTime24(hidden.value)||"";time.className=hidden.className;time.setAttribute("aria-label",(hidden.getAttribute("aria-label")||hidden.name||hidden.id||"Time")+" 24-hour time");const sync=()=>{const t=jfdParseTime24(time.value);if(time.value.trim()&&!t){time.setCustomValidity("Enter a valid time, such as 1430 or 14:30.");return false}time.setCustomValidity("");hidden.value=t||"";hidden.dispatchEvent(new Event("change",{bubbles:true}));return true};time.addEventListener("input",()=>{const raw=time.value.trim();time.setCustomValidity(raw&&!jfdParseTime24(raw)?"Enter a valid time, such as 1430 or 14:30.":"")});time.addEventListener("blur",()=>{const t=jfdParseTime24(time.value);if(t)time.value=t;sync()});hidden.parentNode.insertBefore(time,hidden.nextSibling)})};
-const jfdUpgradeAllDateTimeInputs=()=>{jfdUpgradeDateTimeInputs();jfdUpgradeTimeInputs()};
+const jfdUpgradeAllDateTimeInputs=()=>{jfdUpgradeTimeInputs()};
 const jfdTimeObserver=new MutationObserver(()=>jfdUpgradeAllDateTimeInputs());
 
 function jfdEscapeHtml(value){
@@ -1912,7 +1912,7 @@ async function submitReportToNeris(data,incidentId,explicitAdminReview=false){
   return {ok:true,neris:body};
 }
 async function saveReportDraft(kind,silent=false){
-  const form=$("incidentReportForm");if(!form)return;
+  const form=$("incidentReportForm");if(!form)throw new Error("The incident report form is not available; patient details were not saved.");
   const data=(typeof window.collectReportFormData==="function"?window.collectReportFormData():collectReportFormData()),m=$("reportModal"),incidentId=Number(m?.dataset.incidentId||0)||null;
     const reportType=kind==="pcr"?"pcr_neris_v2":"fire_neris_v2";
   const editingId=String(m?.dataset.reportId||"").trim();
@@ -1923,7 +1923,7 @@ async function saveReportDraft(kind,silent=false){
     const idx=editingId?reports.findIndex(x=>x?.report_id===editingId):-1;
     if(idx>=0)reports[idx]={...reports[idx],...report};
     else reports.unshift(report);
-    const upd=await db.from("incidents").update({reports,updated_at:new Date().toISOString()}).eq("cad",m.dataset.cad||"");if(upd.error)throw new Error(upd.error.message);
+    const upd=await db.from("incidents").update({reports,updated_at:new Date().toISOString()}).eq("cad",m.dataset.cad||"").select("cad").maybeSingle();if(upd.error)throw new Error(upd.error.message);if(!upd.data?.cad)throw new Error("The incident record was not updated. Check that this report is attached to the correct incident and try again.");
     m.dataset.reportId=report.report_id;
   }else{
     if(editingId){
@@ -2628,7 +2628,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     // Do not enforce conditional NERIS module fields while collecting the report.
     // The RMS preserves optional/departmental information, while the NERIS review/API
     // gate enforces only the minimum fields applicable to the incident.
-    if(["pcr","general"].includes(window.currentReportKind)){data.patients=collectPatients();if(window.currentReportKind==="pcr")data.rNarrative=(data.patients||[]).map(p=>p.narrative).filter(Boolean).join("\n\n");}
+    if(document.querySelector("[data-patient-card]")){data.patients=collectPatients();if(["pcr","general"].includes(window.currentReportKind))data.rNarrative=(data.patients||[]).map(p=>p.narrative).filter(Boolean).join("\n\n");}
     data.incident_types=[data.rPrimaryIncidentType,...[...document.querySelectorAll("[id^='rIncidentType_']")].map(x=>x.value).filter(Boolean)];
     data.action_taken=$("rActionTaken")?.checked===true;data.no_action_taken=$("rNoActionTaken")?.checked===true;
     data.actions_taken=[...document.querySelectorAll("input[name='rActionsTaken']:checked")].map(x=>x.value);
