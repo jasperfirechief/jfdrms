@@ -147,7 +147,57 @@ function addMinorRefusalEntry(){const host=$('minorRefusalList');const n=host.ch
 function renumberMinorRefusalEntries(){document.querySelectorAll('.minor-refusal-entry .repeat-head b').forEach((el,i)=>el.textContent='Minor '+(i+1));}
 function clearSignature(){const c=$('refusalSignature');if(c)c.getContext('2d').clearRect(0,0,c.width,c.height)}
 function togglePatientOther(){const f=$('patientForm');$('complaintOther').style.display=f.complaint.value==='Other'?'block':'none';$('injuryOther').style.display=f.injury.value==='Other'?'block':'none'}
-async function savePatient(){const priorPatients=patients.slice();const f=$('patientForm');if(!f.elements.namedItem('name').value||!f.querySelector('input[name=care]:checked')){alert('Patient name and Care Provided? are required.');return}const sig=$('refusalSignature');const existingPatient=editingPatientIndex>=0?patients[editingPatientIndex]:null;const patientRecord={id:existingPatient?.id||'p'+Date.now(),name:f.elements.namedItem('name').value,sex:f.sex.value,age:f.age.value,dob:f.dob.value,care:f.querySelector('input[name=care]:checked').value,narrative:f.narrative.value,complaint:f.complaint.value,complaintOther:f.complaintOtherText.value,injury:f.injury.value,injuryOther:f.injuryOtherText.value,bp:f.bp.value,pulse:f.pulse.value,resp:f.resp.value,spo2:f.spo2.value,vitals:[...f.querySelectorAll("[data-vitals-entry]")].map(row=>({time:row.querySelector("[data-vital=time]").value,bp:row.querySelector("[data-vital=bp]").value,pulse:row.querySelector("[data-vital=pulse]").value,resp:row.querySelector("[data-vital=resp]").value,spo2:row.querySelector("[data-vital=spo2]").value})).filter(v=>v.time||v.bp||v.pulse||v.resp||v.spo2),isMinor:!!f.isMinor?.checked,minorPatients:[...f.querySelectorAll('.minor-refusal-entry')].map(row=>({name:row.querySelector('[data-minor-name]').value,dob:row.querySelector('[data-minor-dob]').value,age:row.querySelector('[data-minor-age]').value,relationship:row.querySelector('[data-minor-relationship]').value})).filter(m=>m.name),guardian:f.guardian?.value||'',guardianRelationship:f.guardianRelationship?.value||'',guardianPhone:f.guardianPhone?.value||'',guardianAddress:f.guardianAddress?.value||'',risksExplained:!!f.risksExplained?.checked,signature:(sig&&sig.toDataURL&&sig.getContext('2d').getImageData(0,0,sig.width,sig.height).data.some(x=>x!==0))?sig.toDataURL('image/png'):(existingPatient?.signature||'')};if(editingPatientIndex>=0)patients[editingPatientIndex]=patientRecord;else patients.push(patientRecord);if(f.isMinor?.checked&&f.guardian?.value.trim()){people.push({name:f.guardian.value.trim(),role:'Parent / Legal Guardian',phone:f.guardianPhone?.value||'',address:f.guardianAddress?.value||''});renderPeople()}try{if(new URLSearchParams(location.search).get("embedded")==="1"&&parent!==window&&typeof parent.jfdSaveSandboxDraft==="function"){await parent.jfdSaveSandboxDraft(record());$("saveStatus").textContent="Patient saved to JFD RMS · "+new Date().toLocaleTimeString()}else{localStorage.setItem("jfd_final_incident_sandbox",JSON.stringify(record()));$("saveStatus").textContent="Patient saved"}}catch(e){patients.splice(0,patients.length,...priorPatients);alert("Unable to save this patient to JFD RMS: "+(e?.message||e));return}closePatient();renderCasualties();update()}
+async function savePatient(){
+  const priorPatients=patients.slice(),priorPeople=people.slice(),form=$('patientForm');
+  const status=$('saveStatus');
+  const field=name=>form?.elements?.namedItem(name);
+  const value=name=>String(field(name)?.value||'');
+  const checked=name=>!!field(name)?.checked;
+  const selectedCare=form?.querySelector('input[name="care"]:checked');
+  try{
+    if(!form)throw new Error('Patient form is unavailable. Close and reopen the patient form.');
+    if(!value('name').trim())throw new Error('Patient name is required.');
+    if(!selectedCare)throw new Error('Please select Yes or No for Care Provided.');
+    if(status)status.textContent='Saving patient to JFD RMS…';
+    const sig=$('refusalSignature');
+    const existingPatient=editingPatientIndex>=0?patients[editingPatientIndex]:null;
+    let signature=existingPatient?.signature||'';
+    if(sig?.getContext){
+      const ctx=sig.getContext('2d');
+      const pixels=ctx?.getImageData(0,0,sig.width,sig.height)?.data;
+      if(pixels&&pixels.some(x=>x!==0))signature=sig.toDataURL('image/png');
+    }
+    const patientRecord={
+      id:existingPatient?.id||'p'+Date.now(),name:value('name').trim(),sex:value('sex'),age:value('age'),dob:value('dob'),care:selectedCare.value,
+      narrative:value('narrative'),complaint:value('complaint'),complaintOther:value('complaintOtherText'),injury:value('injury'),injuryOther:value('injuryOtherText'),
+      bp:value('bp'),pulse:value('pulse'),resp:value('resp'),spo2:value('spo2'),
+      vitals:[...form.querySelectorAll('[data-vitals-entry]')].map(row=>({time:row.querySelector('[data-vital="time"]')?.value||'',bp:row.querySelector('[data-vital="bp"]')?.value||'',pulse:row.querySelector('[data-vital="pulse"]')?.value||'',resp:row.querySelector('[data-vital="resp"]')?.value||'',spo2:row.querySelector('[data-vital="spo2"]')?.value||''})).filter(v=>v.time||v.bp||v.pulse||v.resp||v.spo2),
+      isMinor:checked('isMinor'),minorPatients:[...form.querySelectorAll('.minor-refusal-entry')].map(row=>({name:row.querySelector('[data-minor-name]')?.value||'',dob:row.querySelector('[data-minor-dob]')?.value||'',age:row.querySelector('[data-minor-age]')?.value||'',relationship:row.querySelector('[data-minor-relationship]')?.value||''})).filter(m=>m.name),
+      guardian:value('guardian'),guardianRelationship:value('guardianRelationship'),guardianPhone:value('guardianPhone'),guardianAddress:value('guardianAddress'),
+      risksExplained:checked('risksExplained'),signature
+    };
+    if(editingPatientIndex>=0)patients[editingPatientIndex]=patientRecord;else patients.push(patientRecord);
+    if(patientRecord.isMinor&&patientRecord.guardian.trim()){
+      people.push({name:patientRecord.guardian,role:'Parent / Legal Guardian',phone:patientRecord.guardianPhone,address:patientRecord.guardianAddress});
+      renderPeople();
+    }
+    const embedded=new URLSearchParams(location.search).get('embedded')==='1'&&parent!==window;
+    if(embedded){
+      if(typeof parent.jfdSaveSandboxDraft!=='function')throw new Error('The RMS save connection is unavailable. Reload the incident report and try again.');
+      await parent.jfdSaveSandboxDraft(record());
+      if(status)status.textContent='Patient saved to JFD RMS · '+new Date().toLocaleTimeString();
+    }else{
+      localStorage.setItem('jfd_final_incident_sandbox',JSON.stringify(record()));
+      if(status)status.textContent='Patient saved · '+new Date().toLocaleTimeString();
+    }
+    closePatient();renderCasualties();update();
+  }catch(e){
+    patients.splice(0,patients.length,...priorPatients);people.splice(0,people.length,...priorPeople);
+    if(status)status.textContent='Patient save failed';
+    console.error('Patient save failed',e);
+    alert('Unable to save this patient: '+(e?.message||String(e)||'Unknown error'));
+  }
+}
 $('patientForm').addEventListener('input',togglePatientOther);$('patientForm').addEventListener('change',togglePatientOther);
 
 const ACTION_GROUPS=[['Actions Taken',NERIS_ACTION_TACTICS.map(x=>x.label)]];
