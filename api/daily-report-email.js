@@ -137,7 +137,7 @@ async function sendEmail(attachments,shiftStart,shiftEnd,incidentCount,reportCou
   if(!key||!from) throw new Error("Brevo email is not configured. Add BREVO_API_KEY and BREVO_FROM_EMAIL in Vercel.");
   const payload={
     sender:{email:from,name:"Jasper Fire Department"},
-    to:[{email:"firechief@jaspercity.com"},{email:"fireclerk@jaspercity.com"}],
+    to:[{email:"firechief@jaspercity.com"}],
     subject:"Jasper Fire Department - Daily Shift Reports - "+shiftStart+" to "+shiftEnd,
     textContent:"Daily shift package for "+shiftStart+" through "+shiftEnd+"\\n\\nIncidents: "+incidentCount+"\\nSubmitted reports: "+reportCount+"\\nAttachments: "+attachments.length,
     attachment:attachments.map(a=>({content:a.content,name:a.filename}))
