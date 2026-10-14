@@ -20,7 +20,7 @@ import sharp from "sharp";
 
 async function embedJfdLogoSafely(pdf){
   const raw=String(JFD_LOGO_JPG||"");
-  const encoded=(raw.includes(",")?raw.slice(raw.indexOf(",")+1):raw).replace(/[\\s\u200B]+/g,"");
+  const encoded=(raw.includes(",")?raw.slice(raw.indexOf(",")+1):raw).replace(/[\s\u200B]+/g,"");
   const bytes=Buffer.from(encoded,"base64");
   if(bytes.length<8)throw new Error("JFD logo image data is empty or incomplete");
   // The bundled department logo is a JPEG. Embed that source directly first;
