@@ -19,18 +19,20 @@ import sharp from "sharp";
 
 
 async function embedJfdLogoSafely(pdf){
-  try {
-    const raw=String(JFD_LOGO_JPG||"");
-    const encoded=(raw.includes(",")?raw.slice(raw.indexOf(",")+1):raw).replaceAll(" ","").replaceAll("\n","").replaceAll("\r","").replaceAll("\t","");
-    const bytes=Buffer.from(encoded,"base64");
-    if(bytes.length<8)throw new Error("JFD logo image data is empty or incomplete");
-    // Normalize the source image through Sharp so PDF output does not depend on
-    // the original JPEG's color profile, metadata, or encoding quirks.
-    const png=await sharp(bytes).rotate().png().toBuffer();
-    return await pdf.embedPng(png);
-  } catch(e) {
-    console.error("JFD logo could not be normalized for PDF:",e?.message||e);
-    return null;
+  const raw=String(JFD_LOGO_JPG||"");
+  const encoded=(raw.includes(",")?raw.slice(raw.indexOf(",")+1):raw).replace(/[\\s\u200B]+/g,"");
+  const bytes=Buffer.from(encoded,"base64");
+  if(bytes.length<8)throw new Error("JFD logo image data is empty or incomplete");
+  // The bundled department logo is a JPEG. Embed that source directly first;
+  // this avoids a runtime image-conversion dependency silently hiding the logo.
+  try{return await pdf.embedJpg(bytes);}catch(jpgError){
+    try{
+      const png=await sharp(bytes).rotate().png().toBuffer();
+      return await pdf.embedPng(png);
+    }catch(pngError){
+      console.error("JFD logo could not be embedded:",jpgError?.message||jpgError,pngError?.message||pngError);
+      return null;
+    }
   }
 }
 const SUPABASE_URL="https://audgtwcctdoiptuekqvn.supabase.co";
@@ -368,9 +370,25 @@ export async function makePdf(incident={},reports=[]){
  const sandboxReport=(reports||[]).find(r=>r?.data?.sandboxRecord);
  if(sandboxReport){
     const baseBytes=await makeSandboxIncidentPdf(incident,sandboxReport);
-    const pcrReports=(reports||[]).filter(r=>String(r?.report_type||"").startsWith("pcr_"));
-    if(!pcrReports.length)return baseBytes;
-    const pcrBytes=await makePdf(incident,pcrReports);
+    const allReports=Array.isArray(reports)?reports:[];
+    const nestedPatients=allReports.flatMap(r=>{
+      const d=r?.data||{},sandbox=d.sandboxRecord||{};
+      const p=Array.isArray(d.patients)&&d.patients.length?d.patients:sandbox.patients;
+      return Array.isArray(p)?p:[];
+    });
+    const pcrReports=allReports.filter(r=>String(r?.report_type||"").startsWith("pcr_"));
+    const patientRecords=nestedPatients.length?nestedPatients:pcrReports.map(r=>r?.data||{});
+    if(!patientRecords.length)return baseBytes;
+    // Render each patient using the same two-page summary/protected-record
+    // template as normal incident PDFs, then append every patient page to the
+    // sandbox incident PDF. Do not rely on separate PCR report cards existing.
+    const patientOnlyReport={report_type:"fire_neris_v2",status:"ready_for_neris",data:{
+      rUnifiedIncidentReport:true,rCad:incident.cad||sandboxReport.data?.rCad||"",
+      rLocation:incident.location||sandboxReport.data?.rLocation||"",
+      rDate:incident.dispatch_time||sandboxReport.data?.rDate||"",
+      patients:patientRecords
+    }};
+    const pcrBytes=await makePdf(incident,[patientOnlyReport]);
     const basePdf=await PDFDocument.load(baseBytes),pcrPdf=await PDFDocument.load(pcrBytes);
     const pcrPageIndices=pcrPdf.getPageIndices().slice(1);
     if(!pcrPageIndices.length)return baseBytes;
