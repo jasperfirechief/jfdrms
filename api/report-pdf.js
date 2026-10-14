@@ -653,22 +653,22 @@ let page,y,pageNo=0;
        safeDrawText(page,"REFUSAL ACKNOWLEDGMENT",{x:m+10,y:cardTop-15,font:F.bold,size:8,color:NAVY});
        safeDrawText(page,"DISCLAIMER",{x:m+10,y:cardTop-31,font:F.bold,size:7,color:SLATE});
        disclaimerLines.forEach((ln,i)=>safeDrawText(page,ln,{x:m+10,y:cardTop-44-i*11,font:F.reg,size:8.4,color:NAVY}));
-       let cardY=cardTop-44-disclaimerLines.length*11;
+       let cardY=cardTop-44-disclaimerLines.length*11-5;
        if(extraRiskLines.length){
-         safeDrawText(page,"Additional risks / recommendations",{x:m+10,y:cardY-2,font:F.bold,size:7,color:SLATE});
-         extraRiskLines.forEach((ln,i)=>safeDrawText(page,ln,{x:m+10,y:cardY-14-i*10,font:F.reg,size:8.1,color:NAVY}));
-         cardY-=extraRiskLines.length*10+16;
-       }else cardY-=4;
+         safeDrawText(page,"Additional risks / recommendations",{x:m+10,y:cardY-7,font:F.bold,size:7,color:SLATE});
+         extraRiskLines.forEach((ln,i)=>safeDrawText(page,ln,{x:m+10,y:cardY-19-i*10,font:F.reg,size:8.1,color:NAVY}));
+         cardY-=extraRiskLines.length*10+24;
+       }
        safeDrawText(page,"REFUSING PARTY",{x:m+10,y:cardY-8,font:F.bold,size:7,color:SLATE});
        safeDrawText(page,pretty(signer),{x:m+94,y:cardY-8,font:F.reg,size:8.2,color:NAVY});
        safeDrawText(page,"RELATIONSHIP",{x:m+330,y:cardY-8,font:F.bold,size:7,color:SLATE});
        safeDrawText(page,pretty(relationship),{x:m+404,y:cardY-8,font:F.reg,size:8.2,color:NAVY});
-       const sigTop=cardTop-cardHeight+53;
-       safeDrawText(page,"PATIENT / GUARDIAN SIGNATURE",{x:m+10,y:sigTop+28,font:F.bold,size:7,color:SLATE});
-       page.drawLine({start:{x:m+10,y:sigTop+5},end:{x:m+usable-10,y:sigTop+5},thickness:.5,color:MID});
+       cardY-=20;
+       safeDrawText(page,"PATIENT / GUARDIAN SIGNATURE",{x:m+10,y:cardY-2,font:F.bold,size:7,color:SLATE});
+       page.drawLine({start:{x:m+10,y:cardY-42},end:{x:m+usable-10,y:cardY-42},thickness:.5,color:MID});
        if(String(p.signature||"").startsWith("data:image/png")){
-         try{const bytes=Buffer.from(String(p.signature).split(",")[1],"base64"),img=await pdf.embedPng(bytes);page.drawImage(img,{x:m+12,y:sigTop+7,width:210,height:34});}catch{}
-       }else safeDrawText(page,p.signatureName||p.refusalSigner||"Electronic signature recorded",{x:m+12,y:sigTop+17,font:F.reg,size:8.5,color:NAVY});
+         try{const bytes=Buffer.from(String(p.signature).split(",")[1],"base64"),img=await pdf.embedPng(bytes);page.drawImage(img,{x:m+12,y:cardY-39,width:210,height:30});}catch{}
+       }else safeDrawText(page,p.signatureName||p.refusalSigner||"Electronic signature recorded",{x:m+12,y:cardY-25,font:F.reg,size:8.5,color:NAVY});
        y=cardTop-cardHeight-8;
      }else if(hasVal(p.dispositionNarrative)||hasVal(p.transferNarrative)||hasVal(p.patientSignatureName)||hasVal(p.signatureName)||hasVal(p.provider)){
        section("Disposition / Transfer");
