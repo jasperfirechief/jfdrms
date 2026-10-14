@@ -1,4 +1,19 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+
+// Standard Helvetica uses WinAnsi encoding. Normalize incoming report text before
+// drawing so clinical notation such as CO₂/O₂ cannot break the entire PDF.
+function safePdfText(value) {
+  return String(value ?? "").normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\u2010-\u2015]/g, "-")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2080-\u2089]/g, ch => String(ch.codePointAt(0) - 0x2080))
+    .replace(/[\u2070\u00B9\u00B2\u00B3\u2074-\u2079]/g, ch => ({"⁰":"0","¹":"1","²":"2","³":"3","⁴":"4","⁵":"5","⁶":"6","⁷":"7","⁸":"8","⁹":"9"}[ch] || ch));
+}
+function safeDrawText(page, value, options) {
+  return safeDrawText(page,safePdfText(value), options);
+}
 import { JFD_LOGO_JPG } from "./jfd-logo-data.js";
 
 
@@ -74,15 +89,15 @@ async function makeMvaPdf(incident={},reports=[]){
  const dateText=v=>{if(!has(v))return "—";const s=clean(v),m=s.match(/^(\\d{4})-(\\d{2})-(\\d{2})/);return m?m[2]+"/"+m[3]+"/"+m[1]:s};
  const timeText=v=>{if(!has(v))return "—";const s=clean(v),m=s.match(/T(\\d{2}):(\\d{2})/);return m?m[1]+":"+m[2]:s};
  const wrap=(v,font,size,max)=>{const words=String(v??"").split(/\\s+/).filter(Boolean),out=[];let line="";for(const w of words){const n=line?line+" "+w:w;if(line&&font.widthOfTextAtSize(n,size)>max){out.push(line);line=w}else line=n}if(line)out.push(line);return out.length?out:["—"]};
- const footer=()=>{page.drawLine({start:{x:m,y:35},end:{x:W-m,y:35},thickness:.6,color:MID});page.drawText("JFD RMS • Jasper Fire Department",{x:m,y:23,font:reg,size:7,color:SLATE});page.drawText("Page "+pageNo,{x:W-m-42,y:23,font:reg,size:7,color:SLATE});};
- const newPage=()=>{page=pdf.addPage([W,H]);pageNo++;page.drawRectangle({x:0,y:H-70,width:W,height:70,color:WHITE});if(logo)page.drawImage(logo,{x:m,y:H-60+(48-logoDims.height)/2,width:logoDims.width,height:logoDims.height});page.drawText("JASPER FIRE DEPARTMENT",{x:m+78,y:H-27,font:bold,size:15,color:NAVY});page.drawText("10 18th Street East · Jasper, Alabama 35501 · 205-221-8509",{x:m+78,y:H-41,font:reg,size:7.5,color:SLATE});page.drawText(currentTitle,{x:m+78,y:H-56,font:bold,size:10,color:RED});page.drawLine({start:{x:m,y:H-70},end:{x:W-m,y:H-70},thickness:1,color:MID});y=H-92;};
+ const footer=()=>{page.drawLine({start:{x:m,y:35},end:{x:W-m,y:35},thickness:.6,color:MID});safeDrawText(page,"JFD RMS • Jasper Fire Department",{x:m,y:23,font:reg,size:7,color:SLATE});safeDrawText(page,"Page "+pageNo,{x:W-m-42,y:23,font:reg,size:7,color:SLATE});};
+ const newPage=()=>{page=pdf.addPage([W,H]);pageNo++;page.drawRectangle({x:0,y:H-70,width:W,height:70,color:WHITE});if(logo)page.drawImage(logo,{x:m,y:H-60+(48-logoDims.height)/2,width:logoDims.width,height:logoDims.height});safeDrawText(page,"JASPER FIRE DEPARTMENT",{x:m+78,y:H-27,font:bold,size:15,color:NAVY});safeDrawText(page,"10 18th Street East · Jasper, Alabama 35501 · 205-221-8509",{x:m+78,y:H-41,font:reg,size:7.5,color:SLATE});safeDrawText(page,currentTitle,{x:m+78,y:H-56,font:bold,size:10,color:RED});page.drawLine({start:{x:m,y:H-70},end:{x:W-m,y:H-70},thickness:1,color:MID});y=H-92;};
  const ensure=n=>{if(y-n<bottom){footer();newPage();}};
- const section=title=>{ensure(32);page.drawRectangle({x:m,y:y-20,width:usable,height:22,color:LIGHT,borderWidth:.5,borderColor:MID});page.drawText(title.toUpperCase(),{x:m+9,y:y-14,font:bold,size:8.5,color:NAVY});y-=30;};
- const field=(label,value)=>{const lines=wrap(pretty(value),reg,8.2,usable-166),h=Math.max(20,lines.length*11+7);ensure(h+2);page.drawText(label,{x:m+7,y:y-12,font:bold,size:7.4,color:SLATE});lines.forEach((ln,i)=>page.drawText(ln,{x:m+160,y:y-12-i*11,font:reg,size:8.2,color:NAVY}));page.drawLine({start:{x:m,y:y-h},end:{x:m+usable,y:y-h},thickness:.35,color:MID});y-=h;};
- const two=(a,b)=>{const gap=12,col=(usable-gap)/2,lw=102;const draw=(x,z)=>{const ls=wrap(pretty(z[1]),reg,8,col-lw-12),h=Math.max(21,ls.length*10.5+7);return{x,ls,h,label:z[0]}};const A=draw(m,a),B=draw(m+col+gap,b),h=Math.max(A.h,B.h);ensure(h+2);for(const q of [A,B]){page.drawRectangle({x:q.x,y:y-h,width:col,height:h,borderWidth:.35,borderColor:MID});page.drawText(q.label,{x:q.x+7,y:y-12,font:bold,size:7.1,color:SLATE});q.ls.forEach((ln,i)=>page.drawText(ln,{x:q.x+lw,y:y-12-i*10.5,font:reg,size:8,color:NAVY}));}y-=h+4;};
+ const section=title=>{ensure(32);page.drawRectangle({x:m,y:y-20,width:usable,height:22,color:LIGHT,borderWidth:.5,borderColor:MID});safeDrawText(page,title.toUpperCase(),{x:m+9,y:y-14,font:bold,size:8.5,color:NAVY});y-=30;};
+ const field=(label,value)=>{const lines=wrap(pretty(value),reg,8.2,usable-166),h=Math.max(20,lines.length*11+7);ensure(h+2);safeDrawText(page,label,{x:m+7,y:y-12,font:bold,size:7.4,color:SLATE});lines.forEach((ln,i)=>safeDrawText(page,ln,{x:m+160,y:y-12-i*11,font:reg,size:8.2,color:NAVY}));page.drawLine({start:{x:m,y:y-h},end:{x:m+usable,y:y-h},thickness:.35,color:MID});y-=h;};
+ const two=(a,b)=>{const gap=12,col=(usable-gap)/2,lw=102;const draw=(x,z)=>{const ls=wrap(pretty(z[1]),reg,8,col-lw-12),h=Math.max(21,ls.length*10.5+7);return{x,ls,h,label:z[0]}};const A=draw(m,a),B=draw(m+col+gap,b),h=Math.max(A.h,B.h);ensure(h+2);for(const q of [A,B]){page.drawRectangle({x:q.x,y:y-h,width:col,height:h,borderWidth:.35,borderColor:MID});safeDrawText(page,q.label,{x:q.x+7,y:y-12,font:bold,size:7.1,color:SLATE});q.ls.forEach((ln,i)=>safeDrawText(page,ln,{x:q.x+lw,y:y-12-i*10.5,font:reg,size:8,color:NAVY}));}y-=h+4;};
  const units=[];const seen=new Map();
  for(const r of reports||[]){for(const u of (Array.isArray(r?.data?.responding_apparatus)?r.data.responding_apparatus:[])){const key=String(u?.apparatus_id??u?.unit_number??"");if(!key)continue;if(!seen.has(key))seen.set(key,{...u,crew:Array.isArray(u.crew)?u.crew.slice():[]});else{const p=seen.get(key);p.times={...(p.times||{}),...(u.times||{})};if((!p.crew||!p.crew.length)&&Array.isArray(u.crew))p.crew=u.crew.slice();} }} units.push(...seen.values());
- const responseTable=()=>{section("Response / Apparatus");if(!units.length){field("Responding Apparatus","None recorded");return;}const cols=[76,68,104,112,112,88],xs=[m,m+76,m+144,m+248,m+360,m+472],labs=["Unit","Station","Crew","Dispatch","Response","Disposition"];ensure(35);page.drawRectangle({x:m,y:y-23,width:usable,height:23,color:NAVY});labs.forEach((s,i)=>page.drawText(s,{x:xs[i]+5,y:y-15,font:bold,size:6.8,color:WHITE}));y-=23;for(const u of units){const z=u.times||{},crew=Array.isArray(u.crew)?u.crew.map(x=>typeof x==="object"?(x.name||x.full_name||x.role||"") : x).filter(Boolean).join(", "):u.crew;const vals=[u.unit_number||u.unit,u.station,crew,timeText(z.dispatch),[z.enroute&&("En route "+timeText(z.enroute)),z.on_scene&&("On scene "+timeText(z.on_scene))].filter(Boolean).join(" • "),[z.cancelled&&("Cancelled "+timeText(z.cancelled)),(z.in_service||z.clear)&&("In service "+timeText(z.in_service||z.clear))].filter(Boolean).join(" • ")];const ls=vals.map((v,i)=>wrap(pretty(v),reg,7,cols[i]-10)),rows=Math.max(...ls.map(x=>x.length)),rh=Math.max(20,rows*9+8);ensure(rh+2);page.drawRectangle({x:m,y:y-rh,width:usable,height:rh,borderWidth:.35,borderColor:MID});ls.forEach((arr,i)=>arr.forEach((ln,j)=>page.drawText(ln,{x:xs[i]+5,y:y-12-j*9,font:reg,size:7,color:NAVY})));y-=rh;}};
+ const responseTable=()=>{section("Response / Apparatus");if(!units.length){field("Responding Apparatus","None recorded");return;}const cols=[76,68,104,112,112,88],xs=[m,m+76,m+144,m+248,m+360,m+472],labs=["Unit","Station","Crew","Dispatch","Response","Disposition"];ensure(35);page.drawRectangle({x:m,y:y-23,width:usable,height:23,color:NAVY});labs.forEach((s,i)=>safeDrawText(page,s,{x:xs[i]+5,y:y-15,font:bold,size:6.8,color:WHITE}));y-=23;for(const u of units){const z=u.times||{},crew=Array.isArray(u.crew)?u.crew.map(x=>typeof x==="object"?(x.name||x.full_name||x.role||"") : x).filter(Boolean).join(", "):u.crew;const vals=[u.unit_number||u.unit,u.station,crew,timeText(z.dispatch),[z.enroute&&("En route "+timeText(z.enroute)),z.on_scene&&("On scene "+timeText(z.on_scene))].filter(Boolean).join(" • "),[z.cancelled&&("Cancelled "+timeText(z.cancelled)),(z.in_service||z.clear)&&("In service "+timeText(z.in_service||z.clear))].filter(Boolean).join(" • ")];const ls=vals.map((v,i)=>wrap(pretty(v),reg,7,cols[i]-10)),rows=Math.max(...ls.map(x=>x.length)),rh=Math.max(20,rows*9+8);ensure(rh+2);page.drawRectangle({x:m,y:y-rh,width:usable,height:rh,borderWidth:.35,borderColor:MID});ls.forEach((arr,i)=>arr.forEach((ln,j)=>safeDrawText(page,ln,{x:xs[i]+5,y:y-12-j*9,font:reg,size:7,color:NAVY})));y-=rh;}};
  newPage();
  section("Incident Information");
  two(["CAD / Incident Number",first(d.rCad,incident.cad)],["Incident Date",dateText(first(d.rDate,incident.incident_date,incident.dispatch_time))]);
@@ -141,9 +156,9 @@ async function makeSandboxIncidentPdf(incident={},report={}){
    page=pdf.addPage([W,H]);pageNo++;
    page.drawRectangle({x:0,y:H-8,width:W,height:8,color:red});
    if(logo)page.drawImage(logo,{x:m,y:H-57+(42-logoDims.height)/2,width:logoDims.width,height:logoDims.height});
-   page.drawText("JASPER FIRE DEPARTMENT",{x:m+60,y:H-27,size:15,font:bold,color:ink});
-   page.drawText("10 18th Street East · Jasper, Alabama 35501 · 205-221-8509",{x:m+60,y:H-41,size:7.5,font:reg,color:muted});
-   page.drawText("INCIDENT REPORT",{x:m+60,y:H-56,size:10,font:bold,color:red});
+   safeDrawText(page,"JASPER FIRE DEPARTMENT",{x:m+60,y:H-27,size:15,font:bold,color:ink});
+   safeDrawText(page,"10 18th Street East · Jasper, Alabama 35501 · 205-221-8509",{x:m+60,y:H-41,size:7.5,font:reg,color:muted});
+   safeDrawText(page,"INCIDENT REPORT",{x:m+60,y:H-56,size:10,font:bold,color:red});
    page.drawLine({start:{x:m,y:H-70},end:{x:W-m,y:H-70},thickness:1,color:red});
    y=H-91;
  };
@@ -151,7 +166,7 @@ async function makeSandboxIncidentPdf(incident={},report={}){
  const section=name=>{
    ensure(32);
    page.drawRectangle({x:m,y:y-19,width:usable,height:21,color:light});
-   page.drawText(String(name).toUpperCase(),{x:m+8,y:y-13,size:8.2,font:bold,color:ink});
+   safeDrawText(page,String(name).toUpperCase(),{x:m+8,y:y-13,size:8.2,font:bold,color:ink});
    y-=27;
  };
  const field=(label,value,opts={})=>{
@@ -160,8 +175,8 @@ async function makeSandboxIncidentPdf(incident={},report={}){
    const labelW=opts.labelW||142,fs=opts.size||8.2,lh=opts.lineHeight||10.5;
    const lines=wrap(text,reg,fs,usable-labelW-12),h=Math.max(18,lines.length*lh+6);
    ensure(h+2);
-   page.drawText(String(label),{x:m+6,y:y-11,size:7.3,font:bold,color:muted});
-   lines.forEach((ln,i)=>page.drawText(ln,{x:m+labelW,y:y-11-i*lh,size:fs,font:reg,color:ink}));
+   safeDrawText(page,String(label),{x:m+6,y:y-11,size:7.3,font:bold,color:muted});
+   lines.forEach((ln,i)=>safeDrawText(page,ln,{x:m+labelW,y:y-11-i*lh,size:fs,font:reg,color:ink}));
    page.drawLine({start:{x:m,y:y-h},end:{x:m+usable,y:y-h},thickness:.35,color:line});
    y-=h;
  };
@@ -170,20 +185,20 @@ async function makeSandboxIncidentPdf(incident={},report={}){
    const make=(x,item)=>{const value=human(item[1]);if(!has(value))return null;const lines=wrap(value,reg,fs,col-labelW-10);return{x,label:item[0],lines,h:Math.max(20,lines.length*lh+7)}};
    const A=make(m,a),B=make(m+col+gap,b);if(!A&&!B)return;
    const h=Math.max(A?.h||0,B?.h||0);ensure(h+2);
-   for(const q of [A,B])if(q){page.drawRectangle({x:q.x,y:y-h,width:col,height:h,borderWidth:.35,borderColor:line});page.drawText(q.label,{x:q.x+6,y:y-12,size:6.8,font:bold,color:muted});q.lines.forEach((ln,i)=>page.drawText(ln,{x:q.x+labelW,y:y-12-i*lh,size:fs,font:reg,color:ink}));}
+   for(const q of [A,B])if(q){page.drawRectangle({x:q.x,y:y-h,width:col,height:h,borderWidth:.35,borderColor:line});safeDrawText(page,q.label,{x:q.x+6,y:y-12,size:6.8,font:bold,color:muted});q.lines.forEach((ln,i)=>safeDrawText(page,ln,{x:q.x+labelW,y:y-12-i*lh,size:fs,font:reg,color:ink}));}
    y-=h+4;
  };
  const table=(headers,rows,widths)=>{
    rows=rows.filter(row=>row.some(has));if(!rows.length)return;
    const xs=[m];for(let i=0;i<widths.length;i++)xs.push(xs[i]+widths[i]);
-   const drawHeader=()=>{page.drawRectangle({x:m,y:y-21,width:usable,height:21,color:ink});headers.forEach((h,i)=>page.drawText(h,{x:xs[i]+4,y:y-13,size:6.6,font:bold,color:white}));y-=21};
+   const drawHeader=()=>{page.drawRectangle({x:m,y:y-21,width:usable,height:21,color:ink});headers.forEach((h,i)=>safeDrawText(page,h,{x:xs[i]+4,y:y-13,size:6.6,font:bold,color:white}));y-=21};
    ensure(30);drawHeader();
    for(const row of rows){
      const lines=row.map((v,i)=>wrap(human(v),reg,7,widths[i]-8));
      const count=Math.max(1,...lines.map(x=>x.length)),rh=Math.max(20,count*8.7+7);
      ensure(rh+22);if(y===H-91)drawHeader();
      page.drawRectangle({x:m,y:y-rh,width:usable,height:rh,borderWidth:.35,borderColor:line});
-     lines.forEach((arr,i)=>arr.forEach((txt,j)=>page.drawText(txt,{x:xs[i]+4,y:y-11-j*8.7,size:7,font:reg,color:ink})));
+     lines.forEach((arr,i)=>arr.forEach((txt,j)=>safeDrawText(page,txt,{x:xs[i]+4,y:y-11-j*8.7,size:7,font:reg,color:ink})));
      y-=rh;
    }
    y-=5;
@@ -323,14 +338,14 @@ async function makeSandboxIncidentPdf(incident={},report={}){
  if(has(d.narrative)){
    section("Incident Narrative");
    const lines=wrap(d.narrative,reg,9,usable-14),lh=13;
-   for(const ln of lines){ensure(lh+2);page.drawText(ln,{x:m+7,y:y-10,size:9,font:reg,color:ink});y-=lh;}
+   for(const ln of lines){ensure(lh+2);safeDrawText(page,ln,{x:m+7,y:y-10,size:9,font:reg,color:ink});y-=lh;}
  }
  const completedBy=first(d.completedBy,d.reportCompletedBy,report.completed_by,report.report_by,incident.completed_by);
  if(has(completedBy)){section("Report Completion");field("Report Completed By",completedBy);}
  for(const p of pdf.getPages()){
    p.drawLine({start:{x:m,y:34},end:{x:W-m,y:34},thickness:.5,color:line});
-   p.drawText("Jasper Fire Department · Official Incident Record",{x:m,y:21,size:7,font:reg,color:muted});
-   p.drawText("Page "+(pdf.getPages().indexOf(p)+1),{x:W-m-35,y:21,size:7,font:reg,color:muted});
+   safeDrawText(p,"Jasper Fire Department · Official Incident Record",{x:m,y:21,size:7,font:reg,color:muted});
+   safeDrawText(p,"Page "+(pdf.getPages().indexOf(p)+1),{x:W-m-35,y:21,size:7,font:reg,color:muted});
  }
  return pdf.save({objectsPerTick:Infinity});
 }
@@ -379,15 +394,15 @@ let page,y,pageNo=0;
  const drawHeader=title=>{
    page.drawRectangle({x:0,y:H-70,width:W,height:70,color:WHITE});
    if(logo)page.drawImage(logo,{x:m,y:H-61+((50-logoDims.height)/2),width:logoDims.width,height:logoDims.height});
-   page.drawText("JASPER FIRE DEPARTMENT",{x:m+72,y:H-27,font:F.bold,size:15,color:NAVY});
-   page.drawText("10 18th Street East · Jasper, Alabama 35501 · 205-221-8509",{x:m+72,y:H-41,font:F.reg,size:7.5,color:SLATE});
-   page.drawText(title,{x:m+72,y:H-56,font:F.bold,size:10,color:RED});
+   safeDrawText(page,"JASPER FIRE DEPARTMENT",{x:m+72,y:H-27,font:F.bold,size:15,color:NAVY});
+   safeDrawText(page,"10 18th Street East · Jasper, Alabama 35501 · 205-221-8509",{x:m+72,y:H-41,font:F.reg,size:7.5,color:SLATE});
+   safeDrawText(page,title,{x:m+72,y:H-56,font:F.bold,size:10,color:RED});
    page.drawLine({start:{x:m,y:H-70},end:{x:W-m,y:H-70},thickness:1,color:MID});
  };
  const drawFooter=()=>{
    page.drawLine({start:{x:m,y:35},end:{x:W-m,y:35},thickness:.6,color:MID});
-   page.drawText("JFD RMS • Jasper Fire Department",{x:m,y:23,font:F.reg,size:7,color:SLATE});
-   page.drawText("Page "+pageNo,{x:W-m-42,y:23,font:F.reg,size:7,color:SLATE});
+   safeDrawText(page,"JFD RMS • Jasper Fire Department",{x:m,y:23,font:F.reg,size:7,color:SLATE});
+   safeDrawText(page,"Page "+pageNo,{x:W-m-42,y:23,font:F.reg,size:7,color:SLATE});
  };
  const newPage=(title="JFD RMS REPORT")=>{
    page=pdf.addPage([W,H]);pageNo++;pages.push(page);drawHeader(title);y=H-headerH;
@@ -397,23 +412,23 @@ let page,y,pageNo=0;
  const section=title=>{
    ensure(30);
    page.drawRectangle({x:m,y:y-19,width:usable,height:21,color:LIGHT,borderWidth:.5,borderColor:MID});
-   page.drawText(String(title).toUpperCase(),{x:m+9,y:y-13,font:F.bold,size:8.5,color:NAVY});
+   safeDrawText(page,String(title).toUpperCase(),{x:m+9,y:y-13,font:F.bold,size:8.5,color:NAVY});
    y-=29;
  };
  const field=(label,value,opts={})=>{
    const text=pretty(value),fs=opts.size||8.2,lh=opts.lh||11,labelW=opts.labelW||154,valueW=usable-labelW-12;
    const lines=wrapLines(text,F.reg,fs,valueW),h=Math.max(19,lines.length*lh+7);
    ensure(h+2);
-   page.drawText(String(label),{x:m+7,y:y-12,font:F.bold,size:7.4,color:SLATE});
-   lines.forEach((ln,i)=>page.drawText(ln,{x:m+labelW,y:y-12-(i*lh),font:F.reg,size:fs,color:NAVY}));
+   safeDrawText(page,String(label),{x:m+7,y:y-12,font:F.bold,size:7.4,color:SLATE});
+   lines.forEach((ln,i)=>safeDrawText(page,ln,{x:m+labelW,y:y-12-(i*lh),font:F.reg,size:fs,color:NAVY}));
    page.drawLine({start:{x:m,y:y-h},end:{x:m+usable,y:y-h},thickness:.35,color:rgb(.87,.89,.92)});
    y-=h;
  };
  const fullText=(label,value)=>{
    const text=pretty(value),fs=8.4,lh=12,lines=wrapLines(text,F.reg,fs,usable-14),h=24+lines.length*lh;
    ensure(h+4);
-   page.drawText(String(label),{x:m+7,y:y-12,font:F.bold,size:7.5,color:SLATE});
-   lines.forEach((ln,i)=>page.drawText(ln,{x:m+7,y:y-27-(i*lh),font:F.reg,size:fs,color:NAVY}));
+   safeDrawText(page,String(label),{x:m+7,y:y-12,font:F.bold,size:7.5,color:SLATE});
+   lines.forEach((ln,i)=>safeDrawText(page,ln,{x:m+7,y:y-27-(i*lh),font:F.reg,size:fs,color:NAVY}));
    page.drawRectangle({x:m,y:y-h+3,width:usable,height:h,borderWidth:.5,borderColor:MID});
    y-=h+5;
  };
@@ -426,15 +441,15 @@ let page,y,pageNo=0;
    let a=draw(m,left),b=draw(m+col+gap,right),h=Math.max(a.h,b.h);ensure(h+2);
    page.drawRectangle({x:m,y:y-h,width:col,height:h,borderWidth:.35,borderColor:MID});
    page.drawRectangle({x:m+col+gap,y:y-h,width:col,height:h,borderWidth:.35,borderColor:MID});
-   page.drawText(a.label,{x:m+7,y:y-12,font:F.bold,size:7.2,color:SLATE});a.lines.forEach((ln,i)=>page.drawText(ln,{x:m+labelW,y:y-12-i*10.5,font:F.reg,size:8,color:NAVY}));
-   page.drawText(b.label,{x:m+col+gap+7,y:y-12,font:F.bold,size:7.2,color:SLATE});b.lines.forEach((ln,i)=>page.drawText(ln,{x:m+col+gap+labelW,y:y-12-i*10.5,font:F.reg,size:8,color:NAVY}));
+   safeDrawText(page,a.label,{x:m+7,y:y-12,font:F.bold,size:7.2,color:SLATE});a.lines.forEach((ln,i)=>safeDrawText(page,ln,{x:m+labelW,y:y-12-i*10.5,font:F.reg,size:8,color:NAVY}));
+   safeDrawText(page,b.label,{x:m+col+gap+7,y:y-12,font:F.bold,size:7.2,color:SLATE});b.lines.forEach((ln,i)=>safeDrawText(page,ln,{x:m+col+gap+labelW,y:y-12-i*10.5,font:F.reg,size:8,color:NAVY}));
    y-=h+4;
  };
  const responseTable=units=>{
    if(!units.length){field("Responding Apparatus","None recorded");return}
    const cols=[70,80,92,115,105,102],xs=[m,m+70,m+150,m+242,m+357,m+462],labels=["Unit","Station","Crew","Dispatch","Response","Disposition"];
    ensure(34);page.drawRectangle({x:m,y:y-22,width:usable,height:22,color:NAVY});
-   labels.forEach((s,i)=>page.drawText(s,{x:xs[i]+5,y:y-14,font:F.bold,size:6.8,color:WHITE}));y-=22;
+   labels.forEach((s,i)=>safeDrawText(page,s,{x:xs[i]+5,y:y-14,font:F.bold,size:6.8,color:WHITE}));y-=22;
    for(const u of units){
      const z=u.times||{},crew=Array.isArray(u.crew)?u.crew.map(x=>{if(typeof x!=="object")return x;const role=String(x.role||"").toLowerCase();const tag=role==="driver"?"Driver":role==="officer"?"Officer":(x.role||"");return (x.name||x.full_name||"")+(tag?" ("+tag+")":"");}).filter(Boolean).join(", "):u.crew;
      const dispatch=z.dispatch&&timeText(z.dispatch);
@@ -443,7 +458,7 @@ let page,y,pageNo=0;
      const vals=[pretty(u.unit_number||u.unit),pretty(u.station),pretty(crew),dispatch||"—",response||"—",disp||"—"];
      const lines=vals.map((v,i)=>wrapLines(v,F.reg,7.0,cols[i]-10));const rows=Math.max(...lines.map(a=>a.length));const rh=Math.max(18,rows*9+7);ensure(rh+2);
      page.drawRectangle({x:m,y:y-rh,width:usable,height:rh,borderWidth:.35,borderColor:MID});
-     lines.forEach((ls,i)=>ls.forEach((ln,j)=>page.drawText(ln,{x:xs[i]+5,y:y-11-j*9,font:F.reg,size:7.0,color:NAVY})));y-=rh;
+     lines.forEach((ls,i)=>ls.forEach((ln,j)=>safeDrawText(page,ln,{x:xs[i]+5,y:y-11-j*9,font:F.reg,size:7.0,color:NAVY})));y-=rh;
    }
    y-=5;
  };
@@ -606,13 +621,13 @@ let page,y,pageNo=0;
        if(hasVal(p.refusalDateTime)||hasVal(p.refusalDate)||hasVal(p.signedAt)||hasVal(p.witnessName)||hasVal(p.refusalWitness))twoCol(["Refusal Date / Time",firstVal(p.refusalDateTime,p.refusalDate,p.signedAt)],["Witness",firstVal(p.witnessName,p.refusalWitness)]);
        if(p.signatureRefused||p.patientRefusedSignature)field("If Patient Declined to Sign","Patient/representative declined to sign.");
        ensure(112);
-       page.drawText("Patient / Guardian Signature",{x:m+7,y:y-12,font:F.bold,size:7.5,color:SLATE});
+       safeDrawText(page,"Patient / Guardian Signature",{x:m+7,y:y-12,font:F.bold,size:7.5,color:SLATE});
        if(String(p.signature||"").startsWith("data:image/png")){
          try{const bytes=Buffer.from(String(p.signature).split(",")[1],"base64"),img=await pdf.embedPng(bytes);page.drawImage(img,{x:m+7,y:y-91,width:250,height:70});}catch{}
-       }else page.drawText(p.signatureName||p.refusalSigner||"Electronic signature recorded",{x:m+7,y:y-50,font:F.reg,size:9,color:NAVY});
+       }else safeDrawText(page,p.signatureName||p.refusalSigner||"Electronic signature recorded",{x:m+7,y:y-50,font:F.reg,size:9,color:NAVY});
        page.drawRectangle({x:m+7,y:y-92,width:250,height:70,borderWidth:.5,borderColor:MID});
-       page.drawText("Signature",{x:m+265,y:y-12,font:F.bold,size:7.5,color:SLATE});
-       page.drawText("Date / Time",{x:m+390,y:y-12,font:F.bold,size:7.5,color:SLATE});
+       safeDrawText(page,"Signature",{x:m+265,y:y-12,font:F.bold,size:7.5,color:SLATE});
+       safeDrawText(page,"Date / Time",{x:m+390,y:y-12,font:F.bold,size:7.5,color:SLATE});
        page.drawLine({start:{x:m+265,y:y-58},end:{x:m+380,y:y-58},thickness:.5,color:MID});
        page.drawLine({start:{x:m+390,y:y-58},end:{x:m+usable-7,y:y-58},thickness:.5,color:MID});
        y-=105;
@@ -663,7 +678,7 @@ let page,y,pageNo=0;
        if(hasVal(p.completedBy)||hasVal(p.reportCompletedBy)||hasVal(p.provider))field("Person Completing Report",firstVal(p.completedBy,p.reportCompletedBy,p.provider));
        if(hasVal(p.provider)||hasVal(p.crew))field("Provider / Crew",firstVal(p.provider,p.crew));
      }
-     page.drawText("Patient "+(i+1)+" of "+patients.length,{x:W-m-65,y:23,font:F.bold,size:7,color:SLATE});
+     safeDrawText(page,"Patient "+(i+1)+" of "+patients.length,{x:W-m-65,y:23,font:F.bold,size:7,color:SLATE});
    }
  }
 
@@ -697,11 +712,11 @@ let page,y,pageNo=0;
 
 async function makeArchivePdf(kind,data){
  const pdf=await PDFDocument.create(),reg=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
- const W=612,H=792,m=42,usable=W-2*m;let page,y;const F={reg,bold};const newPage=()=>{page=pdf.addPage([W,H]);y=H-m};const wrap=(s,size=9,lh=13,b=false)=>{const font=b?F.bold:F.reg;let line="";for(const word of String(s??"").split(/\s+/)){const n=line?line+" "+word:word;if(font.widthOfTextAtSize(n,size)>usable&&line){page.drawText(line,{x:m,y,font,size});y-=lh;line=word}else line=n}if(line){page.drawText(line,{x:m,y,font,size});y-=lh}};const top=title=>{newPage();page.drawText("JASPER FIRE DEPARTMENT",{x:m,y,font:F.bold,size:16,color:rgb(.12,.16,.22)});y-=20;page.drawText(title,{x:m,y,font:F.bold,size:11,color:rgb(.65,.02,.02)});y-=24};const section=title=>{if(y<80)newPage();page.drawText(title,{x:m,y,font:F.bold,size:11});y-=17};const kv=(k,v)=>{if(y<55)newPage();page.drawText(k+":",{x:m,y,font:F.bold,size:8});wrap(v||"—",8,10);};
+ const W=612,H=792,m=42,usable=W-2*m;let page,y;const F={reg,bold};const newPage=()=>{page=pdf.addPage([W,H]);y=H-m};const wrap=(s,size=9,lh=13,b=false)=>{const font=b?F.bold:F.reg;let line="";for(const word of String(s??"").split(/\s+/)){const n=line?line+" "+word:word;if(font.widthOfTextAtSize(n,size)>usable&&line){safeDrawText(page,line,{x:m,y,font,size});y-=lh;line=word}else line=n}if(line){safeDrawText(page,line,{x:m,y,font,size});y-=lh}};const top=title=>{newPage();safeDrawText(page,"JASPER FIRE DEPARTMENT",{x:m,y,font:F.bold,size:16,color:rgb(.12,.16,.22)});y-=20;safeDrawText(page,title,{x:m,y,font:F.bold,size:11,color:rgb(.65,.02,.02)});y-=24};const section=title=>{if(y<80)newPage();safeDrawText(page,title,{x:m,y,font:F.bold,size:11});y-=17};const kv=(k,v)=>{if(y<55)newPage();safeDrawText(page,k+":",{x:m,y,font:F.bold,size:8});wrap(v||"—",8,10);};
  top(kind==="staffing"?"DAILY STAFFING REPORT":kind==="check"?"APPARATUS CHECK REPORT":kind==="inspection"?"FIRE INSPECTION REPORT":"INCIDENT REPORT");
  const x=data||{};for(const [k,v] of Object.entries(x)){if(v===null||v===undefined||v==="")continue;if(Array.isArray(v)||typeof v==="object"){section(k.replace(/[_-]/g," ").toUpperCase());wrap(JSON.stringify(v,null,2),7,9)}else kv(k.replace(/[_-]/g," "),v)}
  if(kind==="incident"&&x.reports){for(const r of x.reports||[]){section(r.report_type||"Report");for(const [k,v] of Object.entries(r.data||{})){if(v===null||v===undefined||v==="")continue;if(Array.isArray(v)||typeof v==="object")wrap(k+": "+JSON.stringify(v),7,9);else kv(k,v)}}}
- page.drawText("JFD RMS • Administrative Report Archive",{x:m,y:30,font:F.reg,size:7,color:rgb(.4,.4,.4)});return pdf.save({objectsPerTick:Infinity});
+ safeDrawText(page,"JFD RMS • Administrative Report Archive",{x:m,y:30,font:F.reg,size:7,color:rgb(.4,.4,.4)});return pdf.save({objectsPerTick:Infinity});
 }
 function crc32(buf){let table=crc32.table;if(!table){table=crc32.table=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?(0xedb88320^(c>>>1)):(c>>>1);table[n]=c>>>0;}}let crc=0xffffffff;for(const b of buf)crc=table[(crc^b)&255]^(crc>>>8);return(crc^0xffffffff)>>>0;}
 function zipStore(entries){const locals=[],central=[];let offset=0;for(const entry of entries){const name=Buffer.from(String(entry.name),"utf8"),data=Buffer.from(entry.data),crc=crc32(data),lh=Buffer.alloc(30);lh.writeUInt32LE(0x04034b50,0);lh.writeUInt16LE(20,4);lh.writeUInt16LE(0x800,6);lh.writeUInt32LE(crc,14);lh.writeUInt32LE(data.length,18);lh.writeUInt32LE(data.length,22);lh.writeUInt16LE(name.length,26);locals.push(lh,name,data);const ch=Buffer.alloc(46);ch.writeUInt32LE(0x02014b50,0);ch.writeUInt16LE(20,4);ch.writeUInt16LE(20,6);ch.writeUInt16LE(0x800,8);ch.writeUInt32LE(crc,16);ch.writeUInt32LE(data.length,20);ch.writeUInt32LE(data.length,24);ch.writeUInt16LE(name.length,28);ch.writeUInt32LE(offset,42);central.push(ch,name);offset+=lh.length+name.length+data.length;}const body=Buffer.concat(locals),cd=Buffer.concat(central),end=Buffer.alloc(22);end.writeUInt32LE(0x06054b50,0);end.writeUInt16LE(entries.length,8);end.writeUInt16LE(entries.length,10);end.writeUInt32LE(cd.length,12);end.writeUInt32LE(body.length,16);return Buffer.concat([body,cd,end]);}
