@@ -661,7 +661,7 @@ let page,y,pageNo=0;
      section("Report Identification");
      twoCol(["Patient Record","Patient "+(i+1)+" of "+patients.length],["Completed By",firstVal(p.completedBy,p.reportCompletedBy,p.provider,"JFD RMS user")]);
 
-     currentTitle="PATIENT CARE REPORT — PROTECTED CLINICAL RECORD";newPage(currentTitle);
+     currentTitle="PATIENT CARE REPORT";
      section("Patient Identification");
      twoCol(["Patient",p.name],["Date of Birth",dateText(p.dob)]);
      twoCol(["Age",p.age],["Sex",p.sex]);
@@ -674,7 +674,42 @@ let page,y,pageNo=0;
      section("Clinical Assessment");
      if(p.careProvided===true||p.careProvided===false||hasVal(p.evaluation))field("Patient Care Provided",p.careProvided===true?"Evaluated and cared for":p.careProvided===false?"Evaluated, no care required":p.evaluation);
      const vitals=p.vitals||{};
-     if(Object.keys(vitals).length){section("Vital Signs");for(const [k,v] of Object.entries(vitals))if(hasVal(v))field(prettyKey(k),v);}
+     if(vitals && Object.keys(vitals).length){
+       const rawRows=Array.isArray(vitals)?vitals:
+         Object.values(vitals).some(v=>v&&typeof v==="object"&&!Array.isArray(v))?
+           Object.entries(vitals).filter(([,v])=>v&&typeof v==="object"&&!Array.isArray(v)).map(([k,v])=>({reading:k,...v})):
+           [vitals];
+       const vitalRows=rawRows.map(v=>{
+         const value=(...keys)=>firstVal(...keys.map(k=>v?.[k]));
+         return [
+           value("time","readingTime","takenAt","timestamp","reading","label"),
+           value("bp","bloodPressure","blood_pressure","bloodPressureValue"),
+           value("pulse","heartRate","heart_rate","hr"),
+           value("respirations","respiration","respiratoryRate","respiratory_rate","rr"),
+           value("spo2","SpO2","oxygenSaturation","oxygen_saturation","o2"),
+           value("temperature","temp"),
+           value("glucose","bloodGlucose","blood_glucose")
+         ];
+       }).filter(row=>row.some(hasVal));
+       if(vitalRows.length){
+         section("Vital Signs");
+         const headers=["TIME","BP","PULSE","RESP","SpO₂","TEMP","GLUCOSE"];
+         const widths=[56,72,56,56,56,62,90],xs=[m];
+         for(let j=0;j<widths.length;j++)xs.push(xs[j]+widths[j]);
+         const drawVitalsHeader=()=>{ensure(28);page.drawRectangle({x:m,y:y-19,width:usable,height:19,color:LIGHT,borderWidth:.4,borderColor:MID});headers.forEach((h,j)=>safeDrawText(page,h,{x:xs[j]+3,y:y-12,font:F.bold,size:6.5,color:NAVY}));y-=19;};
+         drawVitalsHeader();
+         for(const row of vitalRows){
+           const vals=row.map(v=>hasVal(v)?pretty(v):"—");
+           const wrapped=vals.map((v,j)=>wrapLines(v,F.reg,7,widths[j]-6));
+           const rh=Math.max(18,Math.max(...wrapped.map(a=>a.length))*8+6);
+           ensure(rh+2);
+           page.drawRectangle({x:m,y:y-rh,width:usable,height:rh,borderWidth:.35,borderColor:MID});
+           wrapped.forEach((arr,j)=>arr.forEach((txt,k)=>safeDrawText(page,txt,{x:xs[j]+3,y:y-10-k*8,font:F.reg,size:7,color:NAVY})));
+           y-=rh;
+         }
+         y-=4;
+       }
+     }
      if(hasVal(p.medicalHistory)||hasVal(p.history))field("Medical History",firstVal(p.medicalHistory,p.history));
      if(hasVal(p.medications)||hasVal(p.meds))field("Medications",firstVal(p.medications,p.meds));
      if(hasVal(p.allergies))field("Allergies",p.allergies);
@@ -745,8 +780,15 @@ function zipStore(entries){const locals=[],central=[];let offset=0;for(const ent
 async function makeIncidentPdfs(incident,reports){const out=[];for(let i=0;i<reports.length;i++){const r=reports[i],pdf=await makePdf(incident,[r]),kind=r?.data?.rUnifiedIncidentReport?"Incident Report":r?.data?.rUnifiedIncidentReport?"Incident Report":String(r?.report_type||"").startsWith("pcr_")?"Patient Care Report":"Fire Incident Report";out.push({pdf,name:String(i+1).padStart(2,"0")+"_"+kind.replace(/[^A-Za-z0-9_-]+/g,"_")+".pdf"});}return out;}
 
 async function makeCombinedIncidentPdf(incident,reports){
+ const list=Array.isArray(reports)?reports:[];
+ // A unified sandbox incident report already assembles its PCR pages. Render
+ // the package once so legacy fire/PCR records do not create duplicate covers.
+ if(list.some(r=>r?.data?.sandboxRecord)){
+  const bytes=await makePdf(incident,list);
+  return bytes;
+ }
  const combined=await PDFDocument.create();
- for(const report of reports||[]){
+ for(const report of list){
   const bytes=await makePdf(incident,[report]);
   const source=await PDFDocument.load(bytes);
   const pages=await combined.copyPages(source,source.getPageIndices());
