@@ -1914,7 +1914,7 @@ async function submitReportToNeris(data,incidentId,explicitAdminReview=false){
 }
 async function saveReportDraft(kind,silent=false){
   const form=$("incidentReportForm");if(!form)return;
-  const data=collectReportFormData(),m=$("reportModal"),incidentId=Number(m?.dataset.incidentId||0)||null;
+  const data=(typeof window.collectReportFormData==="function"?window.collectReportFormData():collectReportFormData()),m=$("reportModal"),incidentId=Number(m?.dataset.incidentId||0)||null;
     const reportType=kind==="pcr"?"pcr_neris_v2":"fire_neris_v2";
   const editingId=String(m?.dataset.reportId||"").trim();
   const report={report_id:editingId||crypto.randomUUID(),report_type:reportType,status:"draft",data,updated_at:new Date().toISOString(),created_by:me?.id||null};
