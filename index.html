@@ -1915,7 +1915,11 @@ async function submitReportToNeris(data,incidentId,explicitAdminReview=false){
 async function saveReportDraft(kind,silent=false){
   const form=$("incidentReportForm");if(!form)throw new Error("The incident report form is not available; patient details were not saved.");
   const data=(typeof window.collectReportFormData==="function"?window.collectReportFormData():collectReportFormData()),m=$("reportModal"),incidentId=Number(m?.dataset.incidentId||0)||null;
-    const reportType=kind==="pcr"?"pcr_neris_v2":"fire_neris_v2";
+  // Patient cards are the source of truth when saving a PCR. Collect them explicitly
+  // here instead of relying on the generic report collector's conditional path.
+  if(kind==="pcr" && document.querySelector("[data-patient-card]")) data.patients=collectPatients();
+  if(kind==="pcr" && !Array.isArray(data.patients)) data.patients=[];
+  const reportType=kind==="pcr"?"pcr_neris_v2":"fire_neris_v2";
   const editingId=String(m?.dataset.reportId||"").trim();
   const report={report_id:editingId||crypto.randomUUID(),report_type:reportType,status:"draft",data,updated_at:new Date().toISOString(),created_by:me?.id||null};
   if(incidentId){
@@ -1925,6 +1929,17 @@ async function saveReportDraft(kind,silent=false){
     if(idx>=0)reports[idx]={...reports[idx],...report};
     else reports.unshift(report);
     const upd=await db.from("incidents").update({reports,updated_at:new Date().toISOString()}).eq("cad",m.dataset.cad||"").select("cad").maybeSingle();if(upd.error)throw new Error(upd.error.message);if(!upd.data?.cad)throw new Error("The incident record was not updated. Check that this report is attached to the correct incident and try again.");
+    // Read the incident back before reporting success. This catches writes that did not
+    // retain the report/patient payload, rather than displaying a misleading confirmation.
+    if(kind==="pcr"){
+      const check=await db.from("incidents").select("reports").eq("cad",m.dataset.cad||"").maybeSingle();
+      if(check.error)throw new Error("Patient data was sent to the incident but could not be verified: "+check.error.message);
+      const savedReports=Array.isArray(check.data?.reports)?check.data.reports:[];
+      const savedReport=savedReports.find(x=>String(x?.report_id||"")===String(report.report_id));
+      if(!savedReport)throw new Error("The incident was updated, but the saved PCR could not be found when verified. Patient details were not confirmed saved.");
+      if(!Array.isArray(savedReport.data?.patients))throw new Error("The PCR was saved, but its patient list was not retained. Please try saving again.");
+      if(Array.isArray(data.patients)&&data.patients.length>0&&savedReport.data.patients.length===0)throw new Error("The PCR was saved, but the patient records were missing when verified. Please try saving again.");
+    }
     m.dataset.reportId=report.report_id;
   }else{
     if(editingId){
