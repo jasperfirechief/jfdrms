@@ -638,15 +638,16 @@ let page,y,pageNo=0;
        section("Patient Refusal / Release");
        field("Refusal Type",refusalType);
        if(hasVal(p.recommendedCare)||hasVal(p.refusalRecommendations)||hasVal(p.refusedServices))field("Recommended Care / Transport",firstVal(p.recommendedCare,p.refusalRecommendations,p.refusedServices));
+       if(hasVal(p.witnessName)||hasVal(p.refusalWitness))field("Witness",firstVal(p.witnessName,p.refusalWitness));
        if(p.signatureRefused||p.patientRefusedSignature)field("Signature Status","Patient / representative declined to sign.");
        // Keep the approved refusal disclaimer and signature together as one readable block.
        const refusalDisclaimer="Patient/Guardian was advised of the risks of refusing medical evaluation, treatment, and/or transport to a medical facility.";
        const disclaimerLines=wrapLines(refusalDisclaimer,F.reg,8.4,usable-28);
        const extraRisk=firstVal(p.risksExplained,p.risksAcknowledged,p.refusalExplanation);
-       const extraRiskLines=hasVal(extraRisk)&&String(extraRisk).trim().toLowerCase()!==refusalDisclaimer.toLowerCase()?wrapLines(pretty(extraRisk),F.reg,8.1,usable-28):[];
+       const extraRiskLines=hasVal(extraRisk)&&typeof extraRisk!=="boolean"&&!/^(yes|no|true|false)$/i.test(String(extraRisk).trim())&&String(extraRisk).trim().toLowerCase()!==refusalDisclaimer.toLowerCase()?wrapLines(pretty(extraRisk),F.reg,8.1,usable-28):[];
        const signer=firstVal(p.refusalSigner,p.patientSigner,p.guardianName,p.name,"Not recorded");
        const relationship=firstVal(p.guardianRelationship,p.signerRelationship,"Patient");
-       const cardHeight=22+disclaimerLines.length*11+(extraRiskLines.length?8+extraRiskLines.length*10:0)+28+57+14;
+       const cardHeight=22+disclaimerLines.length*11+(extraRiskLines.length?24+extraRiskLines.length*10:0)+28+57+14;
        ensure(cardHeight+8);
        const cardTop=y;
        page.drawRectangle({x:m,y:cardTop-cardHeight,width:usable,height:cardHeight,color:rgb(.985,.989,.994),borderWidth:.8,borderColor:MID});
