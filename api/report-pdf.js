@@ -699,20 +699,21 @@ let page,y,pageNo=0;
            [vitals];
        const vitalRows=rawRows.map(v=>{
          const value=(...keys)=>firstVal(...keys.map(k=>v?.[k]));
+         const rawTime=value("time","readingTime","takenAt","timestamp","reading","label");
+         const timeText=rawTime===undefined||rawTime===null?"":String(rawTime).trim();
+         const formattedTime=/^\\d{4}$/.test(timeText)?timeText.slice(0,2)+":"+timeText.slice(2):timeText;
          return [
-           value("time","readingTime","takenAt","timestamp","reading","label"),
+           formattedTime,
            value("bp","bloodPressure","blood_pressure","bloodPressureValue"),
            value("pulse","heartRate","heart_rate","hr"),
-           value("respirations","respiration","respiratoryRate","respiratory_rate","rr"),
-           value("spo2","SpO2","oxygenSaturation","oxygen_saturation","o2"),
-           value("temperature","temp"),
-           value("glucose","bloodGlucose","blood_glucose")
+           value("resp","respiration","respirations","respiratory","respiratoryRate","respiratory_rate","rr"),
+           value("spo2","SpO2","oxygenSaturation","oxygen_saturation","o2")
          ];
        }).filter(row=>row.some(hasVal));
        if(vitalRows.length){
          section("Vital Signs");
-         const headers=["TIME","BP","PULSE","RESP","SpO₂","TEMP","GLUCOSE"];
-         const widths=[65,78,60,60,62,75,132],xs=[m];
+         const headers=["TIME","BP","PULSE","RESP","SpO₂"];
+         const widths=Array(headers.length).fill(usable/headers.length),xs=[m];
          for(let j=0;j<widths.length;j++)xs.push(xs[j]+widths[j]);
          const drawVitalsHeader=()=>{ensure(28);page.drawRectangle({x:m,y:y-19,width:usable,height:19,color:LIGHT,borderWidth:.4,borderColor:MID});headers.forEach((h,j)=>safeDrawText(page,h,{x:xs[j]+3,y:y-12,font:F.bold,size:6.5,color:NAVY}));y-=19;};
          drawVitalsHeader();
