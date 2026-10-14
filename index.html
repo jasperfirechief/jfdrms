@@ -2287,7 +2287,19 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
   window.jfdRenderPatients=function(state){window.jfdPatientState=state||[];const box=$("jfdPatients");if(!box)return;box.innerHTML=(window.jfdPatientState.length?window.jfdPatientState.map(patientCard).join(""):'<div class="rounded-xl border border-dashed p-5 text-sm text-slate-500">No patient started yet.</div>');setTimeout(()=>{jfdBindSignaturePads();jfdSearchableSelects();},0);};
   window.jfdAddPatient=function(p){window.jfdPatientState.push(p||{});jfdRenderPatients(window.jfdPatientState);};
   window.jfdSavePatient=async function(index){
-    try{window.jfdPatientState=collectPatients();await saveReportDraft("pcr");const card=document.querySelector('[data-patient-card="'+Number(index)+'"]');if(card){card.classList.add("ring-2","ring-emerald-400");setTimeout(()=>card.classList.remove("ring-2","ring-emerald-400"),1800)}return true}catch(e){console.error("Unable to save patient draft",e);alert("Unable to save this patient. Please try again.");return false}
+    try{
+      window.jfdPatientState=collectPatients();
+      await saveReportDraft("pcr");
+      const card=document.querySelector('[data-patient-card="'+Number(index)+'"]');
+      if(card){
+        card.classList.add("ring-2","ring-emerald-400");
+        let notice=card.querySelector("[data-patient-saved-notice]");
+        if(!notice){notice=document.createElement("span");notice.dataset.patientSavedNotice="true";notice.className="ml-2 text-sm font-bold text-emerald-700";const heading=card.querySelector("h4");(heading||card).appendChild(notice)}
+        notice.textContent="Patient saved";
+        setTimeout(()=>{notice?.remove();card.classList.remove("ring-2","ring-emerald-400")},2200);
+      }
+      return true;
+    }catch(e){console.error("Unable to save patient draft",e);alert("Unable to save this patient. Please try again.");return false}
   };
   window.jfdAddPatientAndSave=async function(index){
     const ok=await window.jfdSavePatient(index);if(!ok)return;
@@ -2298,19 +2310,25 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     jfdRenderPatients(window.jfdPatientState);
   };
   window.jfdRemovePatient=function(i){window.jfdPatientState.splice(i,1);jfdRenderPatients(window.jfdPatientState);};
-  window.jfdOpenPatientEditor=function(){
-    let patients=window.jfdPatientState||[];try{if(typeof collectPatients==="function")patients=collectPatients();window.jfdPatientState=patients}catch{}
-    let modal=document.getElementById("jfdPatientEditorModal");
-    if(!modal){
-      modal=document.createElement("div");modal.id="jfdPatientEditorModal";
-      modal.className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4";
-      modal.innerHTML=`<div class="w-full max-w-xl max-h-[85vh] overflow-auto rounded-2xl bg-white shadow-2xl"><div class="sticky top-0 flex items-center justify-between gap-3 border-b bg-white p-4"><div><h3 class="text-lg font-black">Edit Patients</h3><p class="text-sm text-slate-500">Select a patient to open their existing details.</p></div><button type="button" id="jfdPatientEditorClose" class="border rounded-lg px-3 py-2 font-bold">Close</button></div><div id="jfdPatientEditorList" class="space-y-2 p-4"></div></div>`;
-      modal.addEventListener("click",e=>{if(e.target===modal)modal.remove()});document.body.appendChild(modal);
-      modal.querySelector("#jfdPatientEditorClose").addEventListener("click",()=>modal.remove());
-    }
+  window.jfdOpenPatientEditor=async function(){
+    const modalRoot=$("reportModal"),cad=String(modalRoot?.dataset.cad||"").trim(),currentReportId=String(modalRoot?.dataset.reportId||"");
+    let currentPatients=[];try{currentPatients=collectPatients();window.jfdPatientState=currentPatients}catch{}
+    const modal=(()=>{let el=document.getElementById("jfdPatientEditorModal");if(el)el.remove();el=document.createElement("div");el.id="jfdPatientEditorModal";el.className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4";el.innerHTML=\`<div class="w-full max-w-2xl max-h-[85vh] overflow-auto rounded-2xl bg-white shadow-2xl"><div class="sticky top-0 flex items-center justify-between gap-3 border-b bg-white p-4"><div><h3 class="text-lg font-black">Edit Patients</h3><p class="text-sm text-slate-500">All patient records saved for this incident.</p></div><button type="button" id="jfdPatientEditorClose" class="border rounded-lg px-3 py-2 font-bold">Close</button></div><div id="jfdPatientEditorList" class="space-y-2 p-4"><p class="text-sm text-slate-500">Loading saved patients…</p></div></div>\`;el.addEventListener("click",e=>{if(e.target===el)el.remove()});document.body.appendChild(el);el.querySelector("#jfdPatientEditorClose").addEventListener("click",()=>el.remove());return el})();
     const list=modal.querySelector("#jfdPatientEditorList");
-    list.innerHTML=patients.length?patients.map((p,i)=>`<div class="flex items-center justify-between gap-3 rounded-xl border p-3"><div class="min-w-0"><div class="font-bold">${jfdEscapeHtml(p.name||("Patient "+(i+1)))}</div><div class="text-xs text-slate-500">${jfdEscapeHtml([p.dob,p.chief,p.transportDisposition].filter(Boolean).join(" · ")||"Patient details entered below")}</div></div><button type="button" class="rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white" data-edit-patient="${i}">Edit Details</button></div>`).join(""):`<p class="rounded-xl border border-dashed p-5 text-sm text-slate-500">No patients have been added yet. Use + Add Patient to start a patient record.</p>`;
-    list.querySelectorAll("[data-edit-patient]").forEach(button=>button.addEventListener("click",()=>window.jfdSelectPatientToEdit(Number(button.dataset.editPatient))));
+    try{
+      await saveReportDraft("pcr",true);
+      let records=[];
+      if(cad){
+        const result=await db.from("incidents").select("reports").eq("cad",cad).maybeSingle();
+        if(result.error)throw new Error(result.error.message);
+        records=(Array.isArray(result.data?.reports)?result.data.reports:[]).filter(r=>String(r?.report_type||"").startsWith("pcr_")||Array.isArray(r?.data?.patients));
+      }
+      const entries=[];
+      records.forEach(r=>(Array.isArray(r?.data?.patients)?r.data.patients:[]).forEach((p,i)=>entries.push({p,i,reportId:String(r.report_id||""),reportType:r.report_type||"PCR",isCurrent:String(r.report_id||"")===String(modalRoot?.dataset.reportId||currentReportId)})));
+      if(!entries.length)currentPatients.forEach((p,i)=>entries.push({p,i,reportId:currentReportId,reportType:"Current PCR",isCurrent:true}));
+      list.innerHTML=entries.length?entries.map(entry=>\`<div class="flex items-center justify-between gap-3 rounded-xl border p-3"><div class="min-w-0"><div class="font-bold">\${jfdEscapeHtml(entry.p.name||("Patient "+(entry.i+1)))}</div><div class="text-xs text-slate-500">\${jfdEscapeHtml([entry.p.dob,entry.p.chief,entry.p.transportDisposition].filter(Boolean).join(" · ")||"Patient details saved")}</div><div class="text-xs text-slate-400">\${entry.isCurrent?"Current PCR":"Saved in another PCR for this incident"}</div></div>\${entry.isCurrent?\`<button type="button" class="rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white" data-edit-patient="\${entry.i}">Edit Details</button>\`:\`<span class="text-xs font-semibold text-slate-500">Open that PCR to edit</span>\`}</div>\`).join(""):\`<p class="rounded-xl border border-dashed p-5 text-sm text-slate-500">No saved patient records were found for this incident yet.</p>\`;
+      list.querySelectorAll("[data-edit-patient]").forEach(button=>button.addEventListener("click",()=>window.jfdSelectPatientToEdit(Number(button.dataset.editPatient))));
+    }catch(e){console.error("Unable to load incident patient list",e);list.innerHTML='<p class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">Unable to load saved patients. Please try again.</p>'}
   };
   window.jfdSelectPatientToEdit=function(index){
     document.getElementById("jfdPatientEditorModal")?.remove();
