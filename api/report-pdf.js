@@ -12,7 +12,7 @@ function safePdfText(value) {
     .replace(/[\u2070\u00B9\u00B2\u00B3\u2074-\u2079]/g, ch => ({"⁰":"0","¹":"1","²":"2","³":"3","⁴":"4","⁵":"5","⁶":"6","⁷":"7","⁸":"8","⁹":"9"}[ch] || ch));
 }
 function safeDrawText(page, value, options) {
-  return safeDrawText(page,safePdfText(value), options);
+  return page["drawText"](safePdfText(value), options);
 }
 import { JFD_LOGO_JPG } from "./jfd-logo-data.js";
 
