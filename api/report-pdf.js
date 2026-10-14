@@ -549,8 +549,8 @@ let page,y,pageNo=0;
    }
  }
 
- currentTitle=isMva?"MOTOR VEHICLE ACCIDENT REPORT":"FIRE INCIDENT REPORT";newPage(currentTitle);
- section("Department Technical Record");
+ currentTitle=fd.rUnifiedIncidentReport?"INCIDENT REPORT":isMva?"MOTOR VEHICLE ACCIDENT REPORT":"FIRE INCIDENT REPORT";
+ section("Response / Apparatus & Department Times");
  const dispatchTimes=[["Dispatch",fd.rDispatch],["En Route",fd.rEnRoute],["On Scene",fd.rOnScene],["Cancelled",fd.rCancelled],["In Service",fd.rInService]];
  const activeTimes=dispatchTimes.filter(x=>hasVal(x[1]));
  if(activeTimes.length){
