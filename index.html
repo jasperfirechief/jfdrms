@@ -1546,7 +1546,8 @@ async function editSavedReport(cad,reportId){
     window.currentReportKind=kind;
     window.applyPreviousReportValues(rep.data||{});
     modal.dataset.reportId=String(rep.report_id||"");
-    const savedUnits=Array.isArray(rep.data?.responding_apparatus)?rep.data.responding_apparatus:[];
+    // Restore apparatus selections only from drafts saved by the explicit-checkbox workflow. Older drafts may contain every staffed apparatus due to the previous auto-fill behavior; require the officer to reselect the actual responding units instead.
+    const savedUnits=rep.data?.responseSelectionVersion===2&&Array.isArray(rep.data?.responding_apparatus)?rep.data.responding_apparatus:[];
     savedUnits.filter(saved=>!saved.apparatus_id||Number(saved.apparatus_id)<=-1000).forEach(saved=>addUnassignedReportApparatus(saved));
     savedUnits.forEach(saved=>{
       const id=Number(saved.apparatus_id||0);if(!id)return;
@@ -1769,6 +1770,8 @@ function collectReportFormData(){
     };
   }).filter(x=>x.unit_number);
   data.additional_personnel=[...(reportModal?.querySelectorAll("[data-report-person]:checked")||[])].map(x=>Number(x.dataset.reportPerson));
+  // Version the explicit response-unit selection so legacy drafts that auto-filled every staffed unit are not reloaded as if every unit responded.
+  data.responseSelectionVersion=2;
   return data;
 }
 function nerisIso(v,fallback){const iso=jfdCentralIso(v);return iso||fallback;}
