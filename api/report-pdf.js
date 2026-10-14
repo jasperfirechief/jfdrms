@@ -23,15 +23,17 @@ async function embedJfdLogoSafely(pdf){
   const encoded=(raw.includes(",")?raw.slice(raw.indexOf(",")+1):raw).replace(/[\s\u200B]+/g,"");
   const bytes=Buffer.from(encoded,"base64");
   if(bytes.length<8)throw new Error("JFD logo image data is empty or incomplete");
-  // The bundled department logo is a JPEG. Embed that source directly first;
-  // this avoids a runtime image-conversion dependency silently hiding the logo.
+  // Try the original image, then repair a missing JPEG end marker before using
+  // the optional image converter. Never silently omit the department logo.
   try{return await pdf.embedJpg(bytes);}catch(jpgError){
-    try{
-      const png=await sharp(bytes).rotate().png().toBuffer();
-      return await pdf.embedPng(png);
-    }catch(pngError){
-      console.error("JFD logo could not be embedded:",jpgError?.message||jpgError,pngError?.message||pngError);
-      return null;
+    try{return await pdf.embedJpg(Buffer.concat([bytes,Buffer.from([0xff,0xd9])]));}catch(repairedJpgError){
+      try{
+        const png=await sharp(bytes).rotate().png().toBuffer();
+        return await pdf.embedPng(png);
+      }catch(pngError){
+        console.error("JFD logo could not be embedded:",jpgError?.message||jpgError,repairedJpgError?.message||repairedJpgError,pngError?.message||pngError);
+        throw new Error("JFD department logo could not be embedded in the PDF.");
+      }
     }
   }
 }
@@ -285,24 +287,8 @@ async function makeSandboxIncidentPdf(incident={},report={}){
    const occupantValues=[occupant.name,occupant.address,occupant.phone,occupant.insuranceCompany,occupant.insurancePolicy].some(has);
    if(occupantValues&&!occupant.sameAsOwner){field("Occupant Name",occupant.name);field("Occupant Address",occupant.address);two(["Occupant Phone",occupant.phone],["Insurance Company",occupant.insuranceCompany]);field("Insurance Policy",occupant.insurancePolicy);}
  }
- const people=Array.isArray(d.people)?d.people:[],patients=Array.isArray(d.patients)?d.patients:[];
- if(people.length){section("People Involved");table(["NAME","ROLE","PHONE","ADDRESS"],people.map(p=>[p.name,p.role,p.phone,p.address]),[115,90,105,218]);}
- if(patients.length){
-   section("Patient Care");
-   patients.forEach((p,i)=>{
-     const name=first(p.name,"Patient "+(i+1));
-     field("Patient",name);
-     two(["Age / Date of Birth",first(p.age,p.dob)],["Sex",p.sex]);
-     field("Chief Complaint",first(p.complaintOther,p.complaint));
-     field("Injury / Medical Complaint",first(p.injuryOther,p.injury));
-     field("Care Provided",p.care);
-     two(["Blood Pressure",p.bp],["Pulse",p.pulse]);
-     two(["Respirations",p.resp],["SpO₂",p.spo2]);
-     if(Array.isArray(p.vitals)&&p.vitals.length)table(["TIME","BP","PULSE","RESPIRATIONS","SPO₂"],p.vitals.map(v=>[v.time,v.bp,v.pulse,v.resp,v.spo2]),[70,95,90,115,158]);
-     field("Patient Narrative",p.narrative);
-     if(i<patients.length-1)y-=5;
-   });
- }
+ // Patient identities, assessments, vitals, and guardian details are deliberately
+ // excluded from the initial incident report. They appear only on PCR pages.
  const vehicles=Array.isArray(d.vehicles)?d.vehicles:[];
  if(vehicles.length){
    section("Vehicles Involved");
@@ -635,8 +621,10 @@ let page,y,pageNo=0;
  if(hasPcrRecords){
    for(let i=0;i<patients.length;i++){
      const p=patients[i]||{};
-     const isRefusal=!!(p.refusedCare||p.refusedTransport||p.minorRefusal||p.refusal||p.refusalType);
-     const refusalType=p.refusalType||[p.refusedCare?"Refused Care":"",p.refusedTransport?"Refused Transport":"",p.minorRefusal?"Minor Refusal":""].filter(Boolean).join(", ")||"Patient Refusal";
+     const careValue=String(p.care??p.careProvided??p.evaluation??"").trim().toLowerCase();
+     const hasSignedRefusal=!!(p.signature||p.signatureName||p.patientSignatureName) && !!(p.risksExplained||p.refusedCare||p.refusedTransport||p.refusal||p.refusalType||careValue==="no"||careValue==="false");
+     const isRefusal=!!(p.refusedCare||p.refusedTransport||p.minorRefusal||p.refusal||p.refusalType||careValue==="no"||careValue==="false"||hasSignedRefusal);
+     const refusalType=p.refusalType||[p.refusedCare?"Refused Care":"",p.refusedTransport?"Refused Transport":"",p.minorRefusal?"Minor Refusal":"",(!p.refusedCare&&!p.refusedTransport&&!p.minorRefusal&&(careValue==="no"||careValue==="false"))?"Care declined / not provided":""].filter(Boolean).join(", ")||"Patient Refusal";
      currentTitle="PATIENT CARE REPORT";newPage(currentTitle);
      section("Patient Care / Disposition Summary");
      twoCol(["Incident / CAD",firstVal(incident.cad,fd.rCad)],["Incident Date",dateText(firstVal(fd.rDate,incident.dispatch_time))]);
