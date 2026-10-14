@@ -701,7 +701,7 @@ let page,y,pageNo=0;
          const value=(...keys)=>firstVal(...keys.map(k=>v?.[k]));
          const rawTime=value("time","readingTime","takenAt","timestamp","reading","label");
          const timeText=rawTime===undefined||rawTime===null?"":String(rawTime).trim();
-         const formattedTime=/^\\d{4}$/.test(timeText)?timeText.slice(0,2)+":"+timeText.slice(2):timeText;
+         const formattedTime=/^\d{4}$/.test(timeText)?timeText.slice(0,2)+":"+timeText.slice(2):timeText;
          return [
            formattedTime,
            value("bp","bloodPressure","blood_pressure","bloodPressureValue"),
