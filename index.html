@@ -1279,7 +1279,7 @@ async function refreshOffDutyPersonnel(dateOverride,onDutyIds=[]){
 }
 function commonReportFields(i,d,m,unitRows=[]){
   const call=d?.call_type||"";
-  const date=/^\\d{4}-\\d{2}-\\d{2}/.test(String(i.dispatch_time||""))?String(i.dispatch_time).slice(0,10):"";
+  const date=iDateForReport(i.dispatch_time);
   const hidden=(id,value)=>'<input type="hidden" id="'+id+'" value="'+esc(value??"")+'">';
   const hiddens=hidden("rDispatchIncidentNumber",i.dispatch_incident_number||i.cad||"")+hidden("rCallArrival",localDateTime(i.call_arrival||i.dispatch_time))+hidden("rCallAnswered",localDateTime(i.call_answered||i.dispatch_time))+hidden("rCallCreate",localDateTime(i.call_create||i.dispatch_time))+hidden("rEnroute",localDateTime(i.enroute_time||i.enroute_at))+hidden("rOnscene",localDateTime(d?.arrival_time))+hidden("rCancelled",localDateTime(i.cancelled_time||i.cancelled_at))+hidden("rCleared",localDateTime(d?.clear_time));
   return reportSection("Incident & Location",
