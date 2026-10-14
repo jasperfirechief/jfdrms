@@ -1854,12 +1854,27 @@ function buildNerisPayload(data){
     const careMap={"Evaluated and cared for":"PATIENT_EVALUATED_CARE_PROVIDED","Evaluated and refused care":"PATIENT_EVALUATED_REFUSED_CARE","Evaluated, no care required":"PATIENT_EVALUATED_NO_CARE_REQUIRED","Refused evaluation/care":"PATIENT_REFUSED_EVALUATION_CARE","Support services provided":"PATIENT_SUPPORT_SERVICES_PROVIDED","DOA":"PATIENT_DEAD_ON_ARRIVAL"};
     const statusMap={Improved:"IMPROVED",Unchanged:"UNCHANGED",Worsened:"WORSE"};
     const transportMap={"Transport by EMS Unit":"TRANSPORT_BY_EMS_UNIT","Transport by Other Agency":"OTHER_AGENCY_TRANSPORT","Patient Refused Transport":"PATIENT_REFUSED_TRANSPORT","Non-Patient Transport":"NONPATIENT_TRANSPORT","No Transport":"NO_TRANSPORT"};
-    payload.medical_details=patients.map((p,i)=>({
-      patient_care_report_id:String(p.careReport||data.rCad||incidentNumber||("JFD-P"+(i+1))),
-      patient_care_evaluation:careMap[p.evaluation]||p.evaluation,
-      ...(p.status?{patient_status:statusMap[p.status]||p.status}:{}),
-      ...(p.transportDisposition?{transport_disposition:transportMap[p.transportDisposition]||p.transportDisposition}:p.transport?{transport_disposition:transportMap[p.transport]||p.transport}:{})
-    }));
+    payload.medical_details=patients.map((p,i)=>{
+      // Support both the current patient form and older saved PCR/unified-report
+      // records. Older records stored care as "Yes"/"No" and the complaint as
+      // "complaint", rather than the current evaluation/chief fields.
+      const legacyCare=String(p.careProvided??p.care??"").trim().toLowerCase();
+      const legacyRefusal=!!(p.refusedCare||p.refusedTransport||p.minorRefusal) ||
+        /refus/i.test(String(p.transportDisposition||p.disposition||""));
+      const evaluation=p.evaluation||p.patientCareEvaluation||
+        (legacyRefusal?"Evaluated and refused care":
+          legacyCare==="yes"?"Evaluated and cared for":
+          legacyCare==="no"?"Evaluated, no care required":"");
+      const medical={
+        patient_care_report_id:String(p.careReport||data.rCad||incidentNumber||("JFD-P"+(i+1)))
+      };
+      if(evaluation)medical.patient_care_evaluation=careMap[evaluation]||evaluation;
+      const status=p.status||p.patientStatus;
+      if(status)medical.patient_status=statusMap[status]||status;
+      const transport=p.transportDisposition||p.transport_disposition||p.transport;
+      if(transport)medical.transport_disposition=transportMap[transport]||transport;
+      return medical;
+    });
   }
   const hazardIncident=incidentTypes.some(x=>/^HAZSIT\\|/.test(String(x)));
   if(hazardIncident){
