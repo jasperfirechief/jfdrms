@@ -549,8 +549,8 @@ let page,y,pageNo=0;
    }
  }
 
- currentTitle=isMva?"MOTOR VEHICLE ACCIDENT REPORT":"FIRE INCIDENT REPORT";newPage(currentTitle);
- section("Department Technical Record");
+ currentTitle=fd.rUnifiedIncidentReport?"INCIDENT REPORT":isMva?"MOTOR VEHICLE ACCIDENT REPORT":"FIRE INCIDENT REPORT";
+ section("Response / Apparatus & Department Times");
  const dispatchTimes=[["Dispatch",fd.rDispatch],["En Route",fd.rEnRoute],["On Scene",fd.rOnScene],["Cancelled",fd.rCancelled],["In Service",fd.rInService]];
  const activeTimes=dispatchTimes.filter(x=>hasVal(x[1]));
  if(activeTimes.length){
@@ -638,21 +638,39 @@ let page,y,pageNo=0;
        section("Patient Refusal / Release");
        field("Refusal Type",refusalType);
        if(hasVal(p.recommendedCare)||hasVal(p.refusalRecommendations)||hasVal(p.refusedServices))field("Recommended Care / Transport",firstVal(p.recommendedCare,p.refusalRecommendations,p.refusedServices));
-       if(hasVal(p.risksExplained)||hasVal(p.risksAcknowledged)||hasVal(p.refusalExplanation))fullText("Risks / Consequences Explained",firstVal(p.risksExplained,p.risksAcknowledged,p.refusalExplanation));
-       if(hasVal(p.refusalSigner)||hasVal(p.patientSigner)||hasVal(p.guardianName)||hasVal(p.name))twoCol(["Refusing Party",firstVal(p.refusalSigner,p.patientSigner,p.guardianName,p.name)],["Relationship",firstVal(p.guardianRelationship,p.signerRelationship,"Patient")]);
-       if(hasVal(p.refusalDateTime)||hasVal(p.refusalDate)||hasVal(p.signedAt)||hasVal(p.witnessName)||hasVal(p.refusalWitness))twoCol(["Refusal Date / Time",firstVal(p.refusalDateTime,p.refusalDate,p.signedAt)],["Witness",firstVal(p.witnessName,p.refusalWitness)]);
-       if(p.signatureRefused||p.patientRefusedSignature)field("If Patient Declined to Sign","Patient/representative declined to sign.");
-       ensure(112);
-       safeDrawText(page,"Patient / Guardian Signature",{x:m+7,y:y-12,font:F.bold,size:7.5,color:SLATE});
+       if(hasVal(p.witnessName)||hasVal(p.refusalWitness))field("Witness",firstVal(p.witnessName,p.refusalWitness));
+       if(p.signatureRefused||p.patientRefusedSignature)field("Signature Status","Patient / representative declined to sign.");
+       // Keep the approved refusal disclaimer and signature together as one readable block.
+       const refusalDisclaimer="Patient/Guardian was advised of the risks of refusing medical evaluation, treatment, and/or transport to a medical facility.";
+       const disclaimerLines=wrapLines(refusalDisclaimer,F.reg,8.4,usable-28);
+       const extraRisk=firstVal(p.risksExplained,p.risksAcknowledged,p.refusalExplanation);
+       const extraRiskLines=hasVal(extraRisk)&&typeof extraRisk!=="boolean"&&!/^(yes|no|true|false)$/i.test(String(extraRisk).trim())&&String(extraRisk).trim().toLowerCase()!==refusalDisclaimer.toLowerCase()?wrapLines(pretty(extraRisk),F.reg,8.1,usable-28):[];
+       const signer=firstVal(p.refusalSigner,p.patientSigner,p.guardianName,p.name,"Not recorded");
+       const relationship=firstVal(p.guardianRelationship,p.signerRelationship,"Patient");
+       const cardHeight=22+disclaimerLines.length*11+(extraRiskLines.length?24+extraRiskLines.length*10:0)+28+57+14;
+       ensure(cardHeight+8);
+       const cardTop=y;
+       page.drawRectangle({x:m,y:cardTop-cardHeight,width:usable,height:cardHeight,color:rgb(.985,.989,.994),borderWidth:.8,borderColor:MID});
+       safeDrawText(page,"REFUSAL ACKNOWLEDGMENT",{x:m+10,y:cardTop-15,font:F.bold,size:8,color:NAVY});
+       safeDrawText(page,"DISCLAIMER",{x:m+10,y:cardTop-31,font:F.bold,size:7,color:SLATE});
+       disclaimerLines.forEach((ln,i)=>safeDrawText(page,ln,{x:m+10,y:cardTop-44-i*11,font:F.reg,size:8.4,color:NAVY}));
+       let cardY=cardTop-44-disclaimerLines.length*11-5;
+       if(extraRiskLines.length){
+         safeDrawText(page,"Additional risks / recommendations",{x:m+10,y:cardY-7,font:F.bold,size:7,color:SLATE});
+         extraRiskLines.forEach((ln,i)=>safeDrawText(page,ln,{x:m+10,y:cardY-19-i*10,font:F.reg,size:8.1,color:NAVY}));
+         cardY-=extraRiskLines.length*10+24;
+       }
+       safeDrawText(page,"REFUSING PARTY",{x:m+10,y:cardY-8,font:F.bold,size:7,color:SLATE});
+       safeDrawText(page,pretty(signer),{x:m+94,y:cardY-8,font:F.reg,size:8.2,color:NAVY});
+       safeDrawText(page,"RELATIONSHIP",{x:m+330,y:cardY-8,font:F.bold,size:7,color:SLATE});
+       safeDrawText(page,pretty(relationship),{x:m+404,y:cardY-8,font:F.reg,size:8.2,color:NAVY});
+       cardY-=20;
+       safeDrawText(page,"PATIENT / GUARDIAN SIGNATURE",{x:m+10,y:cardY-2,font:F.bold,size:7,color:SLATE});
+       page.drawLine({start:{x:m+10,y:cardY-42},end:{x:m+usable-10,y:cardY-42},thickness:.5,color:MID});
        if(String(p.signature||"").startsWith("data:image/png")){
-         try{const bytes=Buffer.from(String(p.signature).split(",")[1],"base64"),img=await pdf.embedPng(bytes);page.drawImage(img,{x:m+7,y:y-91,width:250,height:70});}catch{}
-       }else safeDrawText(page,p.signatureName||p.refusalSigner||"Electronic signature recorded",{x:m+7,y:y-50,font:F.reg,size:9,color:NAVY});
-       page.drawRectangle({x:m+7,y:y-92,width:250,height:70,borderWidth:.5,borderColor:MID});
-       safeDrawText(page,"Signature",{x:m+265,y:y-12,font:F.bold,size:7.5,color:SLATE});
-       safeDrawText(page,"Date / Time",{x:m+390,y:y-12,font:F.bold,size:7.5,color:SLATE});
-       page.drawLine({start:{x:m+265,y:y-58},end:{x:m+380,y:y-58},thickness:.5,color:MID});
-       page.drawLine({start:{x:m+390,y:y-58},end:{x:m+usable-7,y:y-58},thickness:.5,color:MID});
-       y-=105;
+         try{const bytes=Buffer.from(String(p.signature).split(",")[1],"base64"),img=await pdf.embedPng(bytes);page.drawImage(img,{x:m+12,y:cardY-39,width:210,height:30});}catch{}
+       }else safeDrawText(page,p.signatureName||p.refusalSigner||"Electronic signature recorded",{x:m+12,y:cardY-25,font:F.reg,size:8.5,color:NAVY});
+       y=cardTop-cardHeight-8;
      }else if(hasVal(p.dispositionNarrative)||hasVal(p.transferNarrative)||hasVal(p.patientSignatureName)||hasVal(p.signatureName)||hasVal(p.provider)){
        section("Disposition / Transfer");
        if(hasVal(p.dispositionNarrative)||hasVal(p.transferNarrative))field("Disposition Narrative",firstVal(p.dispositionNarrative,p.transferNarrative));
