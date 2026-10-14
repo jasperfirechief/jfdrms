@@ -1617,9 +1617,18 @@ function reportRowsHtml(items){
  (items||[]).forEach(x=>{const cad=String(x.i?.cad||"NO-CAD-"+(x.i?.location||"incident"));(groups[cad]||(groups[cad]=[])).push(x);});
  const list=Object.values(groups);
  return list.length?list.map(group=>{
-   const x=group[0],reports=group.map(v=>v.rep),ready=reports.filter(r=>r.status==="ready_for_neris").length,submitted=reports.filter(r=>r.status==="submitted_to_neris").length,drafts=reports.filter(r=>r.status==="draft").length;
-   const statuses=[...new Set(reports.map(r=>reportStatusLabel(r.status)))].join(" · ");
-   return '<div class="border rounded-2xl p-5 bg-white shadow-sm"><div class="flex flex-wrap justify-between gap-4"><div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2"><div class="font-black text-lg">Incident '+esc(x.i.cad||"No CAD")+'</div><span class="text-xs font-bold px-2 py-1 rounded bg-slate-100">'+esc(statuses||"Saved")+'</span></div><div class="text-sm text-slate-600 mt-1">'+esc(x.i.location||x.rep.data?.rLocation||"Location not provided")+'</div><div class="text-xs text-slate-400 mt-1">'+esc(completedReportDate(x))+' · '+reports.length+' report'+(reports.length===1?"":"s")+(drafts?' · '+drafts+' draft'+(drafts===1?"":"s"):"")+(ready?' · '+ready+' awaiting NERIS review':"")+(submitted?' · '+submitted+' submitted to NERIS':"")+'</div></div><div class="flex flex-wrap gap-2 items-start"><button type="button" onclick="openAdminIncidentPackage(this.dataset.cad)" data-cad="'+esc(x.i.cad||"")+'" class="bg-slate-950 text-white px-4 py-2 rounded-lg text-sm font-bold">Open Incident</button></div></div></div>';
+   const primary=group.find(v=>!String(v.rep?.report_type||"").startsWith("pcr_")&&!v.rep?.data?.isPatientCareReport)||group[0];
+   const x=primary,allReports=group.map(v=>v.rep),cad=String(x.i?.cad||""),rid=String(x.rep?.report_id||"");
+   const ready=allReports.some(r=>r.status==="ready_for_neris"),submitted=allReports.some(r=>r.status==="submitted_to_neris"),drafts=allReports.some(r=>r.status==="draft");
+   const status=ready?"Awaiting NERIS Review":submitted?"Submitted to NERIS":drafts?"Draft":reportStatusLabel(x.rep?.status)||"Saved";
+   const canOpen=!!cad&&!!rid, canSubmit=profile?.app_role==="admin"&&ready;
+   const button=(label,cls,action)=>'<button type="button" '+(canOpen?'':'disabled ')+'onclick="'+action+'" class="'+cls+'">'+label+'</button>';
+   const qcad=JSON.stringify(cad),qrid=JSON.stringify(rid),qidx=Number(x.idx)||0;
+   const actions=button("Open PDF","bg-slate-950 text-white px-3 py-2 rounded-lg text-sm font-bold",'window.generateIncidentPdf('+qcad+','+qrid+')')+
+     button("Download PDF","bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-bold",'window.downloadIncidentPdf('+qcad+','+qrid+')')+
+     button("Email PDF","bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-bold",'window.emailIncidentPdf('+qcad+','+qrid+')')+
+     (canSubmit?button("Submit to NERIS","bg-amber-600 text-white px-3 py-2 rounded-lg text-sm font-bold",'window.adminSubmitReport('+qcad+','+qidx+')'):"");
+   return '<div class="border rounded-2xl p-5 bg-white shadow-sm"><div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4"><div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2"><div class="font-black text-lg">'+esc(x.i.cad||"No CAD")+'</div><span class="text-xs font-bold px-2 py-1 rounded bg-slate-100">'+esc(status)+'</span></div><div class="text-sm text-slate-700 mt-1 font-semibold">'+esc(x.i.location||x.rep?.data?.rLocation||"Location not provided")+'</div><div class="text-xs text-slate-500 mt-1">'+esc(completedReportDate(x))+' · '+esc(x.i.type||x.rep?.data?.rCallType||"Incident")+(allReports.length>1?' · '+allReports.length+' saved report records':'')+'</div></div><div class="flex flex-wrap gap-2">'+actions+'</div></div></div>';
  }).join(""):'<div class="card p-5 text-sm text-slate-500">No reports found.</div>';
 }
 async function openAdminIncidentPackage(cad){
