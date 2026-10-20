@@ -12,7 +12,7 @@
   function shiftValue(){return $("hydrantShift")?.value||"A"}
   function assetKey(v){return String(v||"").trim().toUpperCase()}
   function currentSchedule(){return schedules.filter(x=>String(x.shift)===shiftValue()&&Number(x.schedule_year)===yearValue()&&Number(x.schedule_month)===monthValue())}
-  function scheduleFor(id){return currentSchedule().filter(x=>assetKey(x.hydrant_id)===assetKey(id))}
+  function scheduleFor(id){return currentSchedule().filter(x=>assetKey(x.hydrant_id||x.source_hydrant_id)===assetKey(id)||assetKey(x.test_hydrant_id)===assetKey(id)||assetKey(x.flow_hydrant_id)===assetKey(id))}
   function colorFor(id){const key=assetKey(id),a=assets.find(x=>assetKey(x.id)===key),sch=scheduleFor(id),inArea=!!(a?.map_sheet&&currentSchedule().some(x=>x.task_type==="inspection"&&x.map_sheet&&assetKey(x.map_sheet)===assetKey(a.map_sheet))),isTest=sch.some(x=>x.task_type==="flow_test"&&assetKey(x.test_hydrant_id)===key),isFlow=sch.some(x=>x.task_type==="flow_test"&&assetKey(x.flow_hydrant_id)===key);if(inArea&&isTest)return "#7c3aed";if(inArea)return "#d97706";if(isTest)return "#0f766e";if(isFlow)return "#0284c7";return "#64748b"}
   function iconFor(id){const c=colorFor(id);return window.L.divIcon({className:"jfd-hydrant-marker",html:'<span style="display:flex;align-items:center;justify-content:center;width:25px;height:25px;border:2px solid white;border-radius:50%;background:'+c+';box-shadow:0 1px 5px #0008;color:white;font-size:10px;font-weight:900">'+escH(id).slice(0,4)+'</span>',iconSize:[25,25],iconAnchor:[12,12]})}
   function latestFor(rows,id,dateKey){return rows.filter(x=>assetKey(x.hydrant_id)===assetKey(id)).sort((a,b)=>String(b[dateKey]||"").localeCompare(String(a[dateKey]||"")))[0]||null}
