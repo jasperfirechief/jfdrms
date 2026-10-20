@@ -158,7 +158,7 @@
   window.jfdHydrantTabEntered=async function(){if(!allowed())return alert("Hydrants are available to administrators and officers.");if(!initialized||!map||!map.getContainer().isConnected)await refresh();else{await loadRecords();ensureMap();renderScheduleSummary();renderSelected();renderHydrantRecordList();}};
   window.jfdHydrantFiltersChanged=async function(){if(!allowed())return;await loadRecords();ensureMap();renderScheduleSummary();renderSelected();renderHydrantRecordList();};
   document.addEventListener("DOMContentLoaded",()=>{
-    const form=$("hydrantRecordForm");form?.addEventListener("submit",saveRecord);
+    const form=$("hydrantRecordInnerForm");form?.addEventListener("submit",saveRecord);
     ["hf_orifice","hf_pitot","hf_static","hf_residual","hf_coeff"].forEach(id=>$(id)?.addEventListener("input",calcFlow));
     ["hydrantShift","hydrantMonth","hydrantYear"].forEach(id=>$(id)?.addEventListener("change",()=>window.jfdHydrantFiltersChanged?.()));
     $("hydrantSearchButton")?.addEventListener("click",searchHydrant);$("hydrantSearch")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();searchHydrant()}});
