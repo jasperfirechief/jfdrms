@@ -29,7 +29,7 @@
     if(!Array.isArray(coords)||!Array.isArray(ids)||!coords.length)throw new Error("Hydrant GIS data is empty or invalid.");
     const count=Math.min(coords.length,ids.length);
     const data=[];
-    for(let i=0;i<count;i++){const c=coords[i],id=String(ids[i]||"").trim();if(!id||/^Fire St /i.test(id))continue;const lat=Number(c.lat),lng=Number(c.lng);if(Number.isFinite(lat)&&Number.isFinite(lng))data.push({id,latitude:lat,longitude:lng,label:id});}
+    for(let i=0;i<count;i++){const c=coords[i],id=String(ids[i]||"").trim().toUpperCase();if(!id||/^Fire St /i.test(id))continue;const lat=Number(c.lat),lng=Number(c.lng);if(Number.isFinite(lat)&&Number.isFinite(lng))data.push({id,latitude:lat,longitude:lng,label:id});}
     if(!data.length)throw new Error("No valid hydrant assets were found.");
     const r=await db.from("hydrant_assets").upsert(data,{onConflict:"id"}).select("id");
     if(r.error)throw r.error;
@@ -44,7 +44,7 @@
       db.from("hydrant_flow_tests").select("*").order("tested_at",{ascending:false}).limit(2500)
     ]);
     if(s.error)throw s.error;if(i.error)throw i.error;if(f.error)throw f.error;
-    schedules=s.data||[]; inspections=i.data||[]; flowTests=f.data||[];
+    let sourceRows=[];try{const sr=await fetch("/hydrant-schedule.json",{cache:"no-cache"});if(sr.ok){const sj=await sr.json();sourceRows=[...(sj.assignments||[]),...(sj.inspection_areas||[])].filter(x=>String(x.shift)===shiftValue()&&Number(x.schedule_year)===yearValue()&&Number(x.schedule_month)===monthValue());}}catch(scheduleError){console.warn("Source hydrant schedule could not load",scheduleError)}const combined=[...sourceRows,...(s.data||[])],scheduleMap=new Map();for(const x of combined){const k=[x.shift,x.schedule_year,x.schedule_month,x.task_type,assetKey(x.hydrant_id||x.source_hydrant_id),x.map_sheet||"",x.weekday_label||""].join("|");scheduleMap.set(k,x)}schedules=[...scheduleMap.values()]; inspections=i.data||[]; flowTests=f.data||[];
   }
   function ensureMap(){
     const el=$("hydrantMapCanvas");if(!el||!window.L)return;
@@ -63,11 +63,11 @@
   function renderScheduleSummary(){
     const wrap=$("hydrantScheduleSummary");if(!wrap)return;
     const tasks=currentSchedule(),inspectionCount=tasks.filter(x=>x.task_type==="inspection").length,flowCount=tasks.filter(x=>x.task_type==="flow_test").length;
-    wrap.innerHTML='<div class="grid grid-cols-3 gap-2"><div class="rounded-lg border p-3"><div class="text-xs text-slate-500">Scheduled inspections</div><b class="text-2xl">'+inspectionCount+'</b></div><div class="rounded-lg border p-3"><div class="text-xs text-slate-500">Scheduled flow tests</div><b class="text-2xl">'+flowCount+'</b></div><div class="rounded-lg border p-3"><div class="text-xs text-slate-500">Completed inspections</div><b class="text-2xl">'+new Set(inspections.filter(x=>String(x.inspected_at||"").slice(0,4)===String(yearValue())&&assetKey(x.hydrant_id)).map(x=>assetKey(x.hydrant_id))).size+'</b></div></div>';
+    wrap.innerHTML='<div class="grid grid-cols-3 gap-2"><div class="rounded-lg border p-3"><div class="text-xs text-slate-500">Inspection map sheets</div><b class="text-2xl">'+inspectionCount+'</b></div><div class="rounded-lg border p-3"><div class="text-xs text-slate-500">Scheduled flow tests</div><b class="text-2xl">'+flowCount+'</b></div><div class="rounded-lg border p-3"><div class="text-xs text-slate-500">Completed inspections</div><b class="text-2xl">'+new Set(inspections.filter(x=>String(x.inspected_at||"").slice(0,4)===String(yearValue())&&Number(String(x.inspected_at||"").slice(5,7))===monthValue()&&assetKey(x.hydrant_id)).map(x=>assetKey(x.hydrant_id))).size+'</b></div></div>';
     const sheets=[...new Set(tasks.map(x=>x.map_sheet).filter(Boolean))];
     $("hydrantMapSheetNote").textContent=sheets.length?"Inspection map sheet(s): "+sheets.join(", "):"Inspection map-sheet assignment is displayed when schedule data includes map-sheet references.";
     const list=$("hydrantScheduleList");
-    list.innerHTML=tasks.length?tasks.map(x=>'<div class="flex justify-between items-center gap-2 border rounded-lg p-2"><div><b>'+escH(x.hydrant_id||("Map sheet "+x.map_sheet))+'</b><div class="text-xs text-slate-500">'+(x.task_type==="flow_test"?"Flow test":"Inspection")+(x.weekday_label?" · "+escH(x.weekday_label):"")+'</div></div><span class="text-xs rounded-full px-2 py-1 '+(x.task_type==="flow_test"?"bg-sky-100 text-sky-800":"bg-amber-100 text-amber-800")+'">'+(x.task_type==="flow_test"?"FLOW":"INSPECT")+'</span></div>').join(""):'<p class="text-sm text-slate-500">No individual assignments are loaded for this shift/month/year yet. The shift schedule documents must be reconciled to map-sheet boundaries and individual hydrant IDs before highlighting inspections accurately.</p>';
+    list.innerHTML=tasks.length?tasks.map(x=>'<div class="flex justify-between items-center gap-2 border rounded-lg p-2"><div><b>'+escH(x.hydrant_id||x.source_hydrant_id||("Map sheet "+x.map_sheet))+'</b><div class="text-xs text-slate-500">'+(x.task_type==="flow_test"?"Flow test":"Inspection")+(x.weekday_label?" · "+escH(x.weekday_label):"")+'</div></div><span class="text-xs rounded-full px-2 py-1 '+(x.task_type==="flow_test"?"bg-sky-100 text-sky-800":"bg-amber-100 text-amber-800")+'">'+(x.task_type==="flow_test"?"FLOW":"INSPECT")+'</span></div>').join(""):'<p class="text-sm text-slate-500">No individual assignments are loaded for this shift/month/year yet. The shift schedule documents must be reconciled to map-sheet boundaries and individual hydrant IDs before highlighting inspections accurately.</p>';
   }
   async function refresh(){
     if(!allowed())return status("Hydrants access is limited to administrators and officers.",true);
