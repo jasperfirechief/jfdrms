@@ -51,7 +51,7 @@
     if(!map){map=L.map(el,{preferCanvas:true}).setView([33.875,-87.27],12);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:20,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'}).addTo(map);markerLayer=L.layerGroup().addTo(map);}
     markerLayer.clearLayers();
     assets.forEach(a=>{const lat=Number(a.latitude),lng=Number(a.longitude);if(!Number.isFinite(lat)||!Number.isFinite(lng))return;L.marker([lat,lng],{icon:iconFor(a.id),title:"Hydrant "+a.id}).bindPopup(mapPopup(a)).on("click",()=>{selected=a;renderSelected()}).addTo(markerLayer)});
-    if(markerLayer.getLayers().length)map.fitBounds(markerLayer.getBounds().pad(.04));
+    const markerPoints=markerLayer.getLayers().map(m=>m.getLatLng()).filter(p=>p&&Number.isFinite(p.lat)&&Number.isFinite(p.lng));if(markerPoints.length)map.fitBounds(L.latLngBounds(markerPoints).pad(.04));
     setTimeout(()=>map.invalidateSize(),150);
   }
   function renderSelected(){
