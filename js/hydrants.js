@@ -92,10 +92,10 @@
     $("hydrantFormTitle").textContent=kind==="inspection"?"Hydrant Inspection · "+selected.id:"Hydrant Flow Test · "+selected.id;
     $("hydrantRecordForm").classList.remove("hiddenx");
     const old=kind==="inspection"?latestFor(inspections,id,"inspected_at"):latestFor(flowTests,id,"tested_at");
-    if(kind==="inspection"&&old){const c=old.checklist||{};for(const key of ["accessible","caps_gaskets","barrel_valve","flushed","drain","lubricated","pressure_test"]){const v=c[key];const el=$('hi_'+key);if(el)el.value=v===true?"yes":v===false?"no":"";const r=$('hi_'+key+'_remarks');if(r)r.value=c[key+"_remarks"]||"";} $("hydrantInspectionNotes").value=old.notes||"";}
+    if(kind==="inspection"&&old){const c=old.checklist||{};for(const key of ["accessible","caps_gaskets","barrel_valve","flushed","drain","lubricated","pressure_test"]){const v=c[key];document.querySelectorAll('input[name="hi_'+key+'"]').forEach(el=>el.checked=el.value===(v===true?"yes":v===false?"no":""));const r=$('hi_'+key+'_remarks');if(r)r.value=c[key+"_remarks"]||"";} $("hydrantInspectionNotes").value=old.notes||"";}
     else if(kind==="flow_test"&&old){$("hf_orifice").value=old.orifice_diameter??"2.5";$("hf_pitot").value=old.pitot_pressure??"";$("hf_static").value=old.static_pressure??"";$("hf_residual").value=old.residual_pressure??"";$("hf_testHydrant").value=old.test_hydrant_id||"";$("hf_notes").value=old.notes||"";calcFlow();}
     else if(kind==="flow_test"){$("hf_orifice").value="2.5";$("hf_pitot").value="";$("hf_static").value="";$("hf_residual").value="";$("hf_testHydrant").value="";$("hf_notes").value="";calcFlow();}
-    if(kind==="inspection"&&!old){$("hydrantInspectionNotes").value="";for(const key of ["accessible","caps_gaskets","barrel_valve","flushed","drain","lubricated","pressure_test"]){const el=$('hi_'+key);if(el)el.value="";const r=$('hi_'+key+'_remarks');if(r)r.value="";}}
+    if(kind==="inspection"&&!old){$("hydrantInspectionNotes").value="";for(const key of ["accessible","caps_gaskets","barrel_valve","flushed","drain","lubricated","pressure_test"]){document.querySelectorAll('input[name="hi_'+key+'"]').forEach(el=>el.checked=false);const r=$('hi_'+key+'_remarks');if(r)r.value="";}}
     $("hydrantRecordForm").scrollIntoView({behavior:"smooth",block:"start"});renderSelected();
   }
   function calcFlow(){
