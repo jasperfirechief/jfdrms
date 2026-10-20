@@ -13,7 +13,7 @@
   function assetKey(v){return String(v||"").trim().toUpperCase()}
   function currentSchedule(){return schedules.filter(x=>String(x.shift)===shiftValue()&&Number(x.schedule_year)===yearValue()&&Number(x.schedule_month)===monthValue())}
   function scheduleFor(id){return currentSchedule().filter(x=>assetKey(x.hydrant_id)===assetKey(id))}
-  function colorFor(id){const t=scheduleFor(id).map(x=>x.task_type);if(t.includes("inspection")&&t.includes("flow_test"))return "#7c3aed";if(t.includes("inspection"))return "#d97706";if(t.includes("flow_test"))return "#0284c7";return "#64748b"}
+  function colorFor(id){const key=assetKey(id),a=assets.find(x=>assetKey(x.id)===key),t=scheduleFor(id).map(x=>x.task_type),inArea=!!(a?.map_sheet&&currentSchedule().some(x=>x.task_type==="inspection"&&x.map_sheet&&assetKey(x.map_sheet)===assetKey(a.map_sheet))),isFlow=t.includes("flow_test"),isTest=flowTests.some(x=>assetKey(x.test_hydrant_id)===key&&assetKey(x.hydrant_id)!==key);if(inArea&&isFlow)return "#7c3aed";if(inArea)return "#d97706";if(isFlow)return "#0284c7";if(isTest)return "#0f766e";return "#64748b"}
   function iconFor(id){const c=colorFor(id);return window.L.divIcon({className:"jfd-hydrant-marker",html:'<span style="display:flex;align-items:center;justify-content:center;width:25px;height:25px;border:2px solid white;border-radius:50%;background:'+c+';box-shadow:0 1px 5px #0008;color:white;font-size:10px;font-weight:900">'+escH(id).slice(0,4)+'</span>',iconSize:[25,25],iconAnchor:[12,12]})}
   function latestFor(rows,id,dateKey){return rows.filter(x=>assetKey(x.hydrant_id)===assetKey(id)).sort((a,b)=>String(b[dateKey]||"").localeCompare(String(a[dateKey]||"")))[0]||null}
   function mapPopup(a){
@@ -87,7 +87,7 @@
   function openForm(id,kind){
     if(!allowed())return alert("Only administrators and officers can enter hydrant records.");
     selected=assets.find(a=>assetKey(a.id)===assetKey(id))||{id};
-    mode=kind;$("hydrantRecordType").value=kind;$("hydrantRecordHydrant").value=selected.id;$("hydrantRecordDate").value=todayISO();$("hydrantRecordInspector").value=[profile?.first_name,profile?.last_name].filter(Boolean).join(" ")||"";
+    mode=kind;$("hydrantRecordType").value=kind;$("hydrantRecordHydrant").value=selected.id;$("hydrantRecordDate").value=todayISO();$("hydrantRecordInspector").value=[profile?.first_name,profile?.last_name].filter(Boolean).join(" ")||"";$("hydrantRecordMapSheet").value=selected.map_sheet||currentSchedule().find(x=>x.task_type==="inspection"&&x.map_sheet)?.map_sheet||"";
     $("hydrantInspectionFields").classList.toggle("hiddenx",kind!=="inspection");$("hydrantFlowFields").classList.toggle("hiddenx",kind!=="flow_test");
     $("hydrantFormTitle").textContent=kind==="inspection"?"Hydrant Inspection · "+selected.id:"Hydrant Flow Test · "+selected.id;
     $("hydrantRecordForm").classList.remove("hiddenx");
@@ -109,7 +109,7 @@
   }
   async function saveRecord(ev){
     ev.preventDefault();if(!allowed())return alert("Only administrators and officers can enter hydrant records.");
-    const id=$("hydrantRecordHydrant").value,kind=$("hydrantRecordType").value,date=$("hydrantRecordDate").value,person=$("hydrantRecordInspector").value.trim();
+    const id=$("hydrantRecordHydrant").value,kind=$("hydrantRecordType").value,date=$("hydrantRecordDate").value,person=$("hydrantRecordInspector").value.trim(),mapSheet=$("hydrantRecordMapSheet").value.trim();
     if(!id||!date||!person)return alert("Hydrant, date, and inspector/tester are required.");
     $("hydrantSaveButton").disabled=true;$("hydrantSaveButton").textContent="Saving…";
     try{
@@ -120,8 +120,8 @@
           checklist[key]=v==="yes";checklist[key+"_remarks"]=$("hi_"+key+"_remarks").value.trim();
         }
         const failed=Object.entries(checklist).filter(([k,v])=>!k.endsWith("_remarks")&&v===false).map(([k])=>k);
-        const payload={hydrant_id:id,inspected_at:date,inspector:person,checklist,accessible:checklist.accessible,leaks:checklist.caps_gaskets===false,damage:checklist.barrel_valve===false,operational:checklist.barrel_valve!==false&&checklist.drain!==false,condition:failed.length?"Needs attention":"Satisfactory",deficiencies:failed.map(k=>checklist[k+"_remarks"]).filter(Boolean).join("; "),corrective_action:Object.entries(checklist).filter(([k,v])=>k.endsWith("_remarks")&&v).map(([k,v])=>v).join("; "),follow_up_status:failed.length?"Open":"Closed",notes:$("hydrantInspectionNotes").value.trim(),map_sheet:selected?.map_sheet||null,created_by:typeof me!=="undefined"?(me?.id||null):null};
-        r=await db.from("hydrant_inspections").insert(payload);
+        const payload={hydrant_id:id,inspected_at:date,inspector:person,checklist,accessible:checklist.accessible,leaks:checklist.caps_gaskets===false,damage:checklist.barrel_valve===false,operational:checklist.barrel_valve!==false&&checklist.drain!==false,condition:failed.length?"Needs attention":"Satisfactory",deficiencies:failed.map(k=>checklist[k+"_remarks"]).filter(Boolean).join("; "),corrective_action:Object.entries(checklist).filter(([k,v])=>k.endsWith("_remarks")&&v).map(([k,v])=>v).join("; "),follow_up_status:failed.length?"Open":"Closed",notes:$("hydrantInspectionNotes").value.trim(),map_sheet:mapSheet||selected?.map_sheet||null,created_by:typeof me!=="undefined"?(me?.id||null):null};
+        r=await db.from("hydrant_inspections").insert(payload);if(!r.error&&mapSheet){const assetUpdate=await db.from("hydrant_assets").update({map_sheet:mapSheet}).eq("id",id);if(assetUpdate.error)throw assetUpdate.error;if(selected)selected.map_sheet=mapSheet;}
       }else{
         const calc=calcFlow(),orifice=Number($("hf_orifice").value),pitot=Number($("hf_pitot").value),stat=Number($("hf_static").value),resid=Number($("hf_residual").value);
         if(!(orifice>0&&pitot>0&&stat>resid&&resid>=0))return alert("Enter valid outlet diameter, pitot, static and residual readings. Static must be greater than residual.");
