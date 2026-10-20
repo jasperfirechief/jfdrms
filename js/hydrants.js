@@ -155,7 +155,7 @@
   window.jfdHydrantCalcFlow=calcFlow;
   window.jfdHydrantCloseHistory=()=> $("hydrantHistoryModal")?.classList.add("hiddenx");
   window.jfdHydrantCloseForm=()=> $("hydrantRecordForm")?.classList.add("hiddenx");
-  window.jfdHydrantTabEntered=async function(){if(!allowed())return alert("Hydrants are available to administrators and officers.");if(!initialized||!map||!map.getContainer().isConnected)await refresh();else{await loadRecords();ensureMap();renderScheduleSummary();renderSelected();renderHydrantRecordList();}};
+  window.jfdHydrantTabEntered=async function(){if(!allowed())return alert("Hydrants are available to administrators and officers.");if(!window.jfdHydrantShiftInitialized&&typeof personnel!=="undefined"&&typeof me!=="undefined"){const own=personnel.find(p=>p.auth_user_id===me.id);if(["A","B","C"].includes(String(own?.shift||"").toUpperCase()))$("hydrantShift").value=String(own.shift).toUpperCase();window.jfdHydrantShiftInitialized=true;}if(!initialized||!map||!map.getContainer().isConnected)await refresh();else{await loadRecords();ensureMap();renderScheduleSummary();renderSelected();renderHydrantRecordList();}};
   window.jfdHydrantFiltersChanged=async function(){if(!allowed())return;await loadRecords();ensureMap();renderScheduleSummary();renderSelected();renderHydrantRecordList();};
   document.addEventListener("DOMContentLoaded",()=>{
     const form=$("hydrantRecordInnerForm");form?.addEventListener("submit",saveRecord);
