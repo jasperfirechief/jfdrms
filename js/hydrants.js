@@ -116,7 +116,7 @@
       let r;
       if(kind==="inspection"){
         const checklist={};for(const [key,label] of [["accessible","Accessible / visible"],["caps_gaskets","Caps and gaskets"],["barrel_valve","Barrel and valve"],["flushed","Flushed until clear"],["drain","Drain working"],["lubricated","Threads, gaskets and valve lubricated"],["pressure_test","Pressure test conducted"]]){
-          const v=$("hi_"+key).value;if(v==="")return alert("Complete Yes/No for: "+label);
+          const v=document.querySelector('input[name="hi_'+key+'"]:checked')?.value||"";if(v==="")return alert("Complete Yes/No for: "+label);
           checklist[key]=v==="yes";checklist[key+"_remarks"]=$("hi_"+key+"_remarks").value.trim();
         }
         const failed=Object.entries(checklist).filter(([k,v])=>!k.endsWith("_remarks")&&v===false).map(([k])=>k);
