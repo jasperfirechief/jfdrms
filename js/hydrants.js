@@ -5,7 +5,7 @@
   const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   let map = null, markerLayer = null, assets = [], schedules = [], inspections = [], flowTests = [], selected = null, mode = "inspection", initialized = false, loading = false;
   const todayISO = () => (typeof today === "function" ? today() : new Date().toISOString().slice(0,10));
-  const allowed = () => window.profile && ["admin","officer"].includes(String(window.profile.app_role||"").toLowerCase());
+  const allowed = () => typeof profile!=="undefined" && profile && ["admin","officer"].includes(String(profile.app_role||"").toLowerCase());
   function status(msg, bad=false){const n=$("hydrantStatus");if(n){n.textContent=msg;n.className="text-sm mt-2 "+(bad?"text-red-700":"text-slate-600")}}
   function monthValue(){return Number($("hydrantMonth")?.value||new Date().getMonth()+1)}
   function yearValue(){return Number($("hydrantYear")?.value||new Date().getFullYear())}
@@ -74,7 +74,7 @@
     if(loading)return;loading=true;status("Loading hydrant inventory and history…");
     try{
       if(!window.L){await new Promise((resolve,reject)=>{if(typeof window.jfdLoadLeaflet==="function"){window.jfdLoadLeaflet().then(resolve,reject)}else{const s=document.createElement("script");s.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";s.onload=resolve;s.onerror=()=>reject(new Error("Map library failed to load."));document.head.appendChild(s)}})}
-      await loadAssets();await loadRecords();ensureMap();renderScheduleSummary();renderSelected();renderHydrantRecordList();status("Loaded "+assets.length+" hydrant locations. Records are saved in JFDRMS.");
+      await loadAssets();await loadRecords();const testSel=$("hf_testHydrant");if(testSel){const keep=testSel.value;testSel.innerHTML='<option value="">Same as flow hydrant</option>'+assets.map(a=>'<option value="'+escH(a.id)+'">'+escH(a.id)+'</option>').join("");testSel.value=keep;}ensureMap();renderScheduleSummary();renderSelected();renderHydrantRecordList();status("Loaded "+assets.length+" hydrant locations. Records are saved in JFDRMS.");
       initialized=true;
     }catch(e){console.error("Hydrants module",e);status("Unable to load hydrants: "+(e?.message||String(e)),true)}
     finally{loading=false}
@@ -87,7 +87,7 @@
   function openForm(id,kind){
     if(!allowed())return alert("Only administrators and officers can enter hydrant records.");
     selected=assets.find(a=>assetKey(a.id)===assetKey(id))||{id};
-    mode=kind;$("hydrantRecordType").value=kind;$("hydrantRecordHydrant").value=selected.id;$("hydrantRecordDate").value=todayISO();$("hydrantRecordInspector").value=[window.profile?.first_name,window.profile?.last_name].filter(Boolean).join(" ")||"";
+    mode=kind;$("hydrantRecordType").value=kind;$("hydrantRecordHydrant").value=selected.id;$("hydrantRecordDate").value=todayISO();$("hydrantRecordInspector").value=[profile?.first_name,profile?.last_name].filter(Boolean).join(" ")||"";
     $("hydrantInspectionFields").classList.toggle("hiddenx",kind!=="inspection");$("hydrantFlowFields").classList.toggle("hiddenx",kind!=="flow_test");
     $("hydrantFormTitle").textContent=kind==="inspection"?"Hydrant Inspection · "+selected.id:"Hydrant Flow Test · "+selected.id;
     $("hydrantRecordForm").classList.remove("hiddenx");
@@ -120,7 +120,7 @@
           checklist[key]=v==="yes";checklist[key+"_remarks"]=$("hi_"+key+"_remarks").value.trim();
         }
         const failed=Object.entries(checklist).filter(([k,v])=>!k.endsWith("_remarks")&&v===false).map(([k])=>k);
-        const payload={hydrant_id:id,inspected_at:date,inspector:person,checklist,accessible:checklist.accessible,leaks:checklist.caps_gaskets===false,damage:checklist.barrel_valve===false,operational:checklist.barrel_valve!==false&&checklist.drain!==false,condition:failed.length?"Needs attention":"Satisfactory",deficiencies:failed.map(k=>checklist[k+"_remarks"]).filter(Boolean).join("; "),corrective_action:Object.entries(checklist).filter(([k,v])=>k.endsWith("_remarks")&&v).map(([k,v])=>v).join("; "),follow_up_status:failed.length?"Open":"Closed",notes:$("hydrantInspectionNotes").value.trim(),map_sheet:selected?.map_sheet||null,created_by:window.me?.id||null};
+        const payload={hydrant_id:id,inspected_at:date,inspector:person,checklist,accessible:checklist.accessible,leaks:checklist.caps_gaskets===false,damage:checklist.barrel_valve===false,operational:checklist.barrel_valve!==false&&checklist.drain!==false,condition:failed.length?"Needs attention":"Satisfactory",deficiencies:failed.map(k=>checklist[k+"_remarks"]).filter(Boolean).join("; "),corrective_action:Object.entries(checklist).filter(([k,v])=>k.endsWith("_remarks")&&v).map(([k,v])=>v).join("; "),follow_up_status:failed.length?"Open":"Closed",notes:$("hydrantInspectionNotes").value.trim(),map_sheet:selected?.map_sheet||null,created_by:typeof me!=="undefined"?(me?.id||null):null};
         r=await db.from("hydrant_inspections").insert(payload);
       }else{
         const calc=calcFlow(),orifice=Number($("hf_orifice").value),pitot=Number($("hf_pitot").value),stat=Number($("hf_static").value),resid=Number($("hf_residual").value);
