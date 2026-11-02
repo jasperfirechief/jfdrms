@@ -145,7 +145,7 @@ window.rmsLogin=async function(e){
     <label class="text-sm font-semibold">To<input id="callAnalysisTo" type="date" class="block w-full border rounded p-2 mt-1"></label>
   </div>
   <div id="callAnalysisResults" class="mt-4"><p class="text-sm text-slate-500">Select a date range and run the analysis.</p></div>
-</div><div id="adminHydrantReports" class="card p-5 mb-4">
+</div><div id="adminHydrantReports" class="admin-only-panel hiddenx card p-5 mb-4" style="display:none!important">
 <h2 class="text-xl font-black mb-1">Hydrant Inspection &amp; Flow-Test Reports</h2>
 <p class="text-sm text-slate-500 mb-4">Filter records by date range. Use the monthly or yearly presets, then print or export the results.</p>
 <div class="flex flex-wrap gap-3 items-end">
