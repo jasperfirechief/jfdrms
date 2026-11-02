@@ -126,7 +126,7 @@
       const flow=String(x.flow_hydrant_id||"");
       const done=pairDone(x);
       const known=inventoryIds.has(assetKey(test))&&(!flow||inventoryIds.has(assetKey(flow)));
-      return '<button type="button" class="w-full flex justify-between items-center gap-2 border rounded-lg p-2 text-left hover:bg-slate-50" onclick="jfdOpenHydrantForm(\''+escH(test)+'\',\'flow_test\')"><span><b>T: '+escH(test)+'</b><span class="block text-xs text-slate-500">F: '+(flow?escH(flow):"Not listed in source schedule")+' · Pair '+escH(x.pair_order||"—")+'</span></span><span class="text-xs font-bold '+(done?"text-green-700":(known?"text-sky-700":"text-red-700"))+'">'+(done?"TESTED":(known?"FLOW TEST DUE":"CHECK ID / F"))+'</span></button>';
+      return '<button type="button" class="w-full flex justify-between items-center gap-2 border rounded-lg p-2 text-left hover:bg-slate-50" onclick="jfdOpenHydrantForm(\''+escH(test)+'\',\'flow_test\',\''+escH(flow)+'\','+Number(x.pair_order||0)+')"><span><b>T: '+escH(test)+'</b><span class="block text-xs text-slate-500">F: '+(flow?escH(flow):"Not listed in source schedule")+' · Pair '+escH(x.pair_order||"—")+'</span></span><span class="text-xs font-bold '+(done?"text-green-700":(known?"text-sky-700":"text-red-700"))+'">'+(done?"TESTED":(known?"FLOW TEST DUE":"CHECK ID / F"))+'</span></button>';
     }).join(""):'<p class="text-sm text-slate-500">No flow tests are scheduled for this shift/month/year.</p>';
     list.innerHTML='<div class="space-y-2"><h3 class="font-bold text-sm">Annual inspections · '+inspectionTasks.length+' hydrants</h3>'+inspectionHtml+'</div><div class="space-y-2 mt-4"><h3 class="font-bold text-sm">Flow-test pairings · '+flowTasks.length+' scheduled tests</h3>'+flowHtml+'</div>';
   }
@@ -149,12 +149,12 @@
       return '<button type="button" class="w-full text-left border rounded-lg p-3 hover:bg-slate-50" onclick="jfdShowHydrantHistory(\''+escH(historyId)+'\')"><div class="flex justify-between gap-2"><b>'+escH(heading)+'</b><span class="text-xs text-slate-500">'+escH(x._date)+'</span></div><div class="text-sm">'+(x._type==="inspection"?"Annual inspection":"Flow test")+' · '+escH(x.inspector||x.tester||"")+'</div><div class="text-xs text-slate-500">'+(x._type==="flow_test"&&x.calculated_flow_gpm!=null?Number(x.calculated_flow_gpm).toLocaleString()+" GPM":escH(x.deficiencies||x.notes||""))+'</div></button>';
     }).join(""):'<p class="text-sm text-slate-500">No hydrant records have been entered yet.</p>';
   }
-  function openForm(id,kind){
+  function openForm(id,kind,flowOverride,pairOrder){
     if(!allowed())return alert("Only administrators and officers can enter hydrant records.");
     let scheduledPair=null;
-    if(kind==="flow_test")scheduledPair=currentSchedule().find(x=>x.task_type==="flow_test"&&(assetKey(x.test_hydrant_id)===assetKey(id)||assetKey(x.flow_hydrant_id)===assetKey(id)))||null;
+    if(kind==="flow_test"){const candidates=currentSchedule().filter(x=>x.task_type==="flow_test"&&assetKey(x.test_hydrant_id)===assetKey(id));if(pairOrder)scheduledPair=candidates.find(x=>Number(x.pair_order)===Number(pairOrder)&&(!flowOverride?!x.flow_hydrant_id:assetKey(x.flow_hydrant_id)===assetKey(flowOverride)))||null;if(!scheduledPair&&flowOverride)scheduledPair=candidates.find(x=>assetKey(x.flow_hydrant_id)===assetKey(flowOverride))||null;if(!scheduledPair)scheduledPair=currentSchedule().find(x=>x.task_type==="flow_test"&&(assetKey(x.test_hydrant_id)===assetKey(id)||assetKey(x.flow_hydrant_id)===assetKey(id)))||null;}
     const testId=kind==="flow_test"?(scheduledPair?.test_hydrant_id||""):"";
-    const flowId=kind==="flow_test"?(scheduledPair?.flow_hydrant_id||(!scheduledPair?id:"")):id;
+    const flowId=kind==="flow_test"?(scheduledPair?(scheduledPair.flow_hydrant_id||""):(flowOverride||id)):id;
     const displayId=kind==="flow_test"?(flowId||id):id;
     selected=assets.find(a=>assetKey(a.id)===assetKey(displayId))||{id:displayId};
     mode=kind;populateHydrantRecordSelectors();
