@@ -143,7 +143,11 @@
   function renderHydrantRecordList(){
     const el=$("hydrantRecentRecords");if(!el)return;
     const all=[...inspections.map(x=>({...x,_type:"inspection",_date:x.inspected_at})),...flowTests.map(x=>({...x,_type:"flow_test",_date:x.tested_at}))].sort((a,b)=>String(b._date||"").localeCompare(String(a._date||""))).slice(0,12);
-    el.innerHTML=all.length?all.map(x=>'<button type="button" class="w-full text-left border rounded-lg p-3 hover:bg-slate-50" onclick="jfdShowHydrantHistory(\''+escH(x.hydrant_id)+'\')"><div class="flex justify-between gap-2"><b>'+escH(x.hydrant_id)+'</b><span class="text-xs text-slate-500">'+escH(x._date)+'</span></div><div class="text-sm">'+(x._type==="inspection"?"Inspection":"Flow test")+' · '+escH(x.inspector||x.tester||"")+'</div><div class="text-xs text-slate-500">'+(x._type==="flow_test"&&x.calculated_flow_gpm!=null?Number(x.calculated_flow_gpm).toLocaleString()+" GPM":escH(x.deficiencies||x.notes||""))+'</div></button>').join(""):'<p class="text-sm text-slate-500">No hydrant records have been entered yet.</p>';
+    el.innerHTML=all.length?all.map(x=>{
+      const historyId=x._type==="flow_test"?(x.test_hydrant_id||x.hydrant_id):x.hydrant_id;
+      const heading=x._type==="flow_test"?"T: "+(x.test_hydrant_id||"—")+" · F: "+(x.flow_hydrant_id||x.hydrant_id):x.hydrant_id;
+      return '<button type="button" class="w-full text-left border rounded-lg p-3 hover:bg-slate-50" onclick="jfdShowHydrantHistory(\''+escH(historyId)+'\')"><div class="flex justify-between gap-2"><b>'+escH(heading)+'</b><span class="text-xs text-slate-500">'+escH(x._date)+'</span></div><div class="text-sm">'+(x._type==="inspection"?"Annual inspection":"Flow test")+' · '+escH(x.inspector||x.tester||"")+'</div><div class="text-xs text-slate-500">'+(x._type==="flow_test"&&x.calculated_flow_gpm!=null?Number(x.calculated_flow_gpm).toLocaleString()+" GPM":escH(x.deficiencies||x.notes||""))+'</div></button>';
+    }).join(""):'<p class="text-sm text-slate-500">No hydrant records have been entered yet.</p>';
   }
   function openForm(id,kind){
     if(!allowed())return alert("Only administrators and officers can enter hydrant records.");
