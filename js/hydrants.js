@@ -3,7 +3,7 @@
   const $ = id => document.getElementById(id);
   const escH = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-  let map = null, markerLayer = null, assets = [], schedules = [], inspections = [], flowTests = [], mapSheets = [], selected = null, mode = "inspection", initialized = false, loading = false;
+  let map = null, markerLayer = null, assets = [], schedules = [], inspections = [], flowTests = [], selected = null, mode = "inspection", initialized = false, loading = false;
   const todayISO = () => (typeof today === "function" ? today() : new Date().toISOString().slice(0,10));
   const allowed = () => typeof profile!=="undefined" && profile && ["admin","officer"].includes(String(profile.app_role||"").toLowerCase());
   function status(msg, bad=false){const n=$("hydrantStatus");if(n){n.textContent=msg;n.className="text-sm mt-2 "+(bad?"text-red-700":"text-slate-600")}}
@@ -11,8 +11,6 @@
   function yearValue(){return Number($("hydrantYear")?.value||new Date().getFullYear())}
   function shiftValue(){return $("hydrantShift")?.value||"A"}
   function assetKey(v){return String(v||"").trim().toUpperCase()}
-  function sheetList(a){return Array.isArray(a?.map_sheets)?a.map_sheets:(a?.map_sheet?[a.map_sheet]:[])}
-  function assetHasSheet(a,sheet){const verified=Array.isArray(a?.verified_map_sheets)?a.verified_map_sheets:sheetList(a);return !!sheet&&verified.some(s=>assetKey(s)===assetKey(sheet))}
   function currentSchedule(){return schedules.filter(x=>String(x.shift)===shiftValue()&&Number(x.schedule_year)===yearValue()&&Number(x.schedule_month)===monthValue())}
   function scheduleFor(id){return currentSchedule().filter(x=>assetKey(x.hydrant_id||x.source_hydrant_id)===assetKey(id)||assetKey(x.test_hydrant_id)===assetKey(id)||assetKey(x.flow_hydrant_id)===assetKey(id))}
   function colorFor(id){const key=assetKey(id),sch=scheduleFor(id),isInspection=sch.some(x=>x.task_type==="inspection"&&assetKey(x.hydrant_id||x.source_hydrant_id)===key),isTest=sch.some(x=>x.task_type==="flow_test"&&assetKey(x.test_hydrant_id)===key),isFlow=sch.some(x=>assetKey(x.flow_hydrant_id)===key);if(isTest&&isFlow)return "#7c3aed";if(isTest)return "#0f766e";if(isFlow)return "#0284c7";if(isInspection)return "#d97706";return "#64748b"}
@@ -22,8 +20,8 @@
   function mapPopup(a){
     const ins=latestFor(inspections,a.id,"inspected_at"), fl=latestFlowFor(a.id);
     const sch=scheduleFor(a.id), coord=Number(a.latitude).toFixed(6)+", "+Number(a.longitude).toFixed(6);
-    const scheduleText=sch.length?sch.map(x=>x.task_type==="flow_test"?(assetKey(x.test_hydrant_id)===assetKey(a.id)?"TEST hydrant · flow hydrant "+escH(x.flow_hydrant_id||"not assigned"):"FLOW hydrant · test hydrant "+escH(x.test_hydrant_id||"not identified in source schedule")+(x.pair_status==="needs_review"?" · ID REVIEW":"")):"Inspection area · "+escH(x.map_sheet||"scheduled").replace(/^$/,"scheduled")).join(" · "):"No individual task assigned in this month’s imported schedule";
-    return '<div style="min-width:220px"><b style="font-size:16px">Hydrant '+escH(a.id)+'</b><div style="color:#64748b;font-size:11px">'+coord+(sheetList(a).length?" · Map sheet(s) "+escH(sheetList(a).join(", ")):"")+'</div><div style="margin:7px 0;font-size:12px">'+escH(scheduleText)+'</div><div style="font-size:12px">Last inspection: <b>'+escH(ins?.inspected_at||"No record")+'</b></div><div style="font-size:12px">Last flow test: <b>'+escH(fl?.tested_at||"No record")+'</b>'+(fl?.calculated_flow_gpm!=null?" · "+Number(fl.calculated_flow_gpm).toLocaleString()+" GPM":"")+'</div><div style="display:flex;gap:5px;margin-top:9px"><button onclick="jfdOpenHydrantForm(\''+escH(a.id)+'\',\'inspection\')" style="background:#b45309;color:white;border:0;padding:6px 8px;border-radius:5px;font-weight:bold">Inspect</button><button onclick="jfdOpenHydrantForm(\''+escH(a.id)+'\',\'flow_test\')" style="background:#0369a1;color:white;border:0;padding:6px 8px;border-radius:5px;font-weight:bold">Flow test</button><button onclick="jfdShowHydrantHistory(\''+escH(a.id)+'\')" style="border:1px solid #cbd5e1;padding:6px 8px;border-radius:5px">History</button></div></div>';
+    const scheduleText=sch.length?sch.map(x=>x.task_type==="flow_test"?(assetKey(x.test_hydrant_id)===assetKey(a.id)?"TEST hydrant · flow hydrant "+escH(x.flow_hydrant_id||"not assigned"):"FLOW hydrant · test hydrant "+escH(x.test_hydrant_id||"not identified in source schedule")+(x.pair_status==="needs_review"?" · ID REVIEW":"")):"Annual inspection hydrant").join(" · "):"No individual task assigned in this month’s imported schedule";
+    return '<div style="min-width:220px"><b style="font-size:16px">Hydrant '+escH(a.id)+'</b><div style="color:#64748b;font-size:11px">'+coord++'</div><div style="margin:7px 0;font-size:12px">'+escH(scheduleText)+'</div><div style="font-size:12px">Last inspection: <b>'+escH(ins?.inspected_at||"No record")+'</b></div><div style="font-size:12px">Last flow test: <b>'+escH(fl?.tested_at||"No record")+'</b>'+(fl?.calculated_flow_gpm!=null?" · "+Number(fl.calculated_flow_gpm).toLocaleString()+" GPM":"")+'</div><div style="display:flex;gap:5px;margin-top:9px"><button onclick="jfdOpenHydrantForm(\''+escH(a.id)+'\',\'inspection\')" style="background:#b45309;color:white;border:0;padding:6px 8px;border-radius:5px;font-weight:bold">Inspect</button><button onclick="jfdOpenHydrantForm(\''+escH(a.id)+'\',\'flow_test\')" style="background:#0369a1;color:white;border:0;padding:6px 8px;border-radius:5px;font-weight:bold">Flow test</button><button onclick="jfdShowHydrantHistory(\''+escH(a.id)+'\')" style="border:1px solid #cbd5e1;padding:6px 8px;border-radius:5px">History</button></div></div>';
   }
   function monthlyHydrantIds(){
     const ids=new Set();
@@ -57,11 +55,7 @@
     if(r.error)throw r.error;
     const q=await db.from("hydrant_assets").select("*").order("id");
     if(q.error)throw q.error;
-    const m=await db.from("hydrant_asset_map_sheets").select("hydrant_id,map_sheet,verified,source").order("map_sheet");
-    if(m.error)throw m.error;
-    const byHydrant=new Map();for(const row of (m.data||[])){const k=assetKey(row.hydrant_id);if(!byHydrant.has(k))byHydrant.set(k,[]);byHydrant.get(k).push(row);}
-    assets=(q.data||[]).map(a=>{const links=byHydrant.get(assetKey(a.id))||[];return {...a,map_sheets:links.map(x=>x.map_sheet).filter(Boolean),verified_map_sheets:links.filter(x=>x.verified).map(x=>x.map_sheet).filter(Boolean),unverified_map_sheets:links.filter(x=>!x.verified).map(x=>x.map_sheet).filter(Boolean)}});
-    mapSheets=[...new Set([...mapSheets,...assets.flatMap(a=>sheetList(a))])].sort();
+    assets=q.data||[];
   }
   async function loadRecords(){
     const scheduleQuery=yearValue()>=2027?Promise.resolve({data:[],error:null}):db.from("hydrant_schedule").select("*").eq("shift",shiftValue()).eq("schedule_year",yearValue()).eq("schedule_month",monthValue());
@@ -83,20 +77,18 @@
       const inspectionsForMonth=(assignment?.[2]||[]).map(id=>({shift:shiftValue(),schedule_year:yearValue(),schedule_month:monthValue(),task_type:"inspection",hydrant_id:id,source_hydrant_id:id,map_sheet:mapSheet}));
       const pairsForMonth=pairsForBaseYear.map((pair,j)=>({shift:shiftValue(),schedule_year:yearValue(),schedule_month:monthValue(),task_type:"flow_test",hydrant_id:pair[0],source_hydrant_id:pair[0],test_hydrant_id:pair[0],flow_hydrant_id:pair[1]||null,pair_order:j+1,pair_status:pair[1]?"scheduled":"needs_review"}));
       sourceRows=[...inspectionsForMonth,...pairsForMonth];
-      mapSheets=[...new Set([mapSheet,...assets.flatMap(a=>sheetList(a))])].sort();
     }else{
       try{
         const sr=await fetch("/hydrant-schedule.json",{cache:"no-cache"});
         if(sr.ok){
           const sj=await sr.json();
-          mapSheets=[...new Set([...(sj.inspection_areas||[]).map(x=>x.map_sheet),...(sj.flow_test_pairs||[]).map(x=>x.map_sheet),...assets.flatMap(a=>sheetList(a))].filter(Boolean))].sort();
           const pairs=(sj.flow_test_pairs||[]).map(p=>({...p,task_type:"flow_test",hydrant_id:p.test_hydrant_id,source_hydrant_id:p.test_hydrant_id}));
           const unmatched=(sj.unmatched_flow_test_entries||[]).flatMap(e=>[...(e.unmatched_tests||[]).map((id,j)=>({...e,task_type:"flow_test",hydrant_id:id,source_hydrant_id:id,test_hydrant_id:id,flow_hydrant_id:null,pair_order:null,pair_status:"needs_review"})),...(e.unmatched_flows||[]).map(id=>({...e,task_type:"flow_test",hydrant_id:id,source_hydrant_id:id,test_hydrant_id:null,flow_hydrant_id:id,pair_order:null,pair_status:"needs_review"}))]);
           sourceRows=[...pairs,...unmatched,...(sj.inspection_areas||[])].filter(x=>String(x.shift)===shiftValue()&&Number(x.schedule_year)===yearValue()&&Number(x.schedule_month)===monthValue());
         }
       }catch(scheduleError){console.warn("Source hydrant schedule could not load",scheduleError)}
       const combined=[...sourceRows,...(s.data||[])],scheduleMap=new Map();
-      for(const x of combined){const k=[x.shift,x.schedule_year,x.schedule_month,x.task_type,assetKey(x.hydrant_id||x.source_hydrant_id),x.test_hydrant_id||"",x.flow_hydrant_id||"",x.pair_order||"",x.map_sheet||""].join("|");scheduleMap.set(k,x)}
+      for(const x of combined){const k=[x.shift,x.schedule_year,x.schedule_month,x.task_type,assetKey(x.hydrant_id||x.source_hydrant_id),x.test_hydrant_id||"",x.flow_hydrant_id||"",x.pair_order||"",""].join("|");scheduleMap.set(k,x)}
       sourceRows=[...scheduleMap.values()];
     }
     schedules=sourceRows;
@@ -111,12 +103,11 @@
     const markerPoints=markerLayer.getLayers().map(m=>m.getLatLng()).filter(p=>p&&Number.isFinite(p.lat)&&Number.isFinite(p.lng));if(markerPoints.length)map.fitBounds(L.latLngBounds(markerPoints).pad(.04));
     setTimeout(()=>map.invalidateSize(),150);
   }
-  function renderMapSheetEditor(a){return '<p class="text-xs text-slate-500 mt-3">All hydrants are shown on one map. Select a shift and month to highlight that schedule\u2019s inspection hydrants and flow-test pairs.</p>'}
   function renderSelected(){
     const box=$("hydrantSelected");if(!box)return;
     if(!selected){box.innerHTML='<p class="text-sm text-slate-500">Select a hydrant marker or search by hydrant ID to view details and enter a record.</p>';return}
     const ins=latestFor(inspections,selected.id,"inspected_at"),fl=latestFlowFor(selected.id),sch=scheduleFor(selected.id);
-    box.innerHTML='<div class="flex items-start justify-between gap-2"><div><div class="text-xl font-black">Hydrant '+escH(selected.id)+'</div><div class="text-xs text-slate-500">'+Number(selected.latitude).toFixed(6)+', '+Number(selected.longitude).toFixed(6)+(sheetList(selected).length?" · Map sheet(s) "+escH(sheetList(selected).join(", ")):"")+'</div></div><span class="text-xs rounded-full px-2 py-1 bg-slate-100">'+(sch.length?sch.map(x=>x.task_type==="flow_test"?"Flow test":"Inspection").join(" + "):"Not scheduled individually")+'</span></div>'+renderMapSheetEditor(selected)+'<div class="grid grid-cols-2 gap-2 mt-3"><div class="border rounded-lg p-3"><div class="text-xs text-slate-500">Last inspection</div><b>'+escH(ins?.inspected_at||"No record")+'</b><div class="text-xs mt-1">'+escH(ins?.inspector||"")+'</div>'+(ins?.follow_up_status&&ins.follow_up_status!=="Closed"?'<div class="text-xs font-bold text-amber-700 mt-1">'+escH(ins.follow_up_status)+'</div>':"")+'</div><div class="border rounded-lg p-3"><div class="text-xs text-slate-500">Last flow test</div><b>'+escH(fl?.tested_at||"No record")+'</b><div class="text-xs mt-1">'+(fl?.calculated_flow_gpm!=null?Number(fl.calculated_flow_gpm).toLocaleString()+" GPM":"No calculated flow")+'</div><div class="text-xs text-slate-500">'+(fl?.static_pressure!=null?"Static "+escH(fl.static_pressure)+" PSI":"")+'</div></div></div><div class="flex flex-wrap gap-2 mt-3"><button class="bg-amber-700 text-white rounded-lg px-3 py-2 font-bold" onclick="jfdOpenHydrantForm(\''+escH(selected.id)+'\',\'inspection\')">Enter inspection</button><button class="bg-sky-700 text-white rounded-lg px-3 py-2 font-bold" onclick="jfdOpenHydrantForm(\''+escH(selected.id)+'\',\'flow_test\')">Enter flow test</button><button class="border rounded-lg px-3 py-2 font-bold" onclick="jfdShowHydrantHistory(\''+escH(selected.id)+'\')">View history</button></div>';
+    box.innerHTML='<div class="flex items-start justify-between gap-2"><div><div class="text-xl font-black">Hydrant '+escH(selected.id)+'</div><div class="text-xs text-slate-500">'+Number(selected.latitude).toFixed(6)+', '+Number(selected.longitude).toFixed(6)++'</div></div><span class="text-xs rounded-full px-2 py-1 bg-slate-100">'+(sch.length?sch.map(x=>x.task_type==="flow_test"?"Flow test":"Inspection").join(" + "):"Not scheduled individually")+'</span></div>'+'<div class="grid grid-cols-2 gap-2 mt-3"><div class="border rounded-lg p-3"><div class="text-xs text-slate-500">Last inspection</div><b>'+escH(ins?.inspected_at||"No record")+'</b><div class="text-xs mt-1">'+escH(ins?.inspector||"")+'</div>'+(ins?.follow_up_status&&ins.follow_up_status!=="Closed"?'<div class="text-xs font-bold text-amber-700 mt-1">'+escH(ins.follow_up_status)+'</div>':"")+'</div><div class="border rounded-lg p-3"><div class="text-xs text-slate-500">Last flow test</div><b>'+escH(fl?.tested_at||"No record")+'</b><div class="text-xs mt-1">'+(fl?.calculated_flow_gpm!=null?Number(fl.calculated_flow_gpm).toLocaleString()+" GPM":"No calculated flow")+'</div><div class="text-xs text-slate-500">'+(fl?.static_pressure!=null?"Static "+escH(fl.static_pressure)+" PSI":"")+'</div></div></div><div class="flex flex-wrap gap-2 mt-3"><button class="bg-amber-700 text-white rounded-lg px-3 py-2 font-bold" onclick="jfdOpenHydrantForm(\''+escH(selected.id)+'\',\'inspection\')">Enter inspection</button><button class="bg-sky-700 text-white rounded-lg px-3 py-2 font-bold" onclick="jfdOpenHydrantForm(\''+escH(selected.id)+'\',\'flow_test\')">Enter flow test</button><button class="border rounded-lg px-3 py-2 font-bold" onclick="jfdShowHydrantHistory(\''+escH(selected.id)+'\')">View history</button></div>';
   }
   function renderScheduleSummary(){
     const wrap=$("hydrantScheduleSummary");if(!wrap)return;
@@ -138,7 +129,7 @@
       const id=String(x.hydrant_id||"");
       const exists=inventoryIds.has(assetKey(id));
       const done=inspectionDoneIds.has(assetKey(id))||flowDoneTestIds.has(assetKey(id));
-      return '<button type="button" class="w-full flex justify-between items-center gap-2 border rounded-lg p-2 text-left hover:bg-slate-50" onclick="jfdOpenHydrantForm(\''+escH(id)+'\',\'inspection\')"><span><b>'+escH(id)+'</b><span class="block text-xs text-slate-500">'+escH(x.map_sheet||"Annual inspection assignment")+'</span></span><span class="text-xs font-bold '+(done?"text-green-700":(exists?"text-amber-700":"text-red-700"))+'">'+(done?"INSPECTED":(exists?"DUE":"NOT IN MAP"))+'</span></button>';
+      return '<button type="button" class="w-full flex justify-between items-center gap-2 border rounded-lg p-2 text-left hover:bg-slate-50" onclick="jfdOpenHydrantForm(\''+escH(id)+'\',\'inspection\')"><span><b>'+escH(id)+'</b><span class="block text-xs text-slate-500">'+escH"Annual inspection assignment"+'</span></span><span class="text-xs font-bold '+(done?"text-green-700":(exists?"text-amber-700":"text-red-700"))+'">'+(done?"INSPECTED":(exists?"DUE":"NOT IN MAP"))+'</span></button>';
     }).join(""):'<p class="text-sm text-slate-500">No annual inspection assignments for this shift/month.</p>';
     const flowHtml=flowTasks.length?flowTasks.map(x=>{
       const test=String(x.test_hydrant_id||"");
@@ -183,7 +174,6 @@
     $("hydrantRecordHydrantLabel").textContent=kind==="flow_test"?"Flow hydrant (F)":"Hydrant to inspect";
     $("hydrantRecordDate").value=todayISO();
     $("hydrantRecordInspector").value=[profile?.first_name,profile?.last_name].filter(Boolean).join(" ")||"";
-    $("hydrantRecordMapSheet").value=currentSchedule().find(x=>x.task_type==="inspection"&&x.map_sheet)?.map_sheet||sheetList(selected)[0]||"";
     $("hydrantInspectionFields").classList.toggle("hiddenx",kind!=="inspection");
     $("hydrantFlowFields").classList.toggle("hiddenx",kind!=="flow_test");
     $("hydrantFormTitle").textContent=kind==="inspection"?"Annual Hydrant Inspection · "+id:(scheduledPair?"Flow test · T "+scheduledPair.test_hydrant_id+" / F "+(scheduledPair.flow_hydrant_id||"Select flow hydrant"):"Hydrant Flow Test");
@@ -230,7 +220,7 @@
   }
   async function saveRecord(ev){
     ev.preventDefault();if(!allowed())return alert("Only administrators and officers can enter hydrant records.");
-    const id=$("hydrantRecordHydrant").value,kind=$("hydrantRecordType").value,date=$("hydrantRecordDate").value,person=$("hydrantRecordInspector").value.trim(),mapSheet=$("hydrantRecordMapSheet").value.trim();const testHydrantId=$("hf_testHydrant")?.value||"";
+    const id=$("hydrantRecordHydrant").value,kind=$("hydrantRecordType").value,date=$("hydrantRecordDate").value,person=$("hydrantRecordInspector").value.trim();const testHydrantId=$("hf_testHydrant")?.value||"";
     if(!id||!date||!person)return alert("Hydrant, date, and inspector/tester are required.");
     $("hydrantSaveButton").disabled=true;$("hydrantSaveButton").textContent="Saving…";
     try{
@@ -242,7 +232,7 @@
           checklist[key]=v==="yes";checklist[key+"_remarks"]=$("hi_"+key+"_remarks").value.trim();
         }
         const failed=Object.entries(checklist).filter(([k,v])=>!k.endsWith("_remarks")&&v===false).map(([k])=>k);
-        const payload={hydrant_id:id,inspected_at:date,inspector:person,checklist,accessible:checklist.accessible,leaks:checklist.caps_gaskets===false,damage:checklist.barrel_valve===false,operational:checklist.barrel_valve!==false&&checklist.drain!==false,condition:failed.length?"Needs attention":"Satisfactory",deficiencies:failed.map(k=>checklist[k+"_remarks"]).filter(Boolean).join("; "),corrective_action:Object.entries(checklist).filter(([k,v])=>k.endsWith("_remarks")&&v).map(([k,v])=>v).join("; "),follow_up_status:failed.length?"Open":"Closed",notes:$("hydrantInspectionNotes").value.trim(),map_sheet:mapSheet||selected?.map_sheet||null,created_by:typeof me!=="undefined"?(me?.id||null):null};
+        const payload={hydrant_id:id,inspected_at:date,inspector:person,checklist,accessible:checklist.accessible,leaks:checklist.caps_gaskets===false,damage:checklist.barrel_valve===false,operational:checklist.barrel_valve!==false&&checklist.drain!==false,condition:failed.length?"Needs attention":"Satisfactory",deficiencies:failed.map(k=>checklist[k+"_remarks"]).filter(Boolean).join("; "),corrective_action:Object.entries(checklist).filter(([k,v])=>k.endsWith("_remarks")&&v).map(([k,v])=>v).join("; "),follow_up_status:failed.length?"Open":"Closed",notes:$("hydrantInspectionNotes").value.trim(),created_by:typeof me!=="undefined"?(me?.id||null):null};
         r=await db.from("hydrant_inspections").insert(payload);
       }else{
         const calc=calcFlow(),orifice=Number($("hf_orifice").value),pitot=Number($("hf_pitot").value),stat=Number($("hf_static").value),resid=Number($("hf_residual").value);
@@ -264,30 +254,6 @@
     out.innerHTML=rows.length?rows.map(x=>'<article class="border rounded-lg p-3"><div class="flex justify-between gap-2"><b>'+escH(x._type==="inspection"?"Inspection":"Flow test")+'</b><span>'+escH(x._date)+'</span></div><div class="text-sm mt-1">'+escH(x.inspector||x.tester||"")+'</div>'+(x._type==="inspection"?'<div class="text-sm mt-1">Condition: '+escH(x.condition||"—")+' · Follow-up: '+escH(x.follow_up_status||"—")+'</div><div class="text-sm">'+escH(x.deficiencies||"")+'</div><div class="text-xs text-slate-500 mt-1">'+escH(Object.entries(x.checklist||{}).filter(([k])=>!k.endsWith("_remarks")).map(([k,v])=>k.replaceAll("_"," ")+": "+(v?"Yes":"No")).join(" · "))+'</div>':'<div class="text-sm mt-1">Rate: '+escH(x.rate_gpm??"—")+' GPM · Flow at 20 PSI: '+escH(x.calculated_flow_gpm??"—")+' GPM</div><div class="text-sm">Static '+escH(x.static_pressure??"—")+' · Residual '+escH(x.residual_pressure??"—")+' · Pitot '+escH(x.pitot_pressure??"—")+' · Orifice '+escH(x.orifice_diameter??"—")+'"</div><div class="text-xs text-slate-500">Test hydrant: '+escH(x.test_hydrant_id||(String(x.notes||"").includes("pair not recorded")?"Pair not recorded in source report":"Same as flow hydrant"))+' · Flow hydrant: '+escH(String(x.notes||"").includes("pair not recorded")?"Not recorded in source report":(x.flow_hydrant_id||x.hydrant_id))+'</div>')+'<div class="text-sm mt-1">'+escH(x.notes||"")+'</div></article>').join(""):'<p class="text-sm text-slate-500">No history recorded for this hydrant.</p>';
     $("hydrantHistoryModal").classList.remove("hiddenx");
   }
-  async function assignMapSheet(){
-    if(!allowed())return alert("Only administrators and officers can assign map sheets.");
-    if(!selected?.id)return;
-    const hydrantId=selected.id;
-    const chosen=[...document.querySelectorAll('input[name="hydrantMapSheetChoice"]:checked')].map(el=>el.value).filter(Boolean);
-    try{
-      if(chosen.length){
-        const up=await db.from("hydrant_asset_map_sheets").upsert(chosen.map(map_sheet=>({hydrant_id:hydrantId,map_sheet,verified:true,source:"manual"})),{onConflict:"hydrant_id,map_sheet"});
-        if(up.error)throw up.error;
-      }
-      const existing=await db.from("hydrant_asset_map_sheets").select("map_sheet").eq("hydrant_id",hydrantId);
-      if(existing.error)throw existing.error;
-      for(const row of (existing.data||[])){
-        if(!chosen.some(s=>assetKey(s)===assetKey(row.map_sheet))){
-          const del=await db.from("hydrant_asset_map_sheets").delete().eq("hydrant_id",hydrantId).eq("map_sheet",row.map_sheet);
-          if(del.error)throw del.error;
-        }
-      }
-      await loadAssets();
-      selected=assets.find(a=>assetKey(a.id)===assetKey(hydrantId))||selected;
-      ensureMap();renderSelected();renderScheduleSummary();
-      status("Verified map-sheet assignments saved for hydrant "+hydrantId+".");
-    }catch(e){status("Could not save map-sheet assignments: "+(e?.message||String(e)),true);alert("Could not save map-sheet assignments: "+(e?.message||String(e)));}
-  }
   function searchHydrant(){
     const q=assetKey($("hydrantSearch").value);if(!q)return;
     const visibleIds=monthlyHydrantIds();const a=assets.find(x=>visibleIds.has(assetKey(x.id))&&assetKey(x.id)===q)||assets.find(x=>visibleIds.has(assetKey(x.id))&&assetKey(x.id).includes(q));
@@ -297,7 +263,7 @@
   window.jfdOpenHydrantForm=openForm;window.jfdShowHydrantHistory=showHistory;
   window.jfdRefreshHydrants=refresh;
   window.jfdHydrantSave=saveRecord;
-  window.jfdHydrantSearch=searchHydrant;window.jfdAssignHydrantMapSheet=assignMapSheet;
+  window.jfdHydrantSearch=searchHydrant;
   window.jfdHydrantCalcFlow=calcFlow;
   window.jfdHydrantCloseHistory=()=> $("hydrantHistoryModal")?.classList.add("hiddenx");
   window.jfdHydrantCloseForm=()=> $("hydrantRecordForm")?.classList.add("hiddenx");
