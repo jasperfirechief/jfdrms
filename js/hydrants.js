@@ -73,8 +73,7 @@
       const baseYear=2027+((yearValue()-2027)%4);
       const assignment=(sj.inspection_assignments||[]).find(x=>x[0]===shiftValue()&&Number(x[1])===monthValue());
       const flowGroup=(sj.flow_test_pairs||[]).find(x=>x[0]===shiftValue()&&Number(x[1])===monthValue());const pairsForBaseYear=flowGroup?.[2]?.[baseYear-2027]||[];
-      const mapSheet=shiftValue()+"-SHIFT "+String(monthNames[monthValue()-1]||"").toUpperCase();
-      const inspectionsForMonth=(assignment?.[2]||[]).map(id=>({shift:shiftValue(),schedule_year:yearValue(),schedule_month:monthValue(),task_type:"inspection",hydrant_id:id,source_hydrant_id:id,map_sheet:mapSheet}));
+      const inspectionsForMonth=(assignment?.[2]||[]).map(id=>({shift:shiftValue(),schedule_year:yearValue(),schedule_month:monthValue(),task_type:"inspection",hydrant_id:id,source_hydrant_id:id}));
       const pairsForMonth=pairsForBaseYear.map((pair,j)=>({shift:shiftValue(),schedule_year:yearValue(),schedule_month:monthValue(),task_type:"flow_test",hydrant_id:pair[0],source_hydrant_id:pair[0],test_hydrant_id:pair[0],flow_hydrant_id:pair[1]||null,pair_order:j+1,pair_status:pair[1]?"scheduled":"needs_review"}));
       sourceRows=[...inspectionsForMonth,...pairsForMonth];
     }else{
@@ -122,8 +121,8 @@
     const flowDone=flowTasks.filter(pairDone).length;
     const unmapped=inspectionTasks.filter(x=>!inventoryIds.has(assetKey(x.hydrant_id))).length;
     const baseYear=yearValue()>=2027?2027+((yearValue()-2027)%4):yearValue();
-    wrap.innerHTML='<div class="grid grid-cols-3 gap-2"><div class="rounded-lg border p-3"><div class="text-xs text-slate-500">Annual inspections</div><b class="text-2xl">'+covered.size+' / '+inspectionTasks.length+'</b><div class="text-xs text-slate-500 mt-1">Completed this month; T flow tests count for the test hydrant</div></div><div class="rounded-lg border p-3"><div class="text-xs text-slate-500">Scheduled flow tests</div><b class="text-2xl">'+flowDone+' / '+flowTasks.length+'</b><div class="text-xs text-slate-500 mt-1">Each T/F pairing is tracked separately</div></div><div class="rounded-lg border p-3"><div class="text-xs text-slate-500">Four-year flow rotation</div><b class="text-2xl">'+baseYear+'</b><div class="text-xs text-slate-500 mt-1">'+(yearValue()>=2027?"Using "+baseYear+" T/F schedule for "+yearValue():"Legacy schedule")+(unmapped?' · '+unmapped+' assigned ID(s) not in map inventory':'')+'</div></div></div>';
-    $("hydrantMapSheetNote").textContent=monthlyHydrantIds().size+" hydrants assigned to this shift/month are displayed. Only this month’s annual inspection hydrants and scheduled T/F flow-test hydrants appear on the map. T is tested and F is only its paired flow hydrant.";
+    wrap.innerHTML='<div class="grid grid-cols-3 gap-2"><div class="rounded-lg border p-3"><div class="text-xs text-slate-500">Annual inspections</div><b class="text-2xl">'+covered.size+' / '+inspectionTasks.length+'</b><div class="text-xs text-slate-500 mt-1">Completed this month; T flow tests count for the test hydrant</div></div><div class="rounded-lg border p-3"><div class="text-xs text-slate-500">Scheduled flow tests</div><b class="text-2xl">'+flowDone+' / '+flowTasks.length+'</b><div class="text-xs text-slate-500 mt-1">Each T/F pairing is tracked separately</div></div><div class="rounded-lg border p-3"><div class="text-xs text-slate-500">Four-year flow rotation</div><b class="text-2xl">'+baseYear+'</b><div class="text-xs text-slate-500 mt-1">'+(yearValue()>=2027?"Using "+baseYear+" T/F schedule for "+yearValue():"Legacy schedule")+(unmapped?' · '+unmapped+' assigned ID(s) not in hydrant inventory':'')+'</div></div></div>';
+    $("hydrantMonthlyScheduleNote").textContent=monthlyHydrantIds().size+" hydrants assigned to this shift/month are displayed. Only this month’s annual inspection hydrants and scheduled T/F flow-test hydrants appear on the map. T is tested and F is only its paired flow hydrant.";
     const list=$("hydrantScheduleList");
     const inspectionHtml=inspectionTasks.length?inspectionTasks.map(x=>{
       const id=String(x.hydrant_id||"");
