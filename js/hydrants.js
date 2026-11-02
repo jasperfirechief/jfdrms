@@ -25,6 +25,25 @@
     const scheduleText=sch.length?sch.map(x=>x.task_type==="flow_test"?(assetKey(x.test_hydrant_id)===assetKey(a.id)?"TEST hydrant · flow hydrant "+escH(x.flow_hydrant_id||"not assigned"):"FLOW hydrant · test hydrant "+escH(x.test_hydrant_id||"not identified in source schedule")+(x.pair_status==="needs_review"?" · ID REVIEW":"")):"Inspection area · "+escH(x.map_sheet||"scheduled").replace(/^$/,"scheduled")).join(" · "):"No individual task assigned in this month’s imported schedule";
     return '<div style="min-width:220px"><b style="font-size:16px">Hydrant '+escH(a.id)+'</b><div style="color:#64748b;font-size:11px">'+coord+(sheetList(a).length?" · Map sheet(s) "+escH(sheetList(a).join(", ")):"")+'</div><div style="margin:7px 0;font-size:12px">'+escH(scheduleText)+'</div><div style="font-size:12px">Last inspection: <b>'+escH(ins?.inspected_at||"No record")+'</b></div><div style="font-size:12px">Last flow test: <b>'+escH(fl?.tested_at||"No record")+'</b>'+(fl?.calculated_flow_gpm!=null?" · "+Number(fl.calculated_flow_gpm).toLocaleString()+" GPM":"")+'</div><div style="display:flex;gap:5px;margin-top:9px"><button onclick="jfdOpenHydrantForm(\''+escH(a.id)+'\',\'inspection\')" style="background:#b45309;color:white;border:0;padding:6px 8px;border-radius:5px;font-weight:bold">Inspect</button><button onclick="jfdOpenHydrantForm(\''+escH(a.id)+'\',\'flow_test\')" style="background:#0369a1;color:white;border:0;padding:6px 8px;border-radius:5px;font-weight:bold">Flow test</button><button onclick="jfdShowHydrantHistory(\''+escH(a.id)+'\')" style="border:1px solid #cbd5e1;padding:6px 8px;border-radius:5px">History</button></div></div>';
   }
+  function monthlyHydrantIds(){
+    const ids=new Set();
+    for(const x of currentSchedule()){
+      if(x.task_type==="inspection"){const id=x.hydrant_id||x.source_hydrant_id;if(id)ids.add(assetKey(id));}
+      if(x.task_type==="flow_test"){if(x.test_hydrant_id)ids.add(assetKey(x.test_hydrant_id));if(x.flow_hydrant_id)ids.add(assetKey(x.flow_hydrant_id));}
+    }
+    return ids;
+  }
+  function populateHydrantRecordSelectors(){
+    const inspectionSelect=$("hydrantRecordHydrant"),testSelect=$("hf_testHydrant");
+    if(!inspectionSelect||!testSelect)return;
+    const rows=currentSchedule(),inspectionIds=[...new Set(rows.filter(x=>x.task_type==="inspection").map(x=>String(x.hydrant_id||x.source_hydrant_id||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+    const pairs=rows.filter(x=>x.task_type==="flow_test").sort((a,b)=>Number(a.pair_order||0)-Number(b.pair_order||0));
+    const flowIds=[...new Set(pairs.map(x=>String(x.flow_hydrant_id||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+    const testIds=[...new Set(pairs.map(x=>String(x.test_hydrant_id||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+    const makeOptions=(placeholder,values)=>'<option value="">'+escH(placeholder)+'</option>'+values.map(id=>'<option value="'+escH(id)+'">'+escH(id)+'</option>').join("");
+    inspectionSelect.innerHTML=makeOptions(mode==="inspection"?"Select scheduled inspection hydrant":"Select scheduled flow hydrant (F)",mode==="inspection"?inspectionIds:flowIds);
+    testSelect.innerHTML=makeOptions("Select test hydrant (T)",testIds);
+  }
   async function loadAssets(){
     const [coordsRes,idsRes]=await Promise.all([fetch("/hydrants.json",{cache:"no-cache"}),fetch("/hydrant-ids.json",{cache:"no-cache"})]);
     if(!coordsRes.ok||!idsRes.ok)throw new Error("Could not load the hydrant coordinate/identifier files.");
@@ -88,7 +107,7 @@
     const el=$("hydrantMapCanvas");if(!el||!window.L)return;
     if(!map){map=L.map(el,{preferCanvas:true}).setView([33.875,-87.27],12);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:20,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'}).addTo(map);markerLayer=L.layerGroup().addTo(map);}
     markerLayer.clearLayers();
-    assets.forEach(a=>{const lat=Number(a.latitude),lng=Number(a.longitude);if(!Number.isFinite(lat)||!Number.isFinite(lng))return;L.marker([lat,lng],{icon:iconFor(a.id),title:"Hydrant "+a.id}).bindPopup(mapPopup(a)).on("click",()=>{selected=a;renderSelected()}).addTo(markerLayer)});
+    const visibleIds=monthlyHydrantIds();assets.filter(a=>visibleIds.has(assetKey(a.id))).forEach(a=>{const lat=Number(a.latitude),lng=Number(a.longitude);if(!Number.isFinite(lat)||!Number.isFinite(lng))return;L.marker([lat,lng],{icon:iconFor(a.id),title:"Hydrant "+a.id}).bindPopup(mapPopup(a)).on("click",()=>{selected=a;renderSelected()}).addTo(markerLayer)});
     const markerPoints=markerLayer.getLayers().map(m=>m.getLatLng()).filter(p=>p&&Number.isFinite(p.lat)&&Number.isFinite(p.lng));if(markerPoints.length)map.fitBounds(L.latLngBounds(markerPoints).pad(.04));
     setTimeout(()=>map.invalidateSize(),150);
   }
@@ -113,7 +132,7 @@
     const unmapped=inspectionTasks.filter(x=>!inventoryIds.has(assetKey(x.hydrant_id))).length;
     const baseYear=yearValue()>=2027?2027+((yearValue()-2027)%4):yearValue();
     wrap.innerHTML='<div class="grid grid-cols-3 gap-2"><div class="rounded-lg border p-3"><div class="text-xs text-slate-500">Annual inspections</div><b class="text-2xl">'+covered.size+' / '+inspectionTasks.length+'</b><div class="text-xs text-slate-500 mt-1">Completed this month; T flow tests count for the test hydrant</div></div><div class="rounded-lg border p-3"><div class="text-xs text-slate-500">Scheduled flow tests</div><b class="text-2xl">'+flowDone+' / '+flowTasks.length+'</b><div class="text-xs text-slate-500 mt-1">Each T/F pairing is tracked separately</div></div><div class="rounded-lg border p-3"><div class="text-xs text-slate-500">Four-year flow rotation</div><b class="text-2xl">'+baseYear+'</b><div class="text-xs text-slate-500 mt-1">'+(yearValue()>=2027?"Using "+baseYear+" T/F schedule for "+yearValue():"Legacy schedule")+(unmapped?' · '+unmapped+' assigned ID(s) not in map inventory':'')+'</div></div></div>';
-    $("hydrantMapSheetNote").textContent="All "+assets.length+" hydrant inventory markers are displayed. "+inspectionTasks.length+" assigned hydrants are due for annual inspection in this shift/month. Flow tests follow the four-year schedule; T is tested and F is only its paired flow hydrant.";
+    $("hydrantMapSheetNote").textContent=monthlyHydrantIds().size+" hydrants assigned to this shift/month are displayed. Only this month’s annual inspection hydrants and scheduled T/F flow-test hydrants appear on the map. T is tested and F is only its paired flow hydrant.";
     const list=$("hydrantScheduleList");
     const inspectionHtml=inspectionTasks.length?inspectionTasks.map(x=>{
       const id=String(x.hydrant_id||"");
@@ -135,7 +154,7 @@
     if(loading)return;loading=true;status("Loading hydrant inventory and history…");
     try{
       if(!window.L){await new Promise((resolve,reject)=>{if(typeof window.jfdLoadLeaflet==="function"){window.jfdLoadLeaflet().then(resolve,reject)}else{const s=document.createElement("script");s.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";s.onload=resolve;s.onerror=()=>reject(new Error("Map library failed to load."));document.head.appendChild(s)}})}
-      await loadAssets();await loadRecords();populateHydrantRecordSelectors();ensureMap();renderScheduleSummary();renderSelected();renderHydrantRecordList();status("Loaded "+assets.length+" hydrant locations. Records are saved in JFDRMS.");
+      await loadAssets();await loadRecords();populateHydrantRecordSelectors();ensureMap();renderScheduleSummary();renderSelected();renderHydrantRecordList();status("Loaded "+monthlyHydrantIds().size+" scheduled hydrants for this shift/month. Records are saved in JFDRMS.");
       initialized=true;
     }catch(e){console.error("Hydrants module",e);status("Unable to load hydrants: "+(e?.message||String(e)),true)}
     finally{loading=false}
@@ -217,6 +236,7 @@
     try{
       let r;
       if(kind==="inspection"){
+        if(!currentSchedule().some(x=>x.task_type==="inspection"&&assetKey(x.hydrant_id||x.source_hydrant_id)===assetKey(id)))return alert("This hydrant is not scheduled for annual inspection in the selected shift/month.");
         const checklist={};for(const [key,label] of [["accessible","Accessible / visible"],["caps_gaskets","Caps and gaskets"],["barrel_valve","Barrel and valve"],["flushed","Flushed until clear"],["drain","Drain working"],["lubricated","Threads, gaskets and valve lubricated"],["pressure_test","Pressure test conducted"]]){
           const v=document.querySelector('input[name="hi_'+key+'"]:checked')?.value||"";if(v==="")return alert("Complete Yes/No for: "+label);
           checklist[key]=v==="yes";checklist[key+"_remarks"]=$("hi_"+key+"_remarks").value.trim();
@@ -226,7 +246,7 @@
         r=await db.from("hydrant_inspections").insert(payload);
       }else{
         const calc=calcFlow(),orifice=Number($("hf_orifice").value),pitot=Number($("hf_pitot").value),stat=Number($("hf_static").value),resid=Number($("hf_residual").value);
-        if(!id)return alert("Select the flow hydrant (F) from the schedule or dropdown.");if(!testHydrantId)return alert("Select the test hydrant (T).");if(!(orifice>0&&pitot>0&&stat>resid&&resid>=0))return alert("Enter valid outlet diameter, pitot, static and residual readings. Static must be greater than residual.");
+        if(!id)return alert("Select the flow hydrant (F) from the schedule or dropdown.");if(!testHydrantId)return alert("Select the test hydrant (T).");if(!currentSchedule().some(x=>x.task_type==="flow_test"&&assetKey(x.test_hydrant_id)===assetKey(testHydrantId)&&assetKey(x.flow_hydrant_id)===assetKey(id)))return alert("The selected T/F combination does not match a scheduled pair for this shift/month.");if(!(orifice>0&&pitot>0&&stat>resid&&resid>=0))return alert("Enter valid outlet diameter, pitot, static and residual readings. Static must be greater than residual.");
         const payload={hydrant_id:id,flow_hydrant_id:id,test_hydrant_id:testHydrantId,tested_at:date,tester:person,orifice_diameter:orifice,discharge_coefficient:calc.coefficient,static_pressure:stat,residual_pressure:resid,pitot_pressure:pitot,rate_gpm:calc.rate,calculated_flow_gpm:calc.flow,measured_flow_gpm:calc.flow,notes:$("hf_notes").value.trim(),created_by:typeof me!=="undefined"?(me?.id||null):null};
         r=await db.from("hydrant_flow_tests").insert(payload);
       }
@@ -270,7 +290,7 @@
   }
   function searchHydrant(){
     const q=assetKey($("hydrantSearch").value);if(!q)return;
-    const a=assets.find(x=>assetKey(x.id)===q)||assets.find(x=>assetKey(x.id).includes(q));
+    const visibleIds=monthlyHydrantIds();const a=assets.find(x=>visibleIds.has(assetKey(x.id))&&assetKey(x.id)===q)||assets.find(x=>visibleIds.has(assetKey(x.id))&&assetKey(x.id).includes(q));
     if(!a){status("No hydrant found for “"+$("hydrantSearch").value+"”.",true);return}
     selected=a;renderSelected();map?.setView([a.latitude,a.longitude],18);const marker=markerLayer?.getLayers().find(m=>m.getLatLng().lat===Number(a.latitude)&&m.getLatLng().lng===Number(a.longitude));marker?.openPopup();
   }
