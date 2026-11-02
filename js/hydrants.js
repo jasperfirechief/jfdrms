@@ -59,10 +59,10 @@
       const sj=await sr.json();
       const baseYear=2027+((yearValue()-2027)%4);
       const assignment=(sj.inspection_assignments||[]).find(x=>x[0]===shiftValue()&&Number(x[1])===monthValue());
-      const flowGroup=(sj.flow_test_pairs||[]).find(x=>x[0]===shiftValue()&&Number(x[1])===monthValue()&&Number(x[2])===baseYear);
+      const flowGroup=(sj.flow_test_pairs||[]).find(x=>x[0]===shiftValue()&&Number(x[1])===monthValue());const pairsForBaseYear=flowGroup?.[2]?.[baseYear-2027]||[];
       const mapSheet=shiftValue()+"-SHIFT "+String(monthNames[monthValue()-1]||"").toUpperCase();
       const inspectionsForMonth=(assignment?.[2]||[]).map(id=>({shift:shiftValue(),schedule_year:yearValue(),schedule_month:monthValue(),task_type:"inspection",hydrant_id:id,source_hydrant_id:id,map_sheet:mapSheet}));
-      const pairsForMonth=(flowGroup?.[3]||[]).map((pair,j)=>({shift:shiftValue(),schedule_year:yearValue(),schedule_month:monthValue(),task_type:"flow_test",hydrant_id:pair[0],source_hydrant_id:pair[0],test_hydrant_id:pair[0],flow_hydrant_id:pair[1]||null,pair_order:j+1,pair_status:pair[1]?"scheduled":"needs_review"}));
+      const pairsForMonth=pairsForBaseYear.map((pair,j)=>({shift:shiftValue(),schedule_year:yearValue(),schedule_month:monthValue(),task_type:"flow_test",hydrant_id:pair[0],source_hydrant_id:pair[0],test_hydrant_id:pair[0],flow_hydrant_id:pair[1]||null,pair_order:j+1,pair_status:pair[1]?"scheduled":"needs_review"}));
       sourceRows=[...inspectionsForMonth,...pairsForMonth];
       mapSheets=[...new Set([mapSheet,...assets.flatMap(a=>sheetList(a))])].sort();
     }else{
