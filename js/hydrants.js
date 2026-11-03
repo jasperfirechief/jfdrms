@@ -43,15 +43,15 @@
     testSelect.innerHTML=makeOptions("Select test hydrant (T)",testIds);
   }
   async function loadAssets(){
-    const [coordsRes,idsRes]=await Promise.all([fetch("/hydrants.json",{cache:"no-cache"}),fetch("/hydrant-ids.json",{cache:"no-cache"})]);
-    if(!coordsRes.ok||!idsRes.ok)throw new Error("Could not load the hydrant coordinate/identifier files.");
-    const coords=await coordsRes.json(),ids=await idsRes.json();
-    if(!Array.isArray(coords)||!Array.isArray(ids)||!coords.length)throw new Error("Hydrant GIS data is empty or invalid.");
-    const count=Math.min(coords.length,ids.length);
-    const data=[];
-    for(let i=0;i<count;i++){const c=coords[i],id=String(ids[i]||"").trim().toUpperCase();if(!id||/^Fire St /i.test(id))continue;const lat=Number(c.lat),lng=Number(c.lng);if(Number.isFinite(lat)&&Number.isFinite(lng))data.push({id,latitude:lat,longitude:lng,label:id});}
-    if(!data.length)throw new Error("No valid hydrant assets were found.");
-    const r=await db.from("hydrant_assets").upsert(data,{onConflict:"id"}).select("id");
+    const response=await fetch("/hydrant-inventory.json",{cache:"no-cache"});
+    if(!response.ok)throw new Error("Could not load the authoritative hydrant inventory.");
+    const source=await response.json();
+    if(!Array.isArray(source)||!source.length)throw new Error("The authoritative hydrant inventory is empty or invalid.");
+    const data=source.map(x=>({id:String(x.id||"").trim().toUpperCase(),latitude:Number(x.latitude),longitude:Number(x.longitude),label:String(x.id||"").trim().toUpperCase()}))
+      .filter(x=>x.id&&Number.isFinite(x.latitude)&&Number.isFinite(x.longitude));
+    const unique=new Map(data.map(x=>[x.id,x]));
+    if(!unique.size)throw new Error("No valid hydrant assets were found in the authoritative inventory.");
+    const r=await db.from("hydrant_assets").upsert([...unique.values()],{onConflict:"id"}).select("id");
     if(r.error)throw r.error;
     const q=await db.from("hydrant_assets").select("*").order("id");
     if(q.error)throw q.error;
