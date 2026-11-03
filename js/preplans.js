@@ -214,7 +214,8 @@
     preplanLayer.clearLayers();hydrantLayer.clearLayers();
     hydrantAssets.forEach(a=>L.marker([a.latitude,a.longitude],{icon:hydrantIcon(a.id),title:"Hydrant "+a.id}).bindPopup(hydrantPopup(a)).addTo(hydrantLayer));
     plans.forEach(p=>{const lat=Number(p.latitude),lng=Number(p.longitude);if(!Number.isFinite(lat)||!Number.isFinite(lng))return;
-      const marker=L.marker([lat,lng],{icon:preplanIcon(),title:"Preplan: "+(p.property_name||p.address||"Preplan")}).bindPopup('<b>'+esc(p.property_name||p.title||"Preplan")+'</b><br>'+esc(p.address||"")+'<br><button type="button" onclick="jfdOpenPreplan(\\''+p.id+'\\')" style="margin-top:6px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:5px">Open Preplan</button>');
+      const marker=L.marker([lat,lng],{icon:preplanIcon(),title:"Preplan: "+(p.property_name||p.address||"Preplan")}).bindPopup('<b>'+esc(p.property_name||p.title||"Preplan")+'</b><br>'+esc(p.address||"")+'<br><button type="button" data-open-preplan style="margin-top:6px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:5px">Open Preplan</button>');
+      marker.on("popupopen",event=>{const button=event.popup.getElement()?.querySelector("[data-open-preplan]");if(button)button.onclick=()=>openPlan(p.id)});
       marker.addTo(preplanLayer);
     });
   }
