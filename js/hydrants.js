@@ -248,7 +248,7 @@
     out.innerHTML=rows.length?rows.map(x=>'<article class="border rounded-lg p-3"><div class="flex justify-between gap-2"><b>'+escH(x._type==="inspection"?"Inspection":"Flow test")+'</b><span>'+escH(x._date)+'</span></div><div class="text-sm mt-1">'+escH(x.inspector||x.tester||"")+'</div>'+(x._type==="inspection"?'<div class="text-sm mt-1">Condition: '+escH(x.condition||"—")+' · Follow-up: '+escH(x.follow_up_status||"—")+'</div><div class="text-sm">'+escH(x.deficiencies||"")+'</div><div class="text-xs text-slate-500 mt-1">'+escH(Object.entries(x.checklist||{}).filter(([k])=>!k.endsWith("_remarks")).map(([k,v])=>k.replaceAll("_"," ")+": "+(v?"Yes":"No")).join(" · "))+'</div>':'<div class="text-sm mt-1">Rate: '+escH(x.rate_gpm??"—")+' GPM · Flow at 20 PSI: '+escH(x.calculated_flow_gpm??"—")+' GPM</div><div class="text-sm">Static '+escH(x.static_pressure??"—")+' · Residual '+escH(x.residual_pressure??"—")+' · Pitot '+escH(x.pitot_pressure??"—")+' · Orifice '+escH(x.orifice_diameter??"—")+'"</div><div class="text-xs text-slate-500">Test hydrant: '+escH(x.test_hydrant_id||(String(x.notes||"").includes("pair not recorded")?"Pair not recorded in source report":"Same as flow hydrant"))+' · Flow hydrant: '+escH(String(x.notes||"").includes("pair not recorded")?"Not recorded in source report":(x.flow_hydrant_id||x.hydrant_id))+'</div>')+'<div class="text-sm mt-1">'+escH(x.notes||"")+'</div></article>').join(""):'<p class="text-sm text-slate-500">No history recorded for this hydrant.</p>';
     const modal=$("hydrantHistoryModal");
     if(modal.parentElement!==document.body)document.body.appendChild(modal);
-    modal.style.zIndex="200";
+    modal.style.zIndex="99999";
     modal.classList.remove("hiddenx");
   }
   async function searchHydrant(){
