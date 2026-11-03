@@ -131,7 +131,7 @@
     for(const file of files){
       if(file.size>50*1024*1024){alert(file.name+" exceeds the 50 MB limit.");continue}
       const kind=file.type.startsWith("image/")?"picture":"file";
-      if(activeTab==="pictures"&&kind!=="picture"){alert("Only image files can be uploaded in Pictures.");continue}
+      if(activeTab==="pictures"&&(!["image/jpeg","image/png","image/webp"].includes(file.type))){alert("Pictures must be JPG, PNG, or WebP images.");continue}
       if(activeTab==="files"&&kind==="picture"){alert("Upload images in the Pictures tab.");continue}
       const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,"_");
       const path=activePlan.id+"/"+kind+"/"+crypto.randomUUID()+"-"+safe;
@@ -176,7 +176,7 @@
   async function loadPlans(){
     const r=await db.from("preincident_plans").select("*").order("property_name");
     if(r.error)throw r.error;
-    plans=r.data||[];plansLoaded=true;renderCards();drawMarkers();
+    plans=r.data||[];plansLoaded=true;renderCards();drawMarkers();attachIncidentButtons();
   }
   function drawMarkers(){
     if(!map||!markerLayer)return;markerLayer.clearLayers();
@@ -202,6 +202,7 @@
     await loadPlans();await openPlan(r.data.id);
   }
   async function enter(){
+    $("preplanPlaceButton")?.classList.toggle("hiddenx",!canEdit());
     try{
       if(!window.L&&typeof window.jfdLoadLeaflet==="function")await window.jfdLoadLeaflet();
       if(!window.L){const s=document.createElement("script");s.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";await new Promise((res,rej)=>{s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
