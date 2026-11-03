@@ -673,7 +673,7 @@ async function searchSubmittedInspections(){
   if(profile?.app_role!=="admin")return alert("Administrator access required.");
   const el=$("adminInspectionSearchResults");if(!el)return;
   el.innerHTML='<div class="card p-4 text-sm text-slate-500">Searching inspections...</div>';
-  const q=String($("adminInspectionSearch")?.value||"").trim().toLowerCase();
+  const rawQ=String($("adminInspectionSearch")?.value||"").trim(),q=window.jfdNormalizeSearchText?window.jfdNormalizeSearchText(rawQ):rawQ.toLowerCase(),qAddress=/\d/.test(rawQ)?window.jfdNormalizeAddress?.(rawQ):"";
   const from=$("adminInspectionFrom")?.value||"";
   const to=$("adminInspectionTo")?.value||"";
   const status=$("adminInspectionStatus")?.value||"";
@@ -681,7 +681,7 @@ async function searchSubmittedInspections(){
   if(r.error){el.innerHTML='<div class="card p-4 text-red-600">'+esc(r.error.message)+'</div>';return}
   const rows=(r.data||[]).filter(x=>{
     const d=inspectionDateValue(x.inspection_date);
-    return (!from||d>=from)&&(!to||d<=to)&&(!status||String(x.status||"submitted")===status)&&(!q||adminInspectionText(x).includes(q));
+    return (!from||d>=from)&&(!to||d<=to)&&(!status||String(x.status||"submitted")===status)&&(!q||adminInspectionText(x).includes(q)||(qAddress&&adminInspectionText(x).includes(qAddress)));
   });
   el.innerHTML=rows.map(x=>'<div class="border rounded-xl p-3 bg-white"><div class="flex flex-wrap justify-between gap-3"><div><div class="font-bold">'+esc(x.occupancy_name||"Inspection")+'</div><div class="text-sm text-slate-600">'+esc(x.address||"No address")+(x.city_state_zip?' · '+esc(x.city_state_zip):"")+'</div><div class="text-xs text-slate-500 mt-1">'+esc(x.inspection_date||"")+' '+esc(x.inspection_time||"")+' · '+esc(x.inspection_type||"")+(x.acceptance_type?' · '+esc(x.acceptance_type):"")+'</div></div><div class="flex gap-2"><button type="button" onclick="viewSubmittedInspection('+Number(x.inspection_id)+')" class="border px-3 py-2 rounded font-bold text-sm">View</button></div></div></div>').join("")||'<div class="card p-4 text-sm text-slate-500">No inspections matched those criteria.</div>';
 }
