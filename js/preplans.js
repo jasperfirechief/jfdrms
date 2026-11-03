@@ -248,10 +248,11 @@
     if(!plans.length)return;
     document.querySelectorAll("#incidentList .scene-card").forEach(card=>{
       if(card.querySelector("[data-preplan-button]"))return;
-      const loc=String(card.dataset.location||"").trim().toLowerCase().replace(/[^a-z0-9]/g,"");
+      const normalizeAddress=value=>String(value||"").split(",")[0].trim().toLowerCase().replace(/\\b(east|west|north|south)\\b/g,m=>({east:"e",west:"w",north:"n",south:"s"}[m])).replace(/\\b(highway)\\b/g,"hwy").replace(/[^a-z0-9]/g,"");
+      const loc=normalizeAddress(card.dataset.location);
       const lat=Number(card.dataset.lat),lng=Number(card.dataset.lng);
       const p=plans.find(x=>{
-        const addr=String(x.address||"").trim().toLowerCase().replace(/[^a-z0-9]/g,"");
+        const addr=normalizeAddress(x.address||"");
         if(addr&&loc&&addr===loc)return true;
         if(Number.isFinite(lat)&&Number.isFinite(lng)&&Math.abs(lat-Number(x.latitude))<0.0004&&Math.abs(lng-Number(x.longitude))<0.0004)return true;
         return false;
