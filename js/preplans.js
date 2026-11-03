@@ -258,7 +258,7 @@
       });
       if(!p)return;
       const actions=card.querySelector(".scene-actions");if(!actions)return;
-      const b=document.createElement("button");b.type="button";b.dataset.preplanButton="1";b.className="scene-action scene-secondary px-3 py-2 rounded-lg text-sm font-bold";b.textContent="Open Preplan";b.onclick=()=>openPlan(p.id);actions.appendChild(b);
+      const b=document.createElement("button");b.type="button";b.dataset.preplanButton="1";b.className="scene-action px-3 py-2 rounded-lg text-sm font-bold";b.style.backgroundColor="#174ea6";b.style.color="#fff";b.style.border="1px solid #174ea6";b.textContent="Open Preplan";b.onclick=()=>openPlan(p.id);actions.appendChild(b);
     });
   }
   window.jfdOpenPreplan=openPlan;
