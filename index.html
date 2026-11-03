@@ -1057,7 +1057,7 @@ function staffDateParts(s){const [y,m,d]=String(s||"").split("-").map(Number);re
 function staffDateKey(y,m,d){return y+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0")}
 function changeStaffCalendarMonth(delta){const base=staffCalendarCursor||new Date();staffCalendarCursor=new Date(base.getFullYear(),base.getMonth()+delta,1);renderStaffCalendar()}
 function goStaffCalendarToday(){const t=staffDateParts(today());staffCalendarCursor=new Date(t.y,t.m-1,1);$("staffDate").value=today();loadStaffing({date:today(),shift:$("staffShift").value||"A"});renderStaffCalendar()}
-async async function renderStaffCalendar(){
+async function renderStaffCalendar(){
   const grid=$("staffCalendarGrid"),heading=$("staffCalendarMonth");if(!grid||!heading)return;
   const date=$("staffDate")?.value||today(),parts=staffDateParts(date);
   if(!staffCalendarCursor)staffCalendarCursor=new Date(parts.y,parts.m-1,1);
