@@ -666,7 +666,7 @@ async function deleteInspectionChecklistItem(id){if(!confirm("Delete this inspec
 function adminInspectionText(x){
   const parts=[x.occupancy_name,x.address,x.city_state_zip,x.contact_name,x.contact_phone,x.phone,x.email,x.inspection_type,x.acceptance_type,x.occupancy_group,x.remarks,x.notes,x.acceptance_test_result];
   for(const k of ["checklist","results","acceptance_tests"])parts.push(x[k]&&typeof x[k]==="object"?JSON.stringify(x[k]):x[k]);
-  return parts.filter(v=>v!==undefined&&v!==null).join(" ").toLowerCase()+" "+(window.jfdNormalizeAddress?window.jfdNormalizeAddress(x.address):"");
+  return parts.filter(v=>v!==undefined&&v!==null).join(" ").toLowerCase()+" "+(window.jfdNormalizeSearchText?window.jfdNormalizeSearchText(x.address):"")+" "+(window.jfdNormalizeAddress?window.jfdNormalizeAddress(x.address):"");
 }
 function inspectionDateValue(v){return String(v||"").slice(0,10)}
 async function searchSubmittedInspections(){
@@ -1794,7 +1794,7 @@ async function adminSubmitReportFromButton(btn){
 }
 function completedReportSearchText(x){
   const rep=x.rep||{},i=x.i||{};
-  return [i.cad,i.type,i.location,i.dispatch_time,i.updated_at,rep.report_type,rep.status,JSON.stringify(rep.data||{}),JSON.stringify(rep||{}),rep.data?.rLocation,rep.data?.location,rep.data?.address,rep.data?.rOwnerAddress,rep.data?.rOccupantAddress,rep.data?.occupancy_name,rep.data?.rOccupancyName,rep.data?.rNarrative,rep.data?.narrative,window.jfdNormalizeAddress?.(i.location),window.jfdNormalizeAddress?.(rep.data?.rLocation),window.jfdNormalizeAddress?.(rep.data?.address),window.jfdNormalizeAddress?.(rep.data?.rOwnerAddress),window.jfdNormalizeAddress?.(rep.data?.rOccupantAddress)].filter(Boolean).join(" ").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+  return [i.cad,i.type,i.location,i.dispatch_time,i.updated_at,rep.report_type,rep.status,JSON.stringify(rep.data||{}),JSON.stringify(rep||{}),rep.data?.rLocation,rep.data?.location,rep.data?.address,rep.data?.rOwnerAddress,rep.data?.rOccupantAddress,rep.data?.occupancy_name,rep.data?.rOccupancyName,rep.data?.rNarrative,rep.data?.narrative,window.jfdNormalizeAddress?.(i.location),window.jfdNormalizeAddress?.(rep.data?.rLocation),window.jfdNormalizeAddress?.(rep.data?.address),window.jfdNormalizeAddress?.(rep.data?.rOwnerAddress),window.jfdNormalizeAddress?.(rep.data?.rOccupantAddress),window.jfdNormalizeSearchText?.(i.location),window.jfdNormalizeSearchText?.(rep.data?.rLocation),window.jfdNormalizeSearchText?.(rep.data?.address),window.jfdNormalizeSearchText?.(rep.data?.rOwnerAddress),window.jfdNormalizeSearchText?.(rep.data?.rOccupantAddress)].filter(Boolean).join(" ").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
 }
 function completedReportDate(x){
   const rep=x.rep||{},i=x.i||{};
@@ -2887,7 +2887,7 @@ async function searchAdminIncidentReports(){
         const d=rep?.data||{},isPcr=rep?.report_type==="pcr_neris_v2";
         if(type==="fire"&&isPcr)return;if(type==="pcr"&&!isPcr)return;
         const date=String(rep?.updated_at||d.rDate||i.dispatch_time||i.updated_at||"").slice(0,10);
-        const text=String([i.cad,i.type,i.location,i.dispatch_time,i.source,d.rLocation,d.rCall,d.rNarrative,d.rCompletedBy,d.rOccupancyName,d.rOwnerName,d.rOccupantName,d.rPatientName,JSON.stringify(rep),window.jfdNormalizeAddress?.(i.location),window.jfdNormalizeAddress?.(d.rLocation),window.jfdNormalizeAddress?.(d.address),window.jfdNormalizeAddress?.(d.rOwnerAddress),window.jfdNormalizeAddress?.(d.rOccupantAddress)].filter(Boolean).join(" ")).toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+        const text=String([i.cad,i.type,i.location,i.dispatch_time,i.source,d.rLocation,d.rCall,d.rNarrative,d.rCompletedBy,d.rOccupancyName,d.rOwnerName,d.rOccupantName,d.rPatientName,JSON.stringify(rep),window.jfdNormalizeAddress?.(i.location),window.jfdNormalizeAddress?.(d.rLocation),window.jfdNormalizeAddress?.(d.address),window.jfdNormalizeAddress?.(d.rOwnerAddress),window.jfdNormalizeAddress?.(d.rOccupantAddress),window.jfdNormalizeSearchText?.(i.location),window.jfdNormalizeSearchText?.(d.rLocation),window.jfdNormalizeSearchText?.(d.address),window.jfdNormalizeSearchText?.(d.rOwnerAddress),window.jfdNormalizeSearchText?.(d.rOccupantAddress)].filter(Boolean).join(" ")).toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
         if(q&&!q.split(/\s+/).every(t=>text.includes(t))&&!(qAddress&&text.includes(qAddress)))return;
         if(from&&date<from)return;if(to&&date>to)return;
         rows.push({i,rep,d,date,isPcr});
