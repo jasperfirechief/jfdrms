@@ -3,9 +3,9 @@
   const $ = id => document.getElementById(id);
   const esc = v => String(v ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const BUCKET = "preplan-files";
-  let map=null, markerLayer=null, plans=[], activePlan=null, editing=false, placing=false, activeTab="worksheet";
-  const canEdit=()=>["admin","officer"].includes(String(window.profile?.app_role||"").toLowerCase());
-  const userId=()=>window.me?.id||null;
+  let map=null, markerLayer=null, plans=[], plansLoaded=false, activePlan=null, editing=false, placing=false, activeTab="worksheet";
+  const canEdit=()=>["admin","officer"].includes(String((typeof profile!=="undefined"?profile?.app_role:window.profile?.app_role)||"").toLowerCase());
+  const userId=()=>(typeof me!=="undefined"?me?.id:window.me?.id)||null;
   const fields=[
     ["Occupancy Information",[
       ["occupancy_name","Occupancy Name"],["address","Address"],["phone","Phone"],["emergency_contact","Emergency Contact"],["emergency_phone","Emergency Contact Phone"],
@@ -174,10 +174,9 @@
     el.querySelectorAll("[data-plan-card]").forEach(b=>b.onclick=()=>openPlan(b.dataset.planCard));
   }
   async function loadPlans(){
-    if(!window.db)return;
     const r=await db.from("preincident_plans").select("*").order("property_name");
     if(r.error)throw r.error;
-    plans=r.data||[];renderCards();drawMarkers();
+    plans=r.data||[];plansLoaded=true;renderCards();drawMarkers();
   }
   function drawMarkers(){
     if(!map||!markerLayer)return;markerLayer.clearLayers();
@@ -203,14 +202,14 @@
     await loadPlans();await openPlan(r.data.id);
   }
   async function enter(){
-    if(!window.db)return;
     try{
       if(!window.L&&typeof window.jfdLoadLeaflet==="function")await window.jfdLoadLeaflet();
       if(!window.L){const s=document.createElement("script");s.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";await new Promise((res,rej)=>{s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
       initMap();await loadPlans();
     }catch(e){console.error("Preplans",e);const st=$("preplanStatus");if(st)st.textContent="Unable to load preplans: "+(e.message||e)}
   }
-  function attachIncidentButtons(){
+  async function attachIncidentButtons(){
+    if(!plansLoaded){try{await loadPlans()}catch(e){return}}
     if(!plans.length)return;
     document.querySelectorAll("#incidentList .scene-card").forEach(card=>{
       if(card.querySelector("[data-preplan-button]"))return;
