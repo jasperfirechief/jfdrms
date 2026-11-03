@@ -195,18 +195,17 @@
     return '<div style="min-width:210px"><b style="font-size:15px">Hydrant '+esc(a.id)+'</b><div style="font-size:11px;color:#64748b">'+Number(a.latitude).toFixed(6)+', '+Number(a.longitude).toFixed(6)+'</div><hr style="margin:6px 0"><div style="font-size:12px"><b>Last inspection:</b> '+esc(ins?.inspected_at||"No record")+'</div><div style="font-size:12px"><b>Condition:</b> '+esc(ins?.condition||"Not recorded")+'</div><div style="font-size:12px"><b>Inspector:</b> '+esc(ins?.inspector||"Not recorded")+'</div><div style="font-size:12px;margin-top:5px"><b>Last flow test:</b> '+esc(fl?.tested_at||"No record")+'</div><div style="font-size:12px"><b>Flow:</b> '+(fl?.calculated_flow_gpm!=null?Number(fl.calculated_flow_gpm).toLocaleString()+" GPM":"Not recorded")+'</div><div style="font-size:12px"><b>Static / Residual:</b> '+esc(fl?.static_pressure??"—")+' / '+esc(fl?.residual_pressure??"—")+' PSI</div></div>';
   }
   async function loadHydrantOverlay(){
-    const [coordsRes,idsRes,insRes,flowRes]=await Promise.all([
-      fetch("/hydrants.json",{cache:"no-cache"}),fetch("/hydrant-ids.json",{cache:"no-cache"}),
+    const [inventoryRes,insRes,flowRes]=await Promise.all([
+      fetch("/hydrant-inventory.json",{cache:"no-cache"}),
       db.from("hydrant_inspections").select("hydrant_id,inspected_at,inspector,condition").order("inspected_at",{ascending:false}).limit(2500),
       db.from("hydrant_flow_tests").select("hydrant_id,test_hydrant_id,flow_hydrant_id,tested_at,calculated_flow_gpm,static_pressure,residual_pressure").order("tested_at",{ascending:false}).limit(2500)
     ]);
-    if(!coordsRes.ok||!idsRes.ok)throw new Error("Hydrant coordinate files could not be loaded.");
+    if(!inventoryRes.ok)throw new Error("The authoritative hydrant inventory could not be loaded.");
     if(insRes.error)throw insRes.error;if(flowRes.error)throw flowRes.error;
-    const coords=await coordsRes.json(),ids=await idsRes.json();hydrantAssets=[];
-    for(let i=0;i<Math.min(coords.length,ids.length);i++){
-      const id=String(ids[i]||"").trim().toUpperCase(),lat=Number(coords[i]?.lat),lng=Number(coords[i]?.lng);
-      if(id&&!/^Fire St /i.test(id)&&Number.isFinite(lat)&&Number.isFinite(lng))hydrantAssets.push({id,latitude:lat,longitude:lng});
-    }
+    const inventory=await inventoryRes.json();
+    if(!Array.isArray(inventory))throw new Error("The authoritative hydrant inventory is invalid.");
+    hydrantAssets=inventory.map(x=>({id:String(x.id||"").trim().toUpperCase(),latitude:Number(x.latitude),longitude:Number(x.longitude)}))
+      .filter(x=>x.id&&Number.isFinite(x.latitude)&&Number.isFinite(x.longitude));
     hydrantInspections=insRes.data||[];hydrantFlows=flowRes.data||[];
   }
   function drawMarkers(){
