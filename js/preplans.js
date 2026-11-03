@@ -248,16 +248,7 @@
     if(!plans.length)return;
     document.querySelectorAll("#incidentList .scene-card").forEach(card=>{
       if(card.querySelector("[data-preplan-button]"))return;
-      const normalizeAddress=value=>{
-        const aliases={east:"e",west:"w",north:"n",south:"s",highway:"hwy",street:"st",road:"rd",avenue:"ave",drive:"dr",lane:"ln",boulevard:"blvd",court:"ct",circle:"cir",trail:"trl",terrace:"ter",parkway:"pkwy",place:"pl",turnpike:"tpke"};
-        let tokens=String(value||"").split(",")[0].toLowerCase().replace(/\\b(us|alabama)\\b/g," ").replace(/[^a-z0-9]+/g," ").trim().split(/\\s+/).filter(Boolean);
-        tokens=tokens.map(t=>aliases[t]||t);
-        const directions=["n","s","e","w","ne","nw","se","sw"];
-        const direction=tokens.filter(t=>directions.includes(t)).sort().join("");
-        tokens=tokens.filter(t=>!directions.includes(t));
-        if(direction)tokens.push(direction);
-        return tokens.join("");
-      };
+      const normalizeAddress=value=>window.jfdNormalizeAddress?window.jfdNormalizeAddress(value):String(value||"").split(",")[0].toLowerCase().replace(/[^a-z0-9]/g,"");
       const loc=normalizeAddress(card.dataset.location);
       const lat=Number(card.dataset.lat),lng=Number(card.dataset.lng);
       const p=plans.find(x=>{
