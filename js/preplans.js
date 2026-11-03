@@ -102,7 +102,7 @@
       const pics=activeTab==="pictures",items=(plan.attachments||[]).filter(x=>(x.kind==="picture")===pics);
       body.innerHTML=(editable?'<div class="border rounded-lg p-3 mb-4"><label class="block text-sm font-bold">'+(pics?"Upload Pictures":"Upload Files")+'<input id="ppUpload" type="file" '+(pics?'accept="image/*" multiple':'multiple')+' class="block mt-2 text-sm"></label><p class="text-xs text-slate-500 mt-1">Private department storage. Maximum file size 50 MB.</p></div>':"")+
         (items.length?'<div class="'+(pics?'grid sm:grid-cols-2 lg:grid-cols-3 gap-3':'space-y-2')+'">'+items.map((x,i)=>pics?'<article class="border rounded-lg p-2"><a href="#" data-open-file="'+i+'" class="block"><img data-preview="'+i+'" alt="'+esc(x.name)+'" class="w-full h-48 object-cover rounded bg-slate-100"><span class="block text-sm font-semibold mt-2">'+esc(x.name)+'</span></a>'+(editable?'<button data-delete-file="'+i+'" class="mt-2 text-sm text-red-700 font-bold">Delete picture</button>':"")+'</article>':'<article class="border rounded-lg p-3 flex justify-between gap-3 items-center"><div class="min-w-0"><b class="text-sm">'+esc(x.name)+'</b><div class="text-xs text-slate-500">'+esc(x.mime_type||"File")+' · '+Math.max(1,Math.round((x.size||0)/1024))+' KB</div></div><div class="flex gap-2 shrink-0"><button data-open-file="'+i+'" class="border rounded px-2 py-1 text-sm">Open</button>'+(editable?'<button data-delete-file="'+i+'" class="text-red-700 text-sm font-bold">Delete</button>':"")+'</div></article>').join("")+'</div>':'<p class="text-sm text-slate-500">No '+(pics?"pictures":"files")+' uploaded.</p>');
-      body.querySelectorAll("[data-open-file]").forEach(b=>b.onclick=async e=>{e.preventDefault();const x=items[Number(b.dataset.openFile)];const r=await db.storage.from(BUCKET).createSignedUrl(x.path,3600);if(r.error)return alert(r.error.message);window.open(r.data.signedUrl,"_blank","noopener")});
+      body.querySelectorAll("[data-open-file]").forEach(b=>b.onclick=async e=>{e.preventDefault();const x=items[Number(b.dataset.openFile)];const win=window.open("about:blank","_blank");const r=await db.storage.from(BUCKET).createSignedUrl(x.path,3600);if(r.error){win?.close();return alert(r.error.message)}if(win)win.location.href=r.data.signedUrl});
       body.querySelectorAll("[data-delete-file]").forEach(b=>b.onclick=()=>removeAttachment(items[Number(b.dataset.deleteFile)]));
       if(pics)items.forEach(async(x,i)=>{const r=await db.storage.from(BUCKET).createSignedUrl(x.path,3600);const img=body.querySelector('[data-preview="'+i+'"]');if(!r.error&&img)img.src=r.data.signedUrl});
       $("ppUpload")?.addEventListener("change",uploadAttachments);
@@ -116,8 +116,10 @@
       const data={...(activePlan.worksheet_data||{})};
       body.querySelectorAll("[data-field]").forEach(el=>{const k=el.dataset.field;if(el.dataset.multi){const vals=[...body.querySelectorAll('[data-field="'+k+'"][data-multi="1"]:checked')].map(x=>x.value);data[k]=vals}else data[k]=el.value});
       activePlan.worksheet_data=data;
-      activePlan.property_name=$("ppPropertyName")?.value.trim()||data.occupancy_name||activePlan.property_name||"";
-      activePlan.address=$("ppAddress")?.value.trim()||data.address||"";
+      data.occupancy_name=$("ppPropertyName")?.value.trim()||data.occupancy_name||"";
+      data.address=$("ppAddress")?.value.trim()||data.address||"";
+      activePlan.property_name=data.occupancy_name;
+      activePlan.address=data.address;
       activePlan.title=activePlan.property_name||activePlan.address||"Pre-Plan";
     }else if(activeTab==="notes")activePlan.notes=$("ppNotes")?.value||"";
     const payload={worksheet_data:activePlan.worksheet_data||{},notes:activePlan.notes||"",property_name:activePlan.property_name||null,address:activePlan.address||null,title:activePlan.title||"Pre-Plan",updated_by:userId(),updated_at:new Date().toISOString()};
@@ -219,7 +221,7 @@
       const p=plans.find(x=>{
         const addr=String(x.address||"").trim().toLowerCase().replace(/[^a-z0-9]/g,"");
         if(addr&&loc&&addr===loc)return true;
-        if(Number.isFinite(lat)&&Number.isFinite(lng)&&Math.abs(lat-Number(x.latitude))<0.0008&&Math.abs(lng-Number(x.longitude))<0.0008)return true;
+        if(Number.isFinite(lat)&&Number.isFinite(lng)&&Math.abs(lat-Number(x.latitude))<0.0004&&Math.abs(lng-Number(x.longitude))<0.0004)return true;
         return false;
       });
       if(!p)return;
