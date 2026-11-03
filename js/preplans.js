@@ -3,7 +3,7 @@
   const $ = id => document.getElementById(id);
   const esc = v => String(v ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const BUCKET = "preplan-files";
-  let map=null, markerLayer=null, plans=[], plansLoaded=false, activePlan=null, editing=false, placing=false, activeTab="worksheet";
+  let map=null, preplanLayer=null, hydrantLayer=null, plans=[], plansLoaded=false, hydrantAssets=[], hydrantInspections=[], hydrantFlows=[], activePlan=null, editing=false, placing=false, activeTab="worksheet";
   const canEdit=()=>["admin","officer"].includes(String((typeof profile!=="undefined"?profile?.app_role:window.profile?.app_role)||"").toLowerCase());
   const userId=()=>(typeof me!=="undefined"?me?.id:window.me?.id)||null;
   const fields=[
@@ -181,16 +181,46 @@
     if(r.error)throw r.error;
     plans=r.data||[];plansLoaded=true;renderCards();drawMarkers();attachIncidentButtons();
   }
+  function hydrantIcon(id){
+    return L.divIcon({className:"jfd-preplan-hydrant-icon",html:'<span style="display:flex;align-items:center;justify-content:center;min-width:42px;height:27px;padding:0 5px;border:2px solid #fff;border-radius:6px;background:#c62828;box-shadow:0 1px 5px #0009;color:#fff;font-size:12px;font-weight:900">'+esc(id)+'</span>',iconSize:[48,29],iconAnchor:[24,14]});
+  }
+  function preplanIcon(){
+    return L.divIcon({className:"jfd-preplan-pp-icon",html:'<span style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;border:3px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#174ea6;box-shadow:0 2px 6px #0009;color:#fff;font-size:13px;font-weight:900"><span style="transform:rotate(45deg)">PP</span></span>',iconSize:[36,36],iconAnchor:[18,34]});
+  }
+  function latestHydrantRecord(rows,id,key){
+    return rows.filter(x=>String(x.hydrant_id||"").toUpperCase()===String(id).toUpperCase() || (key==="tested_at"&&[x.test_hydrant_id,x.flow_hydrant_id].some(v=>String(v||"").toUpperCase()===String(id).toUpperCase()))).sort((a,b)=>String(b[key]||"").localeCompare(String(a[key]||"")))[0]||null;
+  }
+  function hydrantPopup(a){
+    const ins=latestHydrantRecord(hydrantInspections,a.id,"inspected_at"),fl=latestHydrantRecord(hydrantFlows,a.id,"tested_at");
+    return '<div style="min-width:210px"><b style="font-size:15px">Hydrant '+esc(a.id)+'</b><div style="font-size:11px;color:#64748b">'+Number(a.latitude).toFixed(6)+', '+Number(a.longitude).toFixed(6)+'</div><hr style="margin:6px 0"><div style="font-size:12px"><b>Last inspection:</b> '+esc(ins?.inspected_at||"No record")+'</div><div style="font-size:12px"><b>Condition:</b> '+esc(ins?.condition||"Not recorded")+'</div><div style="font-size:12px"><b>Inspector:</b> '+esc(ins?.inspector||"Not recorded")+'</div><div style="font-size:12px;margin-top:5px"><b>Last flow test:</b> '+esc(fl?.tested_at||"No record")+'</div><div style="font-size:12px"><b>Flow:</b> '+(fl?.calculated_flow_gpm!=null?Number(fl.calculated_flow_gpm).toLocaleString()+" GPM":"Not recorded")+'</div><div style="font-size:12px"><b>Static / Residual:</b> '+esc(fl?.static_pressure??"—")+' / '+esc(fl?.residual_pressure??"—")+' PSI</div></div>';
+  }
+  async function loadHydrantOverlay(){
+    const [coordsRes,idsRes,insRes,flowRes]=await Promise.all([
+      fetch("/hydrants.json",{cache:"no-cache"}),fetch("/hydrant-ids.json",{cache:"no-cache"}),
+      db.from("hydrant_inspections").select("hydrant_id,inspected_at,inspector,condition").order("inspected_at",{ascending:false}).limit(2500),
+      db.from("hydrant_flow_tests").select("hydrant_id,test_hydrant_id,flow_hydrant_id,tested_at,calculated_flow_gpm,static_pressure,residual_pressure").order("tested_at",{ascending:false}).limit(2500)
+    ]);
+    if(!coordsRes.ok||!idsRes.ok)throw new Error("Hydrant coordinate files could not be loaded.");
+    if(insRes.error)throw insRes.error;if(flowRes.error)throw flowRes.error;
+    const coords=await coordsRes.json(),ids=await idsRes.json();hydrantAssets=[];
+    for(let i=0;i<Math.min(coords.length,ids.length);i++){
+      const id=String(ids[i]||"").trim().toUpperCase(),lat=Number(coords[i]?.lat),lng=Number(coords[i]?.lng);
+      if(id&&!/^Fire St /i.test(id)&&Number.isFinite(lat)&&Number.isFinite(lng))hydrantAssets.push({id,latitude:lat,longitude:lng});
+    }
+    hydrantInspections=insRes.data||[];hydrantFlows=flowRes.data||[];
+  }
   function drawMarkers(){
-    if(!map||!markerLayer)return;markerLayer.clearLayers();
+    if(!map||!preplanLayer||!hydrantLayer)return;
+    preplanLayer.clearLayers();hydrantLayer.clearLayers();
+    hydrantAssets.forEach(a=>L.marker([a.latitude,a.longitude],{icon:hydrantIcon(a.id),title:"Hydrant "+a.id}).bindPopup(hydrantPopup(a)).addTo(hydrantLayer));
     plans.forEach(p=>{const lat=Number(p.latitude),lng=Number(p.longitude);if(!Number.isFinite(lat)||!Number.isFinite(lng))return;
-      const marker=L.marker([lat,lng],{title:p.property_name||p.address||"Preplan"}).bindPopup('<b>'+esc(p.property_name||p.title||"Preplan")+'</b><br>'+esc(p.address||"")+'<br><button type="button" onclick="jfdOpenPreplan(\''+p.id+'\')" style="margin-top:6px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:5px">Open Preplan</button>');
-      marker.addTo(markerLayer);
+      const marker=L.marker([lat,lng],{icon:preplanIcon(),title:"Preplan: "+(p.property_name||p.address||"Preplan")}).bindPopup('<b>'+esc(p.property_name||p.title||"Preplan")+'</b><br>'+esc(p.address||"")+'<br><button type="button" onclick="jfdOpenPreplan(\\''+p.id+'\\')" style="margin-top:6px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:5px">Open Preplan</button>');
+      marker.addTo(preplanLayer);
     });
   }
   function initMap(){
     const el=$("preplanMap");if(!el||!window.L)return;
-    if(!map){map=L.map(el).setView([33.875,-87.27],12);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:20,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'}).addTo(map);markerLayer=L.layerGroup().addTo(map);
+    if(!map){map=L.map(el).setView([33.875,-87.27],12);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:20,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'}).addTo(map);hydrantLayer=L.layerGroup().addTo(map);preplanLayer=L.layerGroup().addTo(map);
       map.on("click",e=>{if(!placing||!canEdit())return;placing=false;$("preplanPlaceButton").textContent="Add Preplan Location";$("preplanPlaceHint").textContent="";createPlanAt(e.latlng.lat,e.latlng.lng)});
     }
     drawMarkers();setTimeout(()=>map.invalidateSize(),150);
@@ -209,7 +239,7 @@
     try{
       if(!window.L&&typeof window.jfdLoadLeaflet==="function")await window.jfdLoadLeaflet();
       if(!window.L){const s=document.createElement("script");s.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";await new Promise((res,rej)=>{s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
-      initMap();await loadPlans();
+      await loadHydrantOverlay();initMap();await loadPlans();
     }catch(e){console.error("Preplans",e);const st=$("preplanStatus");if(st)st.textContent="Unable to load preplans: "+(e.message||e)}
   }
   async function attachIncidentButtons(){
