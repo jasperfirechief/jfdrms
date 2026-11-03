@@ -116,8 +116,9 @@
       const data={...(activePlan.worksheet_data||{})};
       body.querySelectorAll("[data-field]").forEach(el=>{const k=el.dataset.field;if(el.dataset.multi){const vals=[...body.querySelectorAll('[data-field="'+k+'"][data-multi="1"]:checked')].map(x=>x.value);data[k]=vals}else data[k]=el.value});
       activePlan.worksheet_data=data;
-      data.occupancy_name=$("ppPropertyName")?.value.trim()||data.occupancy_name||"";
-      data.address=$("ppAddress")?.value.trim()||data.address||"";
+      const nameInput=$("ppPropertyName")?.value.trim()||"",addressInput=$("ppAddress")?.value.trim()||"";
+      data.occupancy_name=nameInput!==String(activePlan.property_name||"")?nameInput:(data.occupancy_name||nameInput);
+      data.address=addressInput!==String(activePlan.address||"")?addressInput:(data.address||addressInput);
       activePlan.property_name=data.occupancy_name;
       activePlan.address=data.address;
       activePlan.title=activePlan.property_name||activePlan.address||"Pre-Plan";
