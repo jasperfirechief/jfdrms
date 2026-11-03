@@ -1085,11 +1085,13 @@ function bindStaffingControls(){
     window.jfdSelectedStaffShift=v;
     localStorage.setItem("jfd_staff_shift",v);
     $("staffShift").value=v;
-    loadStaffing({date:$("staffDate").value||today(),shift:v});\n    renderStaffCalendar();
+    loadStaffing({date:$("staffDate").value||today(),shift:v});
+    renderStaffCalendar();
   });
 }
 
-bindStaffingControls();\nrenderStaffCalendar();
+bindStaffingControls();
+renderStaffCalendar();
 function incidentDate(v){if(!v)return "";const d=new Date(v);return Number.isNaN(d.getTime())?"":d.toLocaleDateString("en-US",{timeZone:JFD_TIME_ZONE,month:"2-digit",day:"2-digit",year:"numeric"})}function incidentTime(v){if(!v)return "";const d=new Date(v);return Number.isNaN(d.getTime())?"":d.toLocaleTimeString("en-US",{timeZone:JFD_TIME_ZONE,hour:"2-digit",minute:"2-digit",hourCycle:"h23"})}function mapIncident(id){const el=document.querySelector("[data-incident-id=\""+Number(id)+"\"]");const q=el?.dataset.location||"";const lat=el?.dataset.lat||"";const lng=el?.dataset.lng||"";if(!q&&!lat&&!lng)return alert("No incident location is available.");openIncidentMap({location:q,lat,lng});}
 let jfdLeafletPromise=null, jfdHydrantMap=null;
 function jfdLoadLeaflet(){if(window.L)return Promise.resolve(window.L);if(jfdLeafletPromise)return jfdLeafletPromise;jfdLeafletPromise=new Promise((resolve,reject)=>{const s=document.createElement("script");s.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";s.crossOrigin="";s.onload=()=>window.L?resolve(window.L):reject(new Error("Map library did not load"));s.onerror=()=>reject(new Error("Unable to load the map library. Check the internet connection."));document.head.appendChild(s);});return jfdLeafletPromise;}
