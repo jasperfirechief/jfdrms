@@ -239,11 +239,34 @@
     out.innerHTML=rows.length?rows.map(x=>'<article class="border rounded-lg p-3"><div class="flex justify-between gap-2"><b>'+escH(x._type==="inspection"?"Inspection":"Flow test")+'</b><span>'+escH(x._date)+'</span></div><div class="text-sm mt-1">'+escH(x.inspector||x.tester||"")+'</div>'+(x._type==="inspection"?'<div class="text-sm mt-1">Condition: '+escH(x.condition||"—")+' · Follow-up: '+escH(x.follow_up_status||"—")+'</div><div class="text-sm">'+escH(x.deficiencies||"")+'</div><div class="text-xs text-slate-500 mt-1">'+escH(Object.entries(x.checklist||{}).filter(([k])=>!k.endsWith("_remarks")).map(([k,v])=>k.replaceAll("_"," ")+": "+(v?"Yes":"No")).join(" · "))+'</div>':'<div class="text-sm mt-1">Rate: '+escH(x.rate_gpm??"—")+' GPM · Flow at 20 PSI: '+escH(x.calculated_flow_gpm??"—")+' GPM</div><div class="text-sm">Static '+escH(x.static_pressure??"—")+' · Residual '+escH(x.residual_pressure??"—")+' · Pitot '+escH(x.pitot_pressure??"—")+' · Orifice '+escH(x.orifice_diameter??"—")+'"</div><div class="text-xs text-slate-500">Test hydrant: '+escH(x.test_hydrant_id||(String(x.notes||"").includes("pair not recorded")?"Pair not recorded in source report":"Same as flow hydrant"))+' · Flow hydrant: '+escH(String(x.notes||"").includes("pair not recorded")?"Not recorded in source report":(x.flow_hydrant_id||x.hydrant_id))+'</div>')+'<div class="text-sm mt-1">'+escH(x.notes||"")+'</div></article>').join(""):'<p class="text-sm text-slate-500">No history recorded for this hydrant.</p>';
     $("hydrantHistoryModal").classList.remove("hiddenx");
   }
-  function searchHydrant(){
+  async function searchHydrant(){
     const q=assetKey($("hydrantSearch").value);if(!q)return;
-    const visibleIds=monthlyHydrantIds();const a=assets.find(x=>visibleIds.has(assetKey(x.id))&&assetKey(x.id)===q)||assets.find(x=>visibleIds.has(assetKey(x.id))&&assetKey(x.id).includes(q));
+    const a=assets.find(x=>assetKey(x.id)===q)||assets.find(x=>assetKey(x.id).includes(q));
     if(!a){status("No hydrant found for “"+$("hydrantSearch").value+"”.",true);return}
-    selected=a;renderSelected();map?.setView([a.latitude,a.longitude],18);const marker=markerLayer?.getLayers().find(m=>m.getLatLng().lat===Number(a.latitude)&&m.getLatLng().lng===Number(a.longitude));marker?.openPopup();
+    selected=a;renderSelected();
+    const inspectionRows=schedules.filter(x=>x.task_type==="inspection"&&assetKey(x.hydrant_id||x.source_hydrant_id)===assetKey(a.id))
+      .sort((x,y)=>Number(x.schedule_year)-Number(y.schedule_year)||Number(x.schedule_month)-Number(y.schedule_month)||String(x.shift).localeCompare(String(y.shift)));
+    const assignments=[...new Map(inspectionRows.map(x=>[String(x.shift)+"|"+Number(x.schedule_month),{shift:String(x.shift),month:Number(x.schedule_month),years:[]}])).values()];
+    for(const item of assignments)item.years=inspectionRows.filter(x=>String(x.shift)===item.shift&&Number(x.schedule_month)===item.month).map(x=>Number(x.schedule_year));
+    const scheduleLabel=assignments.length
+      ?assignments.map(x=>x.shift+" Shift · "+monthNames[x.month-1]+" ("+[...new Set(x.years)].join(", ")+")").join("; ")
+      :"No annual inspection assignment found in the loaded schedule.";
+    status("Hydrant "+a.id+" · Inspection schedule: "+scheduleLabel);
+    const preferred=inspectionRows.find(x=>Number(x.schedule_year)===yearValue())||inspectionRows[0];
+    if(preferred){
+      $("hydrantShift").value=String(preferred.shift);
+      $("hydrantMonth").value=String(preferred.schedule_month);
+      $("hydrantYear").value=String(preferred.schedule_year);
+      await window.jfdHydrantFiltersChanged?.();
+    }
+    const lat=Number(a.latitude),lng=Number(a.longitude);
+    if(Number.isFinite(lat)&&Number.isFinite(lng)){
+      map?.setView([lat,lng],18);
+      let marker=markerLayer?.getLayers().find(m=>Math.abs(m.getLatLng().lat-lat)<0.0000001&&Math.abs(m.getLatLng().lng-lng)<0.0000001);
+      if(!marker&&window.L&&markerLayer)marker=L.marker([lat,lng],{icon:iconFor(a.id),title:"Hydrant "+a.id}).bindPopup(mapPopup(a)).addTo(markerLayer);
+      marker?.openPopup();
+    }
+    status("Hydrant "+a.id+" · Inspection schedule: "+scheduleLabel);
   }
   window.jfdOpenHydrantForm=openForm;window.jfdShowHydrantHistory=showHistory;
   window.jfdRefreshHydrants=refresh;
