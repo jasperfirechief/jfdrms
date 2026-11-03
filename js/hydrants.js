@@ -123,14 +123,14 @@
       const id=String(x.hydrant_id||"");
       const exists=inventoryIds.has(assetKey(id));
       const done=inspectionDoneIds.has(assetKey(id));
-      return '<button type="button" class="w-full flex justify-between items-center gap-2 border rounded-lg p-2 text-left hover:bg-slate-50" onclick="jfdOpenHydrantForm(\\''+escH(id)+'\\',\\'inspection\\')"><span><b>'+escH(id)+'</b><span class="block text-xs text-slate-500">Annual inspection assignment</span></span><span class="text-xs font-bold '+(done?"text-green-700":(exists?"text-amber-700":"text-red-700"))+'">'+(done?"INSPECTED":(exists?"DUE":"NOT IN INVENTORY"))+'</span></button>';
+      return '<button type="button" class="w-full flex justify-between items-center gap-2 border rounded-lg p-2 text-left hover:bg-slate-50" onclick="jfdOpenHydrantForm(\''+escH(id)+'\',\'inspection\')"><span><b>'+escH(id)+'</b><span class="block text-xs text-slate-500">Annual inspection assignment</span></span><span class="text-xs font-bold '+(done?"text-green-700":(exists?"text-amber-700":"text-red-700"))+'">'+(done?"INSPECTED":(exists?"DUE":"NOT IN INVENTORY"))+'</span></button>';
     }).join(""):'<p class="text-sm text-slate-500">No annual inspection assignments for this shift/month.</p>';
     const flowHtml=flowTasks.length?flowTasks.map(x=>{
       const test=String(x.test_hydrant_id||"");
       const flow=String(x.flow_hydrant_id||"");
       const done=pairDone(x);
       const known=inventoryIds.has(assetKey(test))&&(!flow||inventoryIds.has(assetKey(flow)));
-      return '<button type="button" class="w-full flex justify-between items-center gap-2 border rounded-lg p-2 text-left hover:bg-slate-50" onclick="jfdOpenHydrantForm(\\''+escH(test)+'\\',\\'flow_test\\',\\''+escH(flow)+'\\','+Number(x.pair_order||0)+')"><span><b>T: '+escH(test)+'</b><span class="block text-xs text-slate-500">F: '+(flow?escH(flow):"Not listed in source schedule")+' · Pair '+escH(x.pair_order||"—")+'</span></span><span class="text-xs font-bold '+(done?"text-green-700":(known?"text-sky-700":"text-red-700"))+'">'+(done?"TESTED":(known?"FLOW TEST DUE":"CHECK ID / F"))+'</span></button>';
+      return '<button type="button" class="w-full flex justify-between items-center gap-2 border rounded-lg p-2 text-left hover:bg-slate-50" onclick="jfdOpenHydrantForm(\''+escH(test)+'\',\'flow_test\',\''+escH(flow)+'\','+Number(x.pair_order||0)+')"><span><b>T: '+escH(test)+'</b><span class="block text-xs text-slate-500">F: '+(flow?escH(flow):"Not listed in source schedule")+' · Pair '+escH(x.pair_order||"—")+'</span></span><span class="text-xs font-bold '+(done?"text-green-700":(known?"text-sky-700":"text-red-700"))+'">'+(done?"TESTED":(known?"FLOW TEST DUE":"CHECK ID / F"))+'</span></button>';
     }).join(""):'<p class="text-sm text-slate-500">No flow tests are scheduled for this shift/month/year.</p>';
     list.innerHTML='<div class="space-y-2"><h3 class="font-bold text-sm">Annual inspections · '+inspectionTasks.length+' hydrants</h3>'+inspectionHtml+'</div><div class="space-y-2 mt-4"><h3 class="font-bold text-sm">Flow-test pairings · '+flowTasks.length+' scheduled tests</h3>'+flowHtml+'</div>';
   }
