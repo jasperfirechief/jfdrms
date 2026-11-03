@@ -1064,7 +1064,7 @@ async function renderStaffCalendar(){
   const y=staffCalendarCursor.getFullYear(),m=staffCalendarCursor.getMonth(),first=new Date(y,m,1),days=new Date(y,m+1,0).getDate(),start=first.getDay(),shift=$("staffShift")?.value||"A";
   heading.textContent=first.toLocaleDateString("en-US",{month:"long",year:"numeric"});
   const token=++staffCalendarRequest,from=staffDateKey(y,m+1,1),to=staffDateKey(y,m+1,days);
-  const q=await db.from("daily_staffing").select("staffing_date").eq("shift",shift).gte("staffing_date",from).lte("staffing_date",to);
+  const q=db?await db.from("daily_staffing").select("staffing_date").eq("shift",shift).gte("staffing_date",from).lte("staffing_date",to):{data:[],error:null};
   if(token!==staffCalendarRequest)return;
   if(q.error){grid.innerHTML='<div class="col-span-7 text-sm text-amber-700 p-2">Could not load calendar records: '+esc(q.error.message)+'</div>';return}
   staffCalendarRecords=new Set((q.data||[]).map(x=>String(x.staffing_date).slice(0,10)));
