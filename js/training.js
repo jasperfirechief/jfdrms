@@ -16,6 +16,13 @@
     const rows=source.map(x=>({schedule_date:x[0],shift:x[1],lesson:x[2],subject:x[3],start_time:"09:00",end_time:"12:00",source_year:2026,source_date:x[0]}));
     const by={A:[],B:[],C:[]};rows.forEach(r=>by[r.shift].push(r));
     const aFirstHalf=by.B.filter(r=>r.schedule_date<"2026-07-01");
+    const a2026=[];let aCount=0;
+    for(let date="2026-01-01";date<="2026-06-30";date=addDays(date,1)){
+      const weekday=new Date(date+"T00:00:00Z").getUTCDay();
+      if(weekday===0||weekday===6||shiftForDate(date)!=="A")continue;
+      const sourceRow=aFirstHalf[aCount++];
+      if(sourceRow)a2026.push({...sourceRow,schedule_date:date,shift:"A",source_year:2026,source_date:sourceRow.source_date});
+    }
     const sequences={A:aFirstHalf.concat(by.A),B:by.B,C:by.C};
     const next={A:[],B:[],C:[]},counts={A:0,B:0,C:0};
     for(let date="2027-01-01";date<="2027-12-31";date=addDays(date,1)){
@@ -24,7 +31,7 @@
       const shift=shiftForDate(date),sequence=sequences[shift],sourceRow=sequence.length?sequence[counts[shift]++%sequence.length]:null;
       if(sourceRow)next[shift].push({...sourceRow,schedule_date:date,shift,source_year:2026,source_date:sourceRow.source_date});
     }
-    return rows.concat(next.A,next.B,next.C);
+    return rows.concat(a2026,next.A,next.B,next.C);
   }
   async function seedSchedule() {
     if(profile?.app_role!=="admin" || !db) return;
