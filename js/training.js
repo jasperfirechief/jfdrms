@@ -92,6 +92,7 @@
   }
   function renderShell() {
     const section=$("t-training");if(!section)return;
+    eventRecordId=null;eventSelected.clear();
     section.innerHTML='<div class="flex flex-wrap justify-between items-center gap-3 mb-5"><div><h1 class="text-2xl font-black">Department Training</h1><p class="text-sm text-slate-500">Scheduled shift training and additional training events.</p></div><div class="flex gap-2"><button type="button" id="trainingDailyTab" class="bg-slate-950 text-white rounded-lg px-4 py-2 font-bold text-sm">Daily Training</button><button type="button" id="trainingEventTab" class="border rounded-lg px-4 py-2 font-bold text-sm">Training Event</button></div></div><div id="trainingDailyPanel">'+dailyHtml()+'</div><div id="trainingEventPanel" class="hiddenx">'+eventHtml()+'</div>';
     $("trainingDailyTab").onclick=()=>showView("daily");$("trainingEventTab").onclick=()=>showView("event");
     $("trainingDailyDate").onchange=loadDailyForm;
