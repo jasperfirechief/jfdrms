@@ -62,9 +62,16 @@
   async function getStaffed(date,shift) {
     const s=await db.from("daily_staffing").select("staffing_id").eq("staffing_date",date).eq("shift",shift).maybeSingle();
     if(s.error)throw s.error;if(!s.data)return {staffingId:null,people:[]};
-    const a=await db.from("daily_app_assignments").select("daily_personnel_assignments(personnel_id,personnel(id,first_name,last_name,shift))").eq("staffing_id",s.data.staffing_id);
-    if(a.error)throw a.error;
+    const [a,events]=await Promise.all([
+      db.from("daily_app_assignments").select("daily_personnel_assignments(personnel_id,personnel(id,first_name,last_name,shift))").eq("staffing_id",s.data.staffing_id),
+      db.from("daily_staffing_events").select("event_type,personnel_id,replacement_personnel_id,is_full_shift").eq("staffing_id",s.data.staffing_id)
+    ]);
+    if(a.error)throw a.error;if(events.error)throw events.error;
     const map=new Map();(a.data||[]).forEach(x=>(x.daily_personnel_assignments||[]).forEach(y=>{if(y.personnel_id&&y.personnel)map.set(Number(y.personnel_id),y.personnel)}));
+    (events.data||[]).forEach(e=>{
+      if(e.is_full_shift&&["leave","swap"].includes(e.event_type))map.delete(Number(e.personnel_id));
+      if(e.replacement_personnel_id){const replacement=roster.find(p=>Number(p.id)===Number(e.replacement_personnel_id));if(replacement)map.set(Number(replacement.id),replacement);}
+    });
     return {staffingId:s.data.staffing_id,people:Array.from(map.values()).sort((a,b)=>(a.last_name||"").localeCompare(b.last_name||""))};
   }
   function dailyHtml() {
