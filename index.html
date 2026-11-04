@@ -1080,6 +1080,13 @@ function addNerisTypeField(){
   const wrap=anchor.parentElement?.parentElement; if(!wrap)return;
 }
 let staffCalendarCursor=null,staffCalendarRecords=new Set(),staffCalendarRequest=0;
+function staffEventDuration(x){
+  if(x.is_full_shift)return "Full shift";
+  const start=String(x.start_time||"").slice(0,5),end=String(x.end_time||"").slice(0,5);
+  const mins=v=>{const p=v.split(":").map(Number);return p.length===2&&p.every(Number.isFinite)?p[0]*60+p[1]:null};
+  const a=mins(start),b=mins(end),hours=a===null||b===null?null:((b-a+1440)%1440)/60;
+  return start+"–"+end+(hours===null?"":" ("+hours.toFixed(1)+" hrs)");
+}
 function staffEventName(id){const p=personnel.find(x=>Number(x.id)===Number(id));return p?[p.first_name,p.last_name].filter(Boolean).join(" "):"Unknown employee"}
 function renderStaffingEventOptions(){
   const fill=(id,items,placeholder,mapper)=>{const el=$(id);if(!el)return;const prior=el.value;el.innerHTML='<option value="">'+placeholder+'</option>'+items.map(x=>'<option value="'+Number(mapper(x).id)+'">'+esc(mapper(x).label)+'</option>').join("");if([...el.options].some(o=>o.value===prior))el.value=prior};
@@ -1119,7 +1126,7 @@ async function renderStaffingEventList(staffingId){
   if(r.error){out.innerHTML='<p class="text-sm text-red-700">Unable to load personnel entries: '+esc(r.error.message)+'</p>';return}
   const rows=r.data||[];
   out.innerHTML='<h3 class="font-bold mb-2">Saved personnel entries</h3>'+(rows.length?rows.map(x=>{
-    const duration=x.is_full_shift?"Full shift":((x.start_time||"")+(x.end_time?"–"+x.end_time:""));
+    const duration=staffEventDuration(x);
     const type=x.event_type==="swap"?"Personnel swap":(String(x.leave_type||"Leave").replace("_"," "));
     const station=stations.find(s=>Number(s.station_id)===Number(x.station_id))?.station_name||"";
     const unit=apparatus.find(a=>Number(a.apparatus_id)===Number(x.apparatus_id))?.unit_number||"";
@@ -1230,7 +1237,7 @@ async function renderStaffingCalendarDetails(date,shift){
       const replacement=x.replacement||{};
       const st=stations.find(z=>Number(z.station_id)===Number(x.station_id));
       const ap=apparatus.find(z=>Number(z.apparatus_id)===Number(x.apparatus_id));
-      const duration=x.is_full_shift?"Full shift":((x.start_time||"")+(x.end_time?"–"+x.end_time:""));
+      const duration=staffEventDuration(x);
       const type=x.event_type==="swap"?"Personnel swap":(String(x.leave_type||"Leave").replace("_"," "));
       return '<div class="rounded-lg border p-3 mb-2"><div class="font-semibold">'+esc(type)+'</div><div class="text-sm mt-1">'+esc((person?.first_name||"")+' '+(person?.last_name||""))+(replacement?' → '+esc(replacement.first_name+' '+replacement.last_name):'')+'</div><div class="text-xs text-slate-500 mt-1">'+esc([st?.station_name,ap?.unit_number,duration].filter(Boolean).join(' · '))+'</div>'+(x.notes?'<p class="text-sm mt-2">'+esc(x.notes)+'</p>':'')+'</div>';
     }).join("");
