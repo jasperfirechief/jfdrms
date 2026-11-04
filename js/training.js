@@ -21,7 +21,7 @@
     for(let date="2027-01-01";date<="2027-12-31";date=addDays(date,1)){
       const weekday=new Date(date+"T00:00:00Z").getUTCDay();
       if(weekday===0||weekday===6)continue;
-      const shift=shiftForDate(date),sourceRow=sequences[shift][counts[shift]++];
+      const shift=shiftForDate(date),sequence=sequences[shift],sourceRow=sequence.length?sequence[counts[shift]++%sequence.length]:null;
       if(sourceRow)next[shift].push({...sourceRow,schedule_date:date,shift,source_year:2026,source_date:sourceRow.source_date});
     }
     return rows.concat(next.A,next.B,next.C);
@@ -71,6 +71,7 @@
     section.innerHTML='<div class="flex flex-wrap justify-between items-center gap-3 mb-5"><div><h1 class="text-2xl font-black">Department Training</h1><p class="text-sm text-slate-500">Scheduled shift training and additional training events.</p></div><div class="flex gap-2"><button type="button" id="trainingDailyTab" class="bg-slate-950 text-white rounded-lg px-4 py-2 font-bold text-sm">Daily Training</button><button type="button" id="trainingEventTab" class="border rounded-lg px-4 py-2 font-bold text-sm">Training Event</button></div></div><div id="trainingDailyPanel">'+dailyHtml()+'</div><div id="trainingEventPanel" class="hiddenx">'+eventHtml()+'</div>';
     $("trainingDailyTab").onclick=()=>showView("daily");$("trainingEventTab").onclick=()=>showView("event");
     $("trainingDailyDate").onchange=loadDailyForm;
+    $("trainingDailyStart").oninput=updateDailyHours;$("trainingDailyEnd").oninput=updateDailyHours;
     $("trainingDailySave").onclick=()=>saveDaily(false);$("trainingDailySign").onclick=()=>saveDaily(true);
     $("trainingEventSave").onclick=()=>saveEvent(false);$("trainingEventSign").onclick=()=>saveEvent(true);
     $("trainingEventMemberSearch").oninput=filterEventPeople;
@@ -104,7 +105,7 @@
       $("trainingDailyLesson").value=schedule?.lesson||"";
       $("trainingDailyDetails").value=schedule?.details||"";
       $("trainingDailyStart").value=(schedule?.start_time||"09:00").slice(0,5);
-      $("trainingDailyEnd").value=(schedule?.end_time||"12:00").slice(0,5);
+      $("trainingDailyEnd").value=(schedule?.end_time||"12:00").slice(0,5);updateDailyHours();
       $("trainingScheduleHint").textContent=schedule?"Scheduled subject and lesson loaded from the department training calendar.":"No scheduled lesson is listed for this date. The officer may enter the subject manually.";
       $("trainingStaffingHint").textContent=staffed.staffingId?"Staffing record loaded":"No daily staffing record found for this date and shift";
       const ids=staffed.people.map(p=>Number(p.id));
@@ -115,7 +116,7 @@
         $("trainingDailySubject").value=dailyRecord.subject||$("trainingDailySubject").value;
         $("trainingDailyLesson").value=dailyRecord.lesson||$("trainingDailyLesson").value;
         $("trainingDailyStart").value=(dailyRecord.start_time||"09:00").slice(0,5);
-        $("trainingDailyEnd").value=(dailyRecord.end_time||"12:00").slice(0,5);
+        $("trainingDailyEnd").value=(dailyRecord.end_time||"12:00").slice(0,5);updateDailyHours();
         $("trainingDailyNotes").value=dailyRecord.notes||"";
         const attended=(dailyRecord.training_attendees||[]).map(x=>Number(x.personnel_id));
         $("trainingDailyPeople").innerHTML=personnelChecks("trainingDailyPeopleChecks",staffed.people,attended);
@@ -125,6 +126,7 @@
       $("trainingDailySave").disabled=!isManager()||locked;$("trainingDailySign").disabled=!isManager()||locked;
     } catch(e){console.error(e);$("trainingDailyPeople").textContent="Unable to load training details: "+(e.message||e);}
   }
+  function updateDailyHours(){const h=durationHours($("trainingDailyStart")?.value,$("trainingDailyEnd")?.value);if($("trainingDailyHours"))$("trainingDailyHours").value=h.toFixed(2);}
   function durationHours(start,end) {
     const a=String(start||"").split(":").map(Number),b=String(end||"").split(":").map(Number);
     if(a.length<2||b.length<2)return 0;
@@ -219,7 +221,7 @@
     const originalOpen=window.adminOpenSection,originalBack=window.adminShowSectionCards;
     if(originalOpen&&!originalOpen.__trainingWrapped){
       const wrapped=function(id){
-        if(id!=="adminTrainingReportsSection")return originalOpen(id);
+        if(id!=="adminTrainingReportsSection"){$("adminTrainingReportsSection")?.classList.add("hiddenx");return originalOpen(id);}
         if(profile?.app_role!=="admin")return;
         loadRoster().then(()=>{if($("adminTrainingMember"))$("adminTrainingMember").innerHTML='<option value="">All personnel</option>'+roster.map(p=>'<option value="'+p.id+'">'+esc(p.first_name+" "+p.last_name)+'</option>').join("");}).catch(console.error);
         seedSchedule().catch(console.error);
