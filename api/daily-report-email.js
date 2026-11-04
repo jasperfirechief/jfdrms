@@ -223,8 +223,41 @@ async function sendEmail(attachments,shiftStart,shiftEnd,incidentCount,reportCou
   if(!r.ok) throw new Error("Brevo delivery failed: "+await r.text());
 }
 
+
+async function handleDepartmentEmail(req,res) {
+  try {
+    if(!SUPABASE_SERVICE_KEY||!process.env.BREVO_API_KEY||!process.env.BREVO_FROM_EMAIL)throw new Error("Email service is not configured.");
+    const token=String(req.headers.authorization||"").replace(/^Bearer\\s+/i,"");
+    if(!token)return res.status(401).json({error:"Sign in required."});
+    const auth=await fetch(SUPABASE_URL+"/auth/v1/user",{headers:{apikey:"sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz",Authorization:"Bearer "+token}});
+    if(!auth.ok)return res.status(401).json({error:"Invalid session."});
+    const user=await auth.json();
+    const profiles=await supa("users?select=app_role,active&user_id=eq."+encodeURIComponent(user.id));
+    const profile=profiles?.[0];
+    if(!profile?.active||!["admin","officer"].includes(profile.app_role))return res.status(403).json({error:"Administrator or officer access required."});
+    const {audience,shift,subject,message}=req.body||{};
+    if(!["shift","officers","everyone"].includes(audience)||!String(subject||"").trim()||!String(message||"").trim())return res.status(400).json({error:"Choose recipients and enter a subject and message."});
+    let recipients=[];
+    if(audience==="shift"){
+      if(!["A","B","C"].includes(shift))return res.status(400).json({error:"Select a valid shift."});
+      recipients=await supa("personnel?select=email&active=eq.true&shift=eq."+shift+"&email=not.is.null");
+    }else if(audience==="everyone"){
+      recipients=await supa("personnel?select=email&active=eq.true&email=not.is.null");
+    }else{
+      recipients=await supa("users?select=email&active=eq.true&app_role=eq.officer&email=not.is.null");
+    }
+    const emails=[...new Set((recipients||[]).map(x=>String(x.email||"").trim().toLowerCase()).filter(x=>/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(x)))];
+    if(!emails.length)return res.status(400).json({error:"No active recipients with valid email addresses were found."});
+    const payload={sender:{email:process.env.BREVO_FROM_EMAIL,name:"Jasper Fire Department"},to:[{email:emails[0]}],bcc:emails.slice(1).map(email=>({email})),subject:"Jasper Fire Department: "+String(subject).trim().slice(0,180),textContent:String(message).trim().slice(0,20000)};
+    const sent=await fetch("https://api.brevo.com/v3/smtp/email",{method:"POST",headers:{"api-key":process.env.BREVO_API_KEY,"Content-Type":"application/json","accept":"application/json"},body:JSON.stringify(payload)});
+    if(!sent.ok)throw new Error("Brevo delivery failed: "+(await sent.text()).slice(0,500));
+    return res.status(200).json({ok:true,recipient_count:emails.length});
+  }catch(e){return res.status(500).json({error:e.message||"Email failed."})}
+}
+
 export default async function handler(req,res) {
   if(req.method!=="GET"&&req.method!=="POST") return res.status(405).json({error:"Method not allowed"});
+  if(req.method==="POST"&&req.body?.action==="department_email")return handleDepartmentEmail(req,res);
   const testMva=req.query?.test==="mva-22608-jfd";
   if(process.env.CRON_SECRET && !testMva && (req.headers.authorization||"")!=="Bearer "+process.env.CRON_SECRET) return res.status(401).json({error:"Unauthorized"});
   if(testMva && (req.query?.cad||"")!=="2026-22608") return res.status(400).json({error:"Invalid test request"});
