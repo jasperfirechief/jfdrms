@@ -125,7 +125,7 @@
       $("trainingStaffingHint").textContent=staffed.staffingId?"Staffing record loaded":"No daily staffing record found for this date and shift";
       const ids=staffed.people.map(p=>Number(p.id));
       $("trainingDailyPeople").innerHTML=staffed.people.length?personnelChecks("trainingDailyPeopleChecks",staffed.people,ids):'<p class="text-amber-700 bg-amber-50 rounded-lg p-3">No personnel are assigned in the daily staffing record. Update Staffing first, or contact an administrator.</p>';
-      const q=await db.from("training_records").select("*,training_attendees(id,personnel_id,hours)").eq("record_type","daily").eq("training_date",date).eq("shift",shift).maybeSingle();
+      const q=await db.from("training_records").select("*,training_attendees(id,personnel_id,hours,personnel_name,shift_at_training)").eq("record_type","daily").eq("training_date",date).eq("shift",shift).maybeSingle();
       if(q.error)throw q.error;dailyRecord=q.data||null;
       if(dailyRecord){
         $("trainingDailySubject").value=dailyRecord.subject||$("trainingDailySubject").value;
@@ -147,7 +147,7 @@
     if(a.length<2||b.length<2)return 0;
     return Math.max(0,((b[0]*60+b[1])-(a[0]*60+a[1]))/60);
   }
-  async function saveRecord(payload,attendees,sign) {
+  async function saveRecord(payload,attendees,sign,attendeePeople=[]) {
     if(!isManager())throw new Error("Officer or administrator access is required.");
     if(!payload.subject.trim())throw new Error("Enter a training subject.");
     if(!payload.start_time||!payload.end_time||durationHours(payload.start_time,payload.end_time)<=0)throw new Error("Enter a valid start and end time.");
@@ -166,7 +166,7 @@
     const del=await db.from("training_attendees").delete().eq("training_record_id",record.id);
     if(del.error)throw del.error;
     const hours=durationHours(payload.start_time,payload.end_time);
-    const ins=await db.from("training_attendees").insert(attendees.map(id=>({training_record_id:record.id,personnel_id:id,hours})));
+    const ins=await db.from("training_attendees").insert(attendees.map(id=>{const p=attendeePeople.find(x=>Number(x.id)===Number(id))||roster.find(x=>Number(x.id)===Number(id));return {training_record_id:record.id,personnel_id:id,personnel_name:p?[p.first_name,p.last_name].filter(Boolean).join(" "):"Unknown personnel",shift_at_training:p?.shift||null,hours};}));
     if(ins.error)throw ins.error;
     return record.id;
   }
@@ -177,7 +177,7 @@
       const payload={...(dailyRecord||{}),record_type:"daily",training_date:date,shift,staffing_id:staffed.staffingId,schedule_id:schedule?.id||dailyRecord?.schedule_id||null,subject:$("trainingDailySubject").value.trim(),lesson:$("trainingDailyLesson").value||null,start_time:$("trainingDailyStart").value,end_time:$("trainingDailyEnd").value,description:schedule?.details||null,notes:$("trainingDailyNotes").value||null};
       delete payload.training_attendees;delete payload.id;
       if(dailyRecord?.id)payload.id=dailyRecord.id;
-      const id=await saveRecord(payload,checkedIds("trainingDailyPeopleChecks"),sign);
+      const id=await saveRecord(payload,checkedIds("trainingDailyPeopleChecks"),sign,staffed.people);
       alert(sign?"Daily training report signed and completed.":"Daily training draft saved.");
       await loadDailyForm();
       if(id)dailyRecord={...(dailyRecord||{}),id,signed_at:sign?new Date().toISOString():null};
@@ -187,7 +187,7 @@
     try {
       const payload={id:eventRecordId||undefined,record_type:"event",training_date:$("trainingEventDate").value,shift:null,staffing_id:null,schedule_id:null,subject:$("trainingEventSubject").value.trim(),lesson:$("trainingEventLesson").value||null,category:$("trainingEventCategory").value||null,start_time:$("trainingEventStart").value,end_time:$("trainingEventEnd").value,location:$("trainingEventLocation").value||null,instructor:$("trainingEventInstructor").value||null,description:$("trainingEventDescription").value||null,notes:$("trainingEventNotes").value||null};
       const ids=Array.from(eventSelected);
-      const id=await saveRecord(payload,ids,sign);eventRecordId=id;
+      const id=await saveRecord(payload,ids,sign,roster);eventRecordId=id;
       alert(sign?"Training event signed and completed.":"Training event draft saved.");
       if(sign){eventRecordId=null;eventSelected.clear();$("trainingEventSubject").value="";$("trainingEventLesson").value="";$("trainingEventCategory").value="";$("trainingEventLocation").value="";$("trainingEventInstructor").value="";$("trainingEventDescription").value="";$("trainingEventNotes").value="";roster=roster.slice();$("trainingEventPeople").innerHTML=personnelChecks("trainingEventPeopleChecks",roster,[]);}
     } catch(e){console.error(e);alert("Training event could not be saved: "+(e.message||e));}
@@ -200,11 +200,19 @@
   function adminPanelHtml() {
     return '<div id="adminTrainingReportsSection" class="card p-5 mb-4 hiddenx"><div class="mb-4"><h2 class="text-xl font-black">Training Reports</h2><p class="text-sm text-slate-500">Search and retrieve completed and draft department training records.</p></div><div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-2"><input id="adminTrainingSearch" class="border rounded-lg p-2" placeholder="Subject, notes, instructor…"><select id="adminTrainingMember" class="border rounded-lg p-2"><option value="">All personnel</option></select><select id="adminTrainingShift" class="border rounded-lg p-2"><option value="">All shifts / events</option><option>A</option><option>B</option><option>C</option></select><input id="adminTrainingFrom" type="date" class="border rounded-lg p-2"><input id="adminTrainingTo" type="date" class="border rounded-lg p-2"></div><div class="flex gap-2 mt-3"><button id="adminTrainingSearchButton" class="bg-slate-950 text-white rounded-lg px-4 py-2 font-bold">Search Training</button><button id="adminTrainingExport" class="border rounded-lg px-4 py-2 font-bold">Export CSV</button></div><div id="adminTrainingResults" class="space-y-2 mt-4"><p class="text-sm text-slate-500">Choose search criteria and select Search Training.</p></div></div>';
   }
+  async function refreshAdminTrainingMembers() {
+    if(!$("adminTrainingMember")||!db)return;
+    const r=await db.from("training_attendees").select("personnel_name,personnel(first_name,last_name)");
+    if(r.error)throw r.error;
+    const names=new Set(roster.map(p=>[p.first_name,p.last_name].filter(Boolean).join(" ")));
+    (r.data||[]).forEach(a=>{const name=a.personnel_name||[a.personnel?.first_name,a.personnel?.last_name].filter(Boolean).join(" ");if(name)names.add(name);});
+    $("adminTrainingMember").innerHTML='<option value="">All personnel</option>'+Array.from(names).sort((a,b)=>a.localeCompare(b)).map(name=>'<option value="'+esc(name)+'">'+esc(name)+'</option>').join("");
+  }
   let adminRows=[];
   async function searchAdminTraining() {
     const el=$("adminTrainingResults");el.innerHTML='<p class="text-sm text-slate-500">Searching…</p>';
     try {
-      let q=db.from("training_records").select("*,training_attendees(id,personnel_id,hours,personnel(id,first_name,last_name,shift))").order("training_date",{ascending:false}).limit(1000);
+      let q=db.from("training_records").select("*,training_attendees(id,personnel_id,hours,personnel_name,shift_at_training,personnel(id,first_name,last_name,shift))").order("training_date",{ascending:false}).limit(1000);
       if($("adminTrainingFrom").value)q=q.gte("training_date",$("adminTrainingFrom").value);
       if($("adminTrainingTo").value)q=q.lte("training_date",$("adminTrainingTo").value);
       if($("adminTrainingShift").value)q=q.eq("shift",$("adminTrainingShift").value);
@@ -213,15 +221,15 @@
       adminRows=(r.data||[]).filter(x=>{
         const people=x.training_attendees||[];
         const text=[x.subject,x.lesson,x.category,x.description,x.notes,x.instructor,x.signed_by_name].join(" ").toLowerCase();
-        return (!term||text.includes(term))&&(!member||people.some(p=>String(p.personnel_id)===member));
+        return (!term||text.includes(term))&&(!member||people.some(p=>(p.personnel_name||[p.personnel?.first_name,p.personnel?.last_name].filter(Boolean).join(" "))===member));
       });
-      el.innerHTML=adminRows.map((x,i)=>'<div class="border rounded-lg p-3 flex flex-wrap justify-between items-center gap-3"><div><div class="font-bold">'+esc(x.subject)+'</div><div class="text-xs text-slate-500">'+esc(x.training_date)+' · '+esc(x.shift?x.shift+" Shift":"Training Event")+' · '+esc(x.category||x.lesson||"")+' · '+(x.signed_at?'<span class="text-green-700">Completed</span>':'<span class="text-amber-700">Draft</span>')+'</div><div class="text-xs text-slate-500 mt-1">'+(x.training_attendees||[]).map(p=>esc(p.personnel?.first_name+" "+p.personnel?.last_name)).join(", ")+'</div></div><button type="button" data-index="'+i+'" class="trainingPrintBtn border rounded-lg px-3 py-2 text-sm font-bold">Download PDF</button></div>').join("")||'<p class="text-sm text-slate-500">No training records matched those filters.</p>';
+      el.innerHTML=adminRows.map((x,i)=>'<div class="border rounded-lg p-3 flex flex-wrap justify-between items-center gap-3"><div><div class="font-bold">'+esc(x.subject)+'</div><div class="text-xs text-slate-500">'+esc(x.training_date)+' · '+esc(x.shift?x.shift+" Shift":"Training Event")+' · '+esc(x.category||x.lesson||"")+' · '+(x.signed_at?'<span class="text-green-700">Completed</span>':'<span class="text-amber-700">Draft</span>')+'</div><div class="text-xs text-slate-500 mt-1">'+(x.training_attendees||[]).map(p=>esc(p.personnel_name||[p.personnel?.first_name,p.personnel?.last_name].filter(Boolean).join(" "))).join(", ")+'</div></div><button type="button" data-index="'+i+'" class="trainingPrintBtn border rounded-lg px-3 py-2 text-sm font-bold">Download PDF</button></div>').join("")||'<p class="text-sm text-slate-500">No training records matched those filters.</p>';
       el.querySelectorAll(".trainingPrintBtn").forEach(b=>b.onclick=()=>adminArchivePdf("training",adminRows[Number(b.dataset.index)].id,false));
     } catch(e){el.innerHTML='<p class="text-sm text-red-700">'+esc(e.message||e)+'</p>';}
   }
   function exportAdminTraining() {
     const headers=["Date","Shift","Type","Subject","Lesson","Category","Start","End","Member","Hours","Instructor","Signed By","Signed At","Notes"];
-    const rows=[headers].concat(adminRows.flatMap(r=>(r.training_attendees||[]).length?(r.training_attendees||[]).map(a=>[r.training_date,r.shift||"",r.record_type,r.subject,r.lesson||"",r.category||"",r.start_time,r.end_time,[a.personnel?.first_name,a.personnel?.last_name].filter(Boolean).join(" "),a.hours,r.instructor||"",r.signed_by_name||"",r.signed_at||"",r.notes||""]):[[r.training_date,r.shift||"",r.record_type,r.subject,r.lesson||"",r.category||"",r.start_time,r.end_time,"","",r.instructor||"",r.signed_by_name||"",r.signed_at||"",r.notes||""]]));
+    const rows=[headers].concat(adminRows.flatMap(r=>(r.training_attendees||[]).length?(r.training_attendees||[]).map(a=>[r.training_date,r.shift||"",r.record_type,r.subject,r.lesson||"",r.category||"",r.start_time,r.end_time,a.personnel_name||[a.personnel?.first_name,a.personnel?.last_name].filter(Boolean).join(" "),a.hours,r.instructor||"",r.signed_by_name||"",r.signed_at||"",r.notes||""]):[[r.training_date,r.shift||"",r.record_type,r.subject,r.lesson||"",r.category||"",r.start_time,r.end_time,"","",r.instructor||"",r.signed_by_name||"",r.signed_at||"",r.notes||""]]));
     const csv=rows.map(row=>row.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(",")).join("\r\n");
     const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"})),a=document.createElement("a");a.href=url;a.download="JFD_Training_Records.csv";a.click();URL.revokeObjectURL(url);
   }
@@ -230,7 +238,7 @@
     if(!$("adminTrainingCard")){const b=document.createElement("button");b.id="adminTrainingCard";b.type="button";b.className="card p-4 text-left hover:border-red-400";b.innerHTML="<b>Training Reports</b><p class='text-xs text-slate-500 mt-1'>Search training by member, date, shift, subject, and download records.</p>";b.onclick=()=>window.adminOpenSection("adminTrainingReportsSection");cards.appendChild(b);}
     if(!$("adminTrainingReportsSection")){const panel=document.createElement("div");panel.innerHTML=adminPanelHtml();const node=panel.firstElementChild;$("adminReportArchive")?.insertAdjacentElement("afterend",node);}
     if($("adminTrainingSearchButton"))$("adminTrainingSearchButton").onclick=searchAdminTraining;if($("adminTrainingExport"))$("adminTrainingExport").onclick=exportAdminTraining;
-    if($("adminTrainingMember"))$("adminTrainingMember").innerHTML='<option value="">All personnel</option>'+roster.map(p=>'<option value="'+p.id+'">'+esc(p.first_name+" "+p.last_name)+'</option>').join("");
+    if($("adminTrainingMember"))refreshAdminTrainingMembers().catch(console.error);
   }
   function extendAdminNavigation() {
     const originalOpen=window.adminOpenSection,originalBack=window.adminShowSectionCards;
@@ -238,7 +246,7 @@
       const wrapped=function(id){
         if(id!=="adminTrainingReportsSection"){$("adminTrainingReportsSection")?.classList.add("hiddenx");return originalOpen(id);}
         if(profile?.app_role!=="admin")return;
-        loadRoster().then(()=>{if($("adminTrainingMember"))$("adminTrainingMember").innerHTML='<option value="">All personnel</option>'+roster.map(p=>'<option value="'+p.id+'">'+esc(p.first_name+" "+p.last_name)+'</option>').join("");}).catch(console.error);
+        loadRoster().then(()=>refreshAdminTrainingMembers()).catch(console.error);
         seedSchedule().catch(console.error);
         const ids=["adminReportArchive","adminStationsSection","adminApparatusSection","adminPersonnelSection","adminApparatusChecklistSection","adminInspectionChecklistSection","adminCallAnalysisPanel","adminHydrantReports","adminTrainingReportsSection"];
         $("adminSectionCards")?.classList.add("hiddenx");ids.forEach(k=>$(k)?.classList.toggle("hiddenx",k!==id));$("adminBackToCards")?.classList.remove("hiddenx");$("adminTrainingReportsSection")?.scrollIntoView({behavior:"smooth",block:"start"});
