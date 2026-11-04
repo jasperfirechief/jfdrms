@@ -207,6 +207,7 @@ export default async function handler(req,res) {
   if(process.env.CRON_SECRET && !testMva && (req.headers.authorization||"")!=="Bearer "+process.env.CRON_SECRET) return res.status(401).json({error:"Unauthorized"});
   if(testMva && (req.query?.cad||"")!=="2026-22608") return res.status(400).json({error:"Invalid test request"});
   try {
+    if(!testMva && process.env.RMS_EMAILS_ENABLED!=="true") return res.status(200).json({ok:true,skipped:true,reason:"Automatic RMS emails are disabled until the department authorizes go-live."});
     const now=new Date();
     if(!testMva && chicagoHour(now)!==9) return res.status(200).json({ok:true,skipped:true,reason:"Outside 9 AM America/Chicago delivery window."});
     if(!SUPABASE_SERVICE_KEY) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured in Vercel.");
