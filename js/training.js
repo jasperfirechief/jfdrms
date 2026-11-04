@@ -248,7 +248,7 @@
   }
   function exportAdminTraining() {
     const headers=["Date","Shift","Type","Subject","Lesson","Category","Start","End","Member","Member Shift","Hours","Instructor","Signed By","Signed At","Notes"];
-    const rows=[headers].concat(adminRows.flatMap(r=>(r.training_attendees||[]).length?(r.training_attendees||[]).map(a=>[r.training_date,r.shift||"",r.record_type,r.subject,r.lesson||"",r.category||"",r.start_time,r.end_time,a.personnel_name||[a.personnel?.first_name,a.personnel?.last_name].filter(Boolean).join(" "),a.shift_at_training||a.personnel?.shift||"",a.hours,r.instructor||"",r.signed_by_name||"",r.signed_at||"",r.notes||""]):[[r.training_date,r.shift||"",r.record_type,r.subject,r.lesson||"",r.category||"",r.start_time,r.end_time,"","",r.instructor||"",r.signed_by_name||"",r.signed_at||"",r.notes||""]]));
+    const rows=[headers].concat(adminRows.flatMap(r=>(r.training_attendees||[]).length?(r.training_attendees||[]).map(a=>[r.training_date,r.shift||"",r.record_type,r.subject,r.lesson||"",r.category||"",r.start_time,r.end_time,a.personnel_name||[a.personnel?.first_name,a.personnel?.last_name].filter(Boolean).join(" "),a.shift_at_training||a.personnel?.shift||"",a.hours,r.instructor||"",r.signed_by_name||"",r.signed_at||"",r.notes||""]):[[r.training_date,r.shift||"",r.record_type,r.subject,r.lesson||"",r.category||"",r.start_time,r.end_time,"","","",r.instructor||"",r.signed_by_name||"",r.signed_at||"",r.notes||""]]));
     const csv=rows.map(row=>row.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(",")).join("\r\n");
     const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"})),a=document.createElement("a");a.href=url;a.download="JFD_Training_Records.csv";a.click();URL.revokeObjectURL(url);
   }
