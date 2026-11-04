@@ -1115,7 +1115,7 @@ function resetStaffEventForm(){
 }
 async function renderStaffingEventList(staffingId){
   const out=$("staffEventExisting");if(!out||!canStaff()||!db)return;
-  const r=await db.from("daily_staffing_events").select("*").eq("staffing_id",staffingId).order("created_at");
+  const r=await db.from("daily_staffing_events").select("*,person:personnel!daily_staffing_events_personnel_id_fkey(first_name,last_name),replacement:personnel!daily_staffing_events_replacement_personnel_id_fkey(first_name,last_name)").eq("staffing_id",staffingId).order("created_at");
   if(r.error){out.innerHTML='<p class="text-sm text-red-700">Unable to load personnel entries: '+esc(r.error.message)+'</p>';return}
   const rows=r.data||[];
   out.innerHTML='<h3 class="font-bold mb-2">Saved personnel entries</h3>'+(rows.length?rows.map(x=>{
@@ -1123,7 +1123,7 @@ async function renderStaffingEventList(staffingId){
     const type=x.event_type==="swap"?"Personnel swap":(String(x.leave_type||"Leave").replace("_"," "));
     const station=stations.find(s=>Number(s.station_id)===Number(x.station_id))?.station_name||"";
     const unit=apparatus.find(a=>Number(a.apparatus_id)===Number(x.apparatus_id))?.unit_number||"";
-    return '<div class="flex flex-wrap items-start justify-between gap-3 border rounded-lg p-3 mb-2"><div class="min-w-0"><div class="font-semibold">'+esc(type)+' · '+esc(staffEventName(x.personnel_id))+(x.replacement_personnel_id?' → '+esc(staffEventName(x.replacement_personnel_id)):'')+'</div><div class="text-xs text-slate-500 mt-1">'+esc([station,unit,duration].filter(Boolean).join(" · "))+'</div>'+(x.notes?'<div class="text-sm mt-1">'+esc(x.notes)+'</div>':'')+'</div><div class="flex gap-2 shrink-0"><button type="button" onclick="editStaffingEvent(\''+x.event_id+'\')" class="border rounded px-3 py-1 text-sm font-semibold">Edit</button><button type="button" onclick="deleteStaffingEvent(\''+x.event_id+'\')" class="border border-red-200 text-red-700 rounded px-3 py-1 text-sm font-semibold">Delete</button></div></div>';
+    return '<div class="flex flex-wrap items-start justify-between gap-3 border rounded-lg p-3 mb-2"><div class="min-w-0"><div class="font-semibold">'+esc(type)+' · '+esc([x.person?.first_name,x.person?.last_name].filter(Boolean).join(" ")||"Unknown employee")+(x.replacement_personnel_id?' → '+esc([x.replacement?.first_name,x.replacement?.last_name].filter(Boolean).join(" ")||"Unknown employee"):'')+'</div><div class="text-xs text-slate-500 mt-1">'+esc([station,unit,duration].filter(Boolean).join(" · "))+'</div>'+(x.notes?'<div class="text-sm mt-1">'+esc(x.notes)+'</div>':'')+'</div><div class="flex gap-2 shrink-0"><button type="button" onclick="editStaffingEvent(\''+x.event_id+'\')" class="border rounded px-3 py-1 text-sm font-semibold">Edit</button><button type="button" onclick="deleteStaffingEvent(\''+x.event_id+'\')" class="border border-red-200 text-red-700 rounded px-3 py-1 text-sm font-semibold">Delete</button></div></div>';
   }).join(""):'<p class="text-sm text-slate-500">No personnel changes or leave entries recorded for this shift.</p>');
 }
 async function saveStaffingEvent(){
@@ -1145,7 +1145,7 @@ async function saveStaffingEvent(){
   await renderStaffingCalendarDetails(date,shift);
 }
 async function editStaffingEvent(id){
-  const r=await db.from("daily_staffing_events").select("*").eq("event_id",id).maybeSingle();if(r.error||!r.data)return alert(r.error?.message||"Personnel entry not found.");
+  const r=await db.from("daily_staffing_events").select("*,person:personnel!daily_staffing_events_personnel_id_fkey(first_name,last_name),replacement:personnel!daily_staffing_events_replacement_personnel_id_fkey(first_name,last_name)").eq("event_id",id).maybeSingle();if(r.error||!r.data)return alert(r.error?.message||"Personnel entry not found.");
   const x=r.data;
   $("staffEventId").value=x.event_id;$("staffEventType").value=x.event_type;$("staffEventPerson").value=String(x.personnel_id);$("staffEventReplacement").value=x.replacement_personnel_id?String(x.replacement_personnel_id):"";
   if(x.leave_type!=="swap")$("staffEventLeaveType").value=x.leave_type;
@@ -1214,7 +1214,7 @@ async function renderStaffingCalendarDetails(date,shift){
     const a=await db.from("daily_app_assignments").select("station_id,apparatus_id,daily_personnel_assignments(assignment_role,personnel(first_name,last_name))").eq("staffing_id",s.data.staffing_id);
     if(a.error)throw a.error;
     const rows=a.data||[];
-    const ev=await db.from("daily_staffing_events").select("*").eq("staffing_id",s.data.staffing_id).order("created_at");
+    const ev=await db.from("daily_staffing_events").select("*,person:personnel!daily_staffing_events_personnel_id_fkey(first_name,last_name),replacement:personnel!daily_staffing_events_replacement_personnel_id_fkey(first_name,last_name)").eq("staffing_id",s.data.staffing_id).order("created_at");
     if(ev.error)throw ev.error;
     const sections=stations.map(st=>{
       const assigned=rows.filter(x=>Number(x.station_id)===Number(st.station_id));
@@ -1226,8 +1226,8 @@ async function renderStaffingCalendarDetails(date,shift){
       }).join("")+'</div>';
     }).join("");
     const eventHtml=(ev.data||[]).map(x=>{
-      const person=personnel.find(p=>Number(p.id)===Number(x.personnel_id));
-      const replacement=personnel.find(p=>Number(p.id)===Number(x.replacement_personnel_id));
+      const person=x.person||{};
+      const replacement=x.replacement||{};
       const st=stations.find(z=>Number(z.station_id)===Number(x.station_id));
       const ap=apparatus.find(z=>Number(z.apparatus_id)===Number(x.apparatus_id));
       const duration=x.is_full_shift?"Full shift":((x.start_time||"")+(x.end_time?"–"+x.end_time:""));
