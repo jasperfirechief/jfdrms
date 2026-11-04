@@ -28,7 +28,33 @@ window.rmsLogin=async function(e){
 <nav class="bg-white border-b overflow-x-auto"><div class="max-w-7xl mx-auto px-4 flex gap-5"><button id="n-home" onclick="tab('home')" class="navbtn py-3 text-sm font-semibold">Home</button><button id="n-staffing" onclick="tab('staffing')" class="navbtn py-3 text-sm font-semibold">Staffing</button><button id="n-checks" onclick="tab('checks')" class="navbtn py-3 text-sm font-semibold">Apparatus Checks</button><button id="n-incidents" onclick="tab('incidents')" class="navbtn py-3 text-sm font-semibold">Incidents</button><button id="n-hydrants" onclick="tab('hydrants')" class="navbtn py-3 text-sm font-semibold">Hydrants</button><button id="n-preplans" onclick="tab('preplans')" class="navbtn py-3 text-sm font-semibold">Preplans</button><button id="n-inspections" onclick="tab('inspections')" class="navbtn py-3 text-sm font-semibold">Inspections</button><button id="n-reports" onclick="tab('reports')" class="navbtn py-3 text-sm font-semibold">Reports</button><button id="n-admin" onclick="tab('admin')" class="navbtn py-3 text-sm font-semibold">Admin</button></div></nav>
 <main class="max-w-7xl mx-auto p-4"><div id="appError" class="hiddenx mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"></div>
 <section id="t-home"><h1 class="text-2xl font-black">Department RMS</h1><p class="text-slate-500 mb-5">Operational records and daily staffing.</p><div id="homeCards" class="grid md:grid-cols-2 lg:grid-cols-4 gap-4"></div></section>
-<section id="t-staffing" class="hiddenx"><div class="flex flex-wrap justify-between gap-3 mb-5"><div><h1 class="text-2xl font-black">Daily Staffing</h1><p class="text-slate-500">Choose a date on the calendar to view or schedule station, apparatus, and crew assignments.</p></div><div class="flex flex-wrap items-end gap-2"><label class="text-sm font-semibold">Shift Start Date<input id="staffDate" type="date" class="block border rounded-lg p-2 bg-white mt-1"></label><label class="text-sm font-semibold">Select Shift<select id="staffShift" class="block border rounded-lg p-2 bg-white mt-1"><option value="A">A Shift</option><option value="B">B Shift</option><option value="C">C Shift</option></select></label></div></div><div id="staffStationCards" class="mb-5"><div id="staffGrid" class="grid lg:grid-cols-3 gap-4"></div></div><div class="card p-4 mb-5"><div class="flex flex-wrap items-center justify-between gap-3 mb-3"><div><h2 class="font-black text-lg">Staffing Calendar</h2><p class="text-xs text-slate-500">Dates with a saved staffing record are marked. Select any date to view or schedule that shift.</p></div><div class="flex items-center gap-2"><button type="button" onclick="changeStaffCalendarMonth(-1)" class="border rounded-lg px-3 py-2 font-bold" aria-label="Previous month">‹</button><strong id="staffCalendarMonth" class="min-w-36 text-center"></strong><button type="button" onclick="changeStaffCalendarMonth(1)" class="border rounded-lg px-3 py-2 font-bold" aria-label="Next month">›</button><button type="button" onclick="goStaffCalendarToday()" class="border rounded-lg px-3 py-2 font-semibold">Today</button></div></div><div class="grid grid-cols-7 gap-1 text-center text-xs font-bold text-slate-500 mb-1"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div><div id="staffCalendarGrid" class="grid grid-cols-7 gap-1"></div><div id="staffCalendarDetails" class="mt-4 border-t pt-4"><p class="text-sm text-slate-500">Select a date to view saved staffing assignments.</p></div></div><div id="staffingModal" class="hiddenx fixed inset-0 z-50 bg-slate-950/60 p-4 overflow-y-auto"><div class="max-w-3xl mx-auto mt-6 card p-5"><div class="flex justify-between items-center gap-3 mb-4"><div><h2 id="staffingModalTitle" class="text-xl font-black"></h2><p id="staffingModalDate" class="text-sm text-slate-500"></p></div><button onclick="closeStaffingModal()" class="border px-3 py-2 rounded font-bold">Close</button></div><div id="stationApparatusList" class="space-y-3"></div></div></div></section>
+<section id="t-staffing" class="hiddenx"><div class="flex flex-wrap justify-between gap-3 mb-5"><div><h1 class="text-2xl font-black">Daily Staffing</h1><p class="text-slate-500">Choose a date on the calendar to view or schedule station, apparatus, and crew assignments.</p></div><div class="flex flex-wrap items-end gap-2"><label class="text-sm font-semibold">Shift Start Date<input id="staffDate" type="date" class="block border rounded-lg p-2 bg-white mt-1"></label><label class="text-sm font-semibold">Select Shift<select id="staffShift" class="block border rounded-lg p-2 bg-white mt-1"><option value="A">A Shift</option><option value="B">B Shift</option><option value="C">C Shift</option></select></label></div></div><div id="staffStationCards" class="mb-5"><div id="staffGrid" class="grid lg:grid-cols-3 gap-4"></div></div><div id="staffingActivityEditor" class="card p-4 mb-5 hiddenx">
+  <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+    <div><h2 class="font-black text-lg">Personnel Changes & Leave</h2><p class="text-sm text-slate-500">Record swaps, absences, and the time used for this shift. These entries appear on the calendar and daily staffing report.</p></div>
+    <span class="text-xs text-slate-500">Officer / Administrator entry</span>
+  </div>
+  <input id="staffEventId" type="hidden">
+  <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+    <label class="text-sm font-semibold">Entry type<select id="staffEventType" onchange="updateStaffEventForm()" class="block w-full border rounded-lg p-2 mt-1 bg-white"><option value="leave">Personnel off / leave</option><option value="swap">Personnel swap</option></select></label>
+    <label class="text-sm font-semibold">Employee<select id="staffEventPerson" class="block w-full border rounded-lg p-2 mt-1 bg-white"><option value="">Select employee</option></select></label>
+    <label class="text-sm font-semibold" id="staffEventReplacementWrap">Replacement / swapped with<select id="staffEventReplacement" class="block w-full border rounded-lg p-2 mt-1 bg-white"><option value="">Select replacement</option></select></label>
+    <label id="staffEventLeaveTypeWrap" class="text-sm font-semibold">Leave type<select id="staffEventLeaveType" class="block w-full border rounded-lg p-2 mt-1 bg-white"><option value="sick">Sick</option><option value="vacation">Vacation</option><option value="kelly_day">Kelly Day</option><option value="other">Other</option></select></label>
+    <label class="text-sm font-semibold">Station<select id="staffEventStation" class="block w-full border rounded-lg p-2 mt-1 bg-white"><option value="">Not specified</option></select></label>
+    <label class="text-sm font-semibold">Apparatus<select id="staffEventApparatus" class="block w-full border rounded-lg p-2 mt-1 bg-white"><option value="">Not specified</option></select></label>
+  </div>
+  <div class="mt-3 flex flex-wrap items-center gap-4">
+    <label class="inline-flex items-center gap-2 text-sm font-semibold"><input id="staffEventFullShift" type="checkbox" checked onchange="updateStaffEventForm()" class="h-4 w-4"> Full shift</label>
+    <label id="staffEventStartWrap" class="text-sm font-semibold hiddenx">Start time<input id="staffEventStart" type="time" class="block border rounded-lg p-2 mt-1 bg-white"></label>
+    <label id="staffEventEndWrap" class="text-sm font-semibold hiddenx">End time<input id="staffEventEnd" type="time" class="block border rounded-lg p-2 mt-1 bg-white"></label>
+  </div>
+  <label class="block text-sm font-semibold mt-3">Notes<textarea id="staffEventNotes" rows="2" class="block w-full border rounded-lg p-2 mt-1 bg-white" placeholder="Optional details about the leave, swap, or coverage"></textarea></label>
+  <div class="flex flex-wrap justify-end gap-2 mt-4">
+    <button id="staffEventCancel" type="button" onclick="resetStaffEventForm()" class="hiddenx border rounded-lg px-4 py-2 font-bold">Cancel edit</button>
+    <button type="button" onclick="saveStaffingEvent()" class="bg-red-600 text-white rounded-lg px-4 py-2 font-bold">Save Personnel Entry</button>
+  </div>
+  <div id="staffEventExisting" class="mt-4 border-t pt-4"><p class="text-sm text-slate-500">Select a shift to view its personnel changes and leave entries.</p></div>
+</div>
+<div class="card p-4 mb-5"><div class="flex flex-wrap items-center justify-between gap-3 mb-3"><div><h2 class="font-black text-lg">Staffing Calendar</h2><p class="text-xs text-slate-500">Dates with a saved staffing record are marked. Select any date to view or schedule that shift.</p></div><div class="flex items-center gap-2"><button type="button" onclick="changeStaffCalendarMonth(-1)" class="border rounded-lg px-3 py-2 font-bold" aria-label="Previous month">‹</button><strong id="staffCalendarMonth" class="min-w-36 text-center"></strong><button type="button" onclick="changeStaffCalendarMonth(1)" class="border rounded-lg px-3 py-2 font-bold" aria-label="Next month">›</button><button type="button" onclick="goStaffCalendarToday()" class="border rounded-lg px-3 py-2 font-semibold">Today</button></div></div><div class="grid grid-cols-7 gap-1 text-center text-xs font-bold text-slate-500 mb-1"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div><div id="staffCalendarGrid" class="grid grid-cols-7 gap-1"></div><div id="staffCalendarDetails" class="mt-4 border-t pt-4"><p class="text-sm text-slate-500">Select a date to view saved staffing assignments.</p></div></div><div id="staffingModal" class="hiddenx fixed inset-0 z-50 bg-slate-950/60 p-4 overflow-y-auto"><div class="max-w-3xl mx-auto mt-6 card p-5"><div class="flex justify-between items-center gap-3 mb-4"><div><h2 id="staffingModalTitle" class="text-xl font-black"></h2><p id="staffingModalDate" class="text-sm text-slate-500"></p></div><button onclick="closeStaffingModal()" class="border px-3 py-2 rounded font-bold">Close</button></div><div id="stationApparatusList" class="space-y-3"></div></div></div></section>
 <section id="t-reports" class="hiddenx"><div class="flex flex-wrap justify-between gap-3 mb-5"><div><h1 class="text-2xl font-black">Reports</h1><p class="text-slate-500">Choose the report queue or search area you need.</p></div><button onclick="renderReports()" class="border px-3 py-2 rounded-lg font-bold">Refresh</button></div><div id="reportsList" class="space-y-4"></div></section><section id="t-preplans" class="hiddenx">
 <div class="flex flex-wrap justify-between items-start gap-3 mb-4"><div><h1 class="text-2xl font-black">Pre-Incident Plans</h1><p class="text-sm text-slate-500 mt-1">Select a property on the map to create or open its preplan. All active personnel can view preplans; only officers and administrators can create, edit, or delete them.</p></div><button id="preplanPlaceButton" type="button" class="bg-red-600 text-white rounded-lg px-4 py-2 font-bold">Add Preplan Location</button></div>
 <div id="preplanPlaceHint" class="text-sm text-blue-800 mb-2"></div><div id="preplanStatus" class="text-sm text-slate-500 mb-3">Loading preplans…</div>
@@ -522,7 +548,7 @@ window.rmsLogout=async function(){
   if(btn){btn.disabled=false;btn.textContent="Sign in";}
   if(signoutButton){signoutButton.disabled=false;signoutButton.textContent="Sign out";}
 };
-async function refresh(){const [p,s,a]=await Promise.all([db.from("personnel").select("*").eq("active",true).order("last_name"),db.from("stations").select("*").eq("active",true).order("station_id"),db.from("apparatus").select("*").eq("active",true).order("apparatus_id")]);personnel=p.data||[];stations=s.data||[];apparatus=a.data||[];await loadCrew();renderHome();renderApparatus();renderPersonnel();renderAdmin();$("staffStationCards")?.classList.toggle("hiddenx",!canStaff());$("n-hydrants")?.classList.toggle("hiddenx",!["admin","officer"].includes(String(profile?.app_role||"")));$("n-inspections")?.classList.toggle("hiddenx",!canInspect());$("n-reports")?.classList.toggle("hiddenx",profile?.app_role!=="admin");$("n-admin")?.classList.toggle("hiddenx",profile?.app_role!=="admin");if(profile?.app_role!=="admin"&&activeTab==="admin")tab("home");await renderStaffCalendar()}
+async function refresh(){const [p,s,a]=await Promise.all([db.from("personnel").select("*").eq("active",true).order("last_name"),db.from("stations").select("*").eq("active",true).order("station_id"),db.from("apparatus").select("*").eq("active",true).order("apparatus_id")]);personnel=p.data||[];stations=s.data||[];apparatus=a.data||[];renderStaffingEventOptions();$("staffingActivityEditor")?.classList.toggle("hiddenx",!canStaff());await loadCrew();renderHome();renderApparatus();renderPersonnel();renderAdmin();$("staffStationCards")?.classList.toggle("hiddenx",!canStaff());$("n-hydrants")?.classList.toggle("hiddenx",!["admin","officer"].includes(String(profile?.app_role||"")));$("n-inspections")?.classList.toggle("hiddenx",!canInspect());$("n-reports")?.classList.toggle("hiddenx",profile?.app_role!=="admin");$("n-admin")?.classList.toggle("hiddenx",profile?.app_role!=="admin");if(profile?.app_role!=="admin"&&activeTab==="admin")tab("home");await renderStaffCalendar()}
 async function loadCrew(){crew=[];if(!me)return;const cp=await db.from("personnel").select("id,shift").eq("auth_user_id",me.id).maybeSingle();if(cp.error||!cp.data?.id)return;const shift=String(cp.data.shift||"A").trim()||"A";const r=await db.from("daily_staffing").select("staffing_id").eq("staffing_date",today()).eq("shift",shift).maybeSingle();if(r.error||!r.data)return;const x=await db.from("daily_personnel_assignments").select("*,daily_app_assignments!inner(apparatus_id,staffing_id)").eq("daily_app_assignments.staffing_id",r.data.staffing_id).eq("personnel_id",cp.data.id);crew=x.data||[]}
 async function loadAdminData(){
   if(!db)return;
@@ -778,6 +804,7 @@ async function loadStaffing(preferred={}){
   const a=await db.from("daily_app_assignments").select("assignment_id,station_id,apparatus_id,daily_personnel_assignments(assignment_id,personnel_id,assignment_role,personnel(id,first_name,last_name,shift))").eq("staffing_id",sid);
   if(a.error)return alert(a.error.message);
   const rows=a.data||[];
+  await renderStaffingEventList(sid);
   $("staffGrid").innerHTML=stations.map(s=>{
     const sr=rows.filter(x=>Number(x.station_id)===Number(s.station_id));
     const crewed=sr.filter(x=>(x.daily_personnel_assignments||[]).length>0).length;
@@ -1053,6 +1080,88 @@ function addNerisTypeField(){
   const wrap=anchor.parentElement?.parentElement; if(!wrap)return;
 }
 let staffCalendarCursor=null,staffCalendarRecords=new Set(),staffCalendarRequest=0;
+function staffEventName(id){const p=personnel.find(x=>Number(x.id)===Number(id));return p?[p.first_name,p.last_name].filter(Boolean).join(" "):"Unknown employee"}
+function renderStaffingEventOptions(){
+  const fill=(id,items,placeholder,mapper)=>{const el=$(id);if(!el)return;const prior=el.value;el.innerHTML='<option value="">'+placeholder+'</option>'+items.map(x=>'<option value="'+Number(mapper(x).id)+'">'+esc(mapper(x).label)+'</option>').join("");if([...el.options].some(o=>o.value===prior))el.value=prior};
+  const active=(personnel||[]).filter(p=>p.active!==false).sort((a,b)=>(a.last_name||"").localeCompare(b.last_name||""));
+  fill("staffEventPerson",active,"Select employee",p=>({id:p.id,label:[p.first_name,p.last_name].filter(Boolean).join(" ")}));
+  fill("staffEventReplacement",active,"Select replacement",p=>({id:p.id,label:[p.first_name,p.last_name].filter(Boolean).join(" ")}));
+  fill("staffEventStation",stations||[],"Not specified",s=>({id:s.station_id,label:s.station_name}));
+  fill("staffEventApparatus",apparatus||[],"Not specified",a=>({id:a.apparatus_id,label:a.unit_number}));
+  updateStaffEventForm();
+}
+function updateStaffEventForm(){
+  const swap=$("staffEventType")?.value==="swap",full=$("staffEventFullShift")?.checked!==false;
+  $("staffEventReplacementWrap")?.classList.toggle("hiddenx",false);
+  $("staffEventReplacement")?.toggleAttribute("required",swap);
+  $("staffEventLeaveTypeWrap")?.classList.toggle("hiddenx",swap);
+  $("staffEventStartWrap")?.classList.toggle("hiddenx",full);
+  $("staffEventEndWrap")?.classList.toggle("hiddenx",full);
+}
+function resetStaffEventForm(){
+  if($("staffEventId"))$("staffEventId").value="";
+  if($("staffEventType"))$("staffEventType").value="leave";
+  if($("staffEventPerson"))$("staffEventPerson").value="";
+  if($("staffEventReplacement"))$("staffEventReplacement").value="";
+  if($("staffEventLeaveType"))$("staffEventLeaveType").value="sick";
+  if($("staffEventStation"))$("staffEventStation").value="";
+  if($("staffEventApparatus"))$("staffEventApparatus").value="";
+  if($("staffEventFullShift"))$("staffEventFullShift").checked=true;
+  if($("staffEventStart"))$("staffEventStart").value="";
+  if($("staffEventEnd"))$("staffEventEnd").value="";
+  if($("staffEventNotes"))$("staffEventNotes").value="";
+  $("staffEventCancel")?.classList.add("hiddenx");
+  updateStaffEventForm();
+}
+async function renderStaffingEventList(staffingId){
+  const out=$("staffEventExisting");if(!out||!canStaff()||!db)return;
+  const r=await db.from("daily_staffing_events").select("*").eq("staffing_id",staffingId).order("created_at");
+  if(r.error){out.innerHTML='<p class="text-sm text-red-700">Unable to load personnel entries: '+esc(r.error.message)+'</p>';return}
+  const rows=r.data||[];
+  out.innerHTML='<h3 class="font-bold mb-2">Saved personnel entries</h3>'+(rows.length?rows.map(x=>{
+    const duration=x.is_full_shift?"Full shift":((x.start_time||"")+(x.end_time?"–"+x.end_time:""));
+    const type=x.event_type==="swap"?"Personnel swap":(String(x.leave_type||"Leave").replace("_"," "));
+    const station=stations.find(s=>Number(s.station_id)===Number(x.station_id))?.station_name||"";
+    const unit=apparatus.find(a=>Number(a.apparatus_id)===Number(x.apparatus_id))?.unit_number||"";
+    return '<div class="flex flex-wrap items-start justify-between gap-3 border rounded-lg p-3 mb-2"><div class="min-w-0"><div class="font-semibold">'+esc(type)+' · '+esc(staffEventName(x.personnel_id))+(x.replacement_personnel_id?' → '+esc(staffEventName(x.replacement_personnel_id)):'')+'</div><div class="text-xs text-slate-500 mt-1">'+esc([station,unit,duration].filter(Boolean).join(" · "))+'</div>'+(x.notes?'<div class="text-sm mt-1">'+esc(x.notes)+'</div>':'')+'</div><div class="flex gap-2 shrink-0"><button type="button" onclick="editStaffingEvent(\''+x.event_id+'\')" class="border rounded px-3 py-1 text-sm font-semibold">Edit</button><button type="button" onclick="deleteStaffingEvent(\''+x.event_id+'\')" class="border border-red-200 text-red-700 rounded px-3 py-1 text-sm font-semibold">Delete</button></div></div>';
+  }).join(""):'<p class="text-sm text-slate-500">No personnel changes or leave entries recorded for this shift.</p>');
+}
+async function saveStaffingEvent(){
+  if(!canStaff()||!db)return alert("Only officers and administrators can edit staffing.");
+  const date=$("staffDate").value||today(),shift=$("staffShift").value||"A";
+  const eventType=$("staffEventType").value,personnelId=Number($("staffEventPerson").value||0),replacementId=Number($("staffEventReplacement").value||0);
+  const full=$("staffEventFullShift").checked;
+  if(!personnelId)return alert("Select the employee.");
+  if(eventType==="swap"&&(!replacementId||replacementId===personnelId))return alert("Select a different replacement employee for this swap.");
+  if(!full&&(!$("staffEventStart").value||!$("staffEventEnd").value))return alert("Enter both start and end times for a partial-shift entry.");
+  const base=await getOrCreateStaffing(date,shift);if(base.error)return alert(base.error.message);
+  const payload={staffing_id:base.data.staffing_id,event_type:eventType,personnel_id:personnelId,replacement_personnel_id:replacementId||null,station_id:Number($("staffEventStation").value)||null,apparatus_id:Number($("staffEventApparatus").value)||null,leave_type:eventType==="swap"?"swap":$("staffEventLeaveType").value,is_full_shift:full,start_time:full?null:$("staffEventStart").value,end_time:full?null:$("staffEventEnd").value,notes:$("staffEventNotes").value.trim()||null,created_by:me?.id||null};
+  const id=$("staffEventId").value;
+  const result=id?await db.from("daily_staffing_events").update(payload).eq("event_id",id):await db.from("daily_staffing_events").insert(payload);
+  if(result.error)return alert("Could not save personnel entry: "+result.error.message);
+  resetStaffEventForm();
+  await renderStaffingEventList(base.data.staffing_id);
+  await renderStaffCalendar();
+  await renderStaffingCalendarDetails(date,shift);
+}
+async function editStaffingEvent(id){
+  const r=await db.from("daily_staffing_events").select("*").eq("event_id",id).maybeSingle();if(r.error||!r.data)return alert(r.error?.message||"Personnel entry not found.");
+  const x=r.data;
+  $("staffEventId").value=x.event_id;$("staffEventType").value=x.event_type;$("staffEventPerson").value=String(x.personnel_id);$("staffEventReplacement").value=x.replacement_personnel_id?String(x.replacement_personnel_id):"";
+  if(x.leave_type!=="swap")$("staffEventLeaveType").value=x.leave_type;
+  $("staffEventStation").value=x.station_id?String(x.station_id):"";$("staffEventApparatus").value=x.apparatus_id?String(x.apparatus_id):"";
+  $("staffEventFullShift").checked=!!x.is_full_shift;$("staffEventStart").value=x.start_time||"";$("staffEventEnd").value=x.end_time||"";$("staffEventNotes").value=x.notes||"";
+  $("staffEventCancel")?.classList.remove("hiddenx");updateStaffEventForm();
+  $("staffingActivityEditor")?.scrollIntoView({behavior:"smooth",block:"start"});
+}
+async function deleteStaffingEvent(id){
+  if(!canStaff()||!confirm("Delete this personnel entry?"))return;
+  const r=await db.from("daily_staffing_events").delete().eq("event_id",id);if(r.error)return alert(r.error.message);
+  const d=$("staffDate").value||today(),shift=$("staffShift").value||"A";
+  const s=await db.from("daily_staffing").select("staffing_id").eq("staffing_date",d).eq("shift",shift).maybeSingle();
+  if(s.data)await renderStaffingEventList(s.data.staffing_id);
+  await renderStaffCalendar();await renderStaffingCalendarDetails(d,shift);
+}
 function staffDateParts(s){const [y,m,d]=String(s||"").split("-").map(Number);return {y,m,d}}
 function staffDateKey(y,m,d){return y+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0")}
 function changeStaffCalendarMonth(delta){const base=staffCalendarCursor||new Date();staffCalendarCursor=new Date(base.getFullYear(),base.getMonth()+delta,1);renderStaffCalendar()}
@@ -1064,15 +1173,23 @@ async function renderStaffCalendar(){
   const y=staffCalendarCursor.getFullYear(),m=staffCalendarCursor.getMonth(),first=new Date(y,m,1),days=new Date(y,m+1,0).getDate(),start=first.getDay(),shift=$("staffShift")?.value||"A";
   heading.textContent=first.toLocaleDateString("en-US",{month:"long",year:"numeric"});
   const token=++staffCalendarRequest,from=staffDateKey(y,m+1,1),to=staffDateKey(y,m+1,days);
-  const q=db?await db.from("daily_staffing").select("staffing_date").eq("shift",shift).gte("staffing_date",from).lte("staffing_date",to):{data:[],error:null};
+  const q=db?await db.from("daily_staffing").select("staffing_id,staffing_date").eq("shift",shift).gte("staffing_date",from).lte("staffing_date",to):{data:[],error:null};
   if(token!==staffCalendarRequest)return;
   if(q.error){grid.innerHTML='<div class="col-span-7 text-sm text-amber-700 p-2">Could not load calendar records: '+esc(q.error.message)+'</div>';return}
   staffCalendarRecords=new Set((q.data||[]).map(x=>String(x.staffing_date).slice(0,10)));
+  const staffingIds=(q.data||[]).map(x=>x.staffing_id).filter(Boolean);
+  const eventCounts=new Map();
+  if(staffingIds.length){
+    const ev=await db.from("daily_staffing_events").select("staffing_id,event_type").in("staffing_id",staffingIds);
+    if(!ev.error)(ev.data||[]).forEach(x=>eventCounts.set(Number(x.staffing_id),(eventCounts.get(Number(x.staffing_id))||0)+1));
+  }
+  const staffingIdByDate=new Map((q.data||[]).map(x=>[String(x.staffing_date).slice(0,10),Number(x.staffing_id)]));
   const cells=[];
   for(let i=0;i<start;i++)cells.push('<div class="min-h-16 rounded-lg bg-slate-50/70"></div>');
   for(let d=1;d<=days;d++){
-    const key=staffDateKey(y,m+1,d),selected=key===date,isToday=key===today(),has=staffCalendarRecords.has(key);
-    cells.push('<button type="button" data-staff-calendar-date="'+key+'" class="min-h-16 sm:min-h-20 rounded-lg border p-2 text-left flex flex-col justify-between '+(selected?'border-blue-700 bg-blue-50 ring-1 ring-blue-700':isToday?'border-red-400 bg-red-50':'border-slate-200 bg-white hover:bg-slate-50')+'" aria-label="Select '+key+'"><span class="text-sm font-bold '+(isToday?'text-red-700':'text-slate-800')+'">'+d+'</span><span class="flex items-center justify-between"><span class="text-[10px] '+(has?'text-blue-800 font-semibold':'text-slate-400')+'">'+(has?'Staffing saved':'')+'</span>'+(has?'<span class="inline-block w-2 h-2 rounded-full bg-blue-700"></span>':'')+'</span></button>');
+    const key=staffDateKey(y,m+1,d),selected=key===date,isToday=key===today(),has=staffCalendarRecords.has(key),eventCount=eventCounts.get(staffingIdByDate.get(key))||0;
+    const status=has?(eventCount?("Staffing · "+eventCount+" change"+(eventCount===1?"":"s"):"Staffing saved"):""):"";
+    cells.push('<button type="button" data-staff-calendar-date="'+key+'" class="min-h-16 sm:min-h-20 rounded-lg border p-2 text-left flex flex-col justify-between '+(selected?'border-blue-700 bg-blue-50 ring-1 ring-blue-700':isToday?'border-red-400 bg-red-50':'border-slate-200 bg-white hover:bg-slate-50')+'" aria-label="Select '+key+'"><span class="text-sm font-bold '+(isToday?'text-red-700':'text-slate-800')+'">'+d+'</span><span class="flex items-center justify-between"><span class="text-[10px] '+(has?'text-blue-800 font-semibold':'text-slate-400')+'">'+status+'</span>'+(has?'<span class="inline-block w-2 h-2 rounded-full bg-blue-700"></span>':'')+'</span></button>');
   }
   grid.innerHTML=cells.join("");
   grid.onclick=event=>{const day=event.target.closest("[data-staff-calendar-date]");if(day)selectStaffCalendarDate(day.dataset.staffCalendarDate)};
@@ -1097,6 +1214,8 @@ async function renderStaffingCalendarDetails(date,shift){
     const a=await db.from("daily_app_assignments").select("station_id,apparatus_id,daily_personnel_assignments(assignment_role,personnel(first_name,last_name))").eq("staffing_id",s.data.staffing_id);
     if(a.error)throw a.error;
     const rows=a.data||[];
+    const ev=await db.from("daily_staffing_events").select("*").eq("staffing_id",s.data.staffing_id).order("created_at");
+    if(ev.error)throw ev.error;
     const sections=stations.map(st=>{
       const assigned=rows.filter(x=>Number(x.station_id)===Number(st.station_id));
       if(!assigned.length)return "";
@@ -1106,7 +1225,16 @@ async function renderStaffingCalendarDetails(date,shift){
         return '<div class="text-sm mt-2"><b>'+esc(ap?.unit_number||"Apparatus")+'</b>'+(crew?' — '+crew:' — No crew assigned')+'</div>';
       }).join("")+'</div>';
     }).join("");
-    out.innerHTML='<h3 class="font-bold mb-3">'+esc(date)+' · '+esc(shift)+' Shift Staffing</h3>'+(sections||'<p class="text-sm text-slate-500">No apparatus assignments have been saved.</p>');
+    const eventHtml=(ev.data||[]).map(x=>{
+      const person=personnel.find(p=>Number(p.id)===Number(x.personnel_id));
+      const replacement=personnel.find(p=>Number(p.id)===Number(x.replacement_personnel_id));
+      const st=stations.find(z=>Number(z.station_id)===Number(x.station_id));
+      const ap=apparatus.find(z=>Number(z.apparatus_id)===Number(x.apparatus_id));
+      const duration=x.is_full_shift?"Full shift":((x.start_time||"")+(x.end_time?"–"+x.end_time:""));
+      const type=x.event_type==="swap"?"Personnel swap":(String(x.leave_type||"Leave").replace("_"," "));
+      return '<div class="rounded-lg border p-3 mb-2"><div class="font-semibold">'+esc(type)+'</div><div class="text-sm mt-1">'+esc((person?.first_name||"")+' '+(person?.last_name||""))+(replacement?' → '+esc(replacement.first_name+' '+replacement.last_name):'')+'</div><div class="text-xs text-slate-500 mt-1">'+esc([st?.station_name,ap?.unit_number,duration].filter(Boolean).join(' · '))+'</div>'+(x.notes?'<p class="text-sm mt-2">'+esc(x.notes)+'</p>':'')+'</div>';
+    }).join("");
+    out.innerHTML='<h3 class="font-bold mb-3">'+esc(date)+' · '+esc(shift)+' Shift Staffing</h3>'+(sections||'<p class="text-sm text-slate-500">No apparatus assignments have been saved.</p>')+'<h4 class="font-bold mt-5 mb-2">Personnel Changes & Leave</h4>'+(eventHtml||'<p class="text-sm text-slate-500">No personnel changes or leave entries recorded.</p>');
   }catch(err){out.innerHTML='<p class="text-sm text-red-700">Unable to load staffing: '+esc(err.message||String(err))+'</p>'}
 }
 window.selectStaffCalendarDate=selectStaffCalendarDate;
