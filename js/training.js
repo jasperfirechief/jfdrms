@@ -55,6 +55,16 @@
     return '<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2" id="'+id+'">'+people.map(p=>'<label class="flex items-center gap-2 border rounded-lg px-3 py-2 text-sm"><input type="checkbox" value="'+Number(p.id)+'" '+(checked.has(Number(p.id))?'checked':'')+'><span>'+esc(p.first_name+" "+p.last_name)+'</span><span class="ml-auto text-xs text-slate-400">'+esc(p.shift||"")+'</span></label>').join("")+'</div>';
   }
   function checkedIds(id){return Array.from($(id)?.querySelectorAll('input[type="checkbox"]:checked')||[]).map(x=>Number(x.value));}
+  async function ensureScheduleYear(year) {
+    if(year<2027)return;
+    const from=year+"-01-01",to=year+"-12-31";
+    const existing=await db.from("training_schedule").select("id").gte("schedule_date",from).lte("schedule_date",to).limit(1);
+    if(existing.error)throw existing.error;
+    if(!existing.data?.length){
+      const generated=await db.rpc("ensure_training_schedule_year",{target_year:year});
+      if(generated.error)throw generated.error;
+    }
+  }
   async function getSchedule(date,shift) {
     const r=await db.from("training_schedule").select("*").eq("schedule_date",date).eq("shift",shift).maybeSingle();
     if(r.error)throw r.error;return r.data||null;
@@ -115,6 +125,7 @@
     $("trainingDailyOfficer").value=signedName();
     $("trainingDailyPeople").textContent="Loading staffed personnel…";
     try {
+      await ensureScheduleYear(Number(date.slice(0,4)));
       const [schedule,staffed]=await Promise.all([getSchedule(date,shift),getStaffed(date,shift)]);
       $("trainingDailySubject").value=schedule?.subject||"";
       $("trainingDailyLesson").value=schedule?.lesson||"";
