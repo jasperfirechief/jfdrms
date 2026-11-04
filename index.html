@@ -958,6 +958,15 @@ async function submitApparatusCheck(){
   const problemCount=answers.filter(x=>x.status!=="ok").length;
   const r=await db.from("apparatus_checks").insert({apparatus_id:window.checkState.apparatusId,performed_by:me?.id||null,check_date:today(),status:problemCount?"attention":"ready",checklist:answers,notes:$("checkNotes")?.value||null,check_time:new Date().toLocaleTimeString("en-US",{timeZone:JFD_TIME_ZONE,hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"}),problem_count:problemCount,email_status:problemCount?"pending":"not_required"}).select("check_id").maybeSingle();
   if(r.error)return alert("Could not save apparatus check: "+r.error.message);
+  if(problemCount){
+    try{
+      const session=(await db.auth.getSession()).data?.session;
+      if(!session)throw new Error("Authentication required.");
+      const alertResponse=await fetch("/api/apparatus-problem-alert",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({check_id:r.data?.check_id})});
+      let alertResult={};try{alertResult=await alertResponse.json()}catch{}
+      if(!alertResponse.ok)console.error("Apparatus problem email notification failed:",alertResult.error||alertResponse.statusText);
+    }catch(notificationError){console.error("Apparatus problem email notification failed:",notificationError);}
+  }
   alert(problemCount?"Check saved with items needing attention.":"Apparatus check completed.");
   closeCheckModal();
 }
