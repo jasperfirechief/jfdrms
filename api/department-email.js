@@ -16,7 +16,7 @@ export default async function handler(req,res){
   else {recipients=await rows("users?select=email&active=eq.true&app_role=eq.officer&email=not.is.null");}
   const emails=[...new Set(recipients.map(x=>String(x.email||"").trim().toLowerCase()).filter(x=>/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(x)))];
   if(!emails.length)return res.status(400).json({error:"No active recipients with valid email addresses were found."});
-  const payload={sender:{email:process.env.BREVO_FROM_EMAIL,name:"Jasper Fire Department"},to:[{email:process.env.BREVO_FROM_EMAIL}],bcc:emails.map(email=>({email})),subject:"Jasper Fire Department: "+String(subject).trim().slice(0,180),textContent:String(message).trim().slice(0,20000)};
+  const payload={sender:{email:process.env.BREVO_FROM_EMAIL,name:"Jasper Fire Department"},to:[{email:emails[0]}],bcc:emails.slice(1).map(email=>({email})),subject:"Jasper Fire Department: "+String(subject).trim().slice(0,180),textContent:String(message).trim().slice(0,20000)};
   const sent=await fetch("https://api.brevo.com/v3/smtp/email",{method:"POST",headers:{"api-key":process.env.BREVO_API_KEY,"Content-Type":"application/json","accept":"application/json"},body:JSON.stringify(payload)});
   if(!sent.ok)throw new Error("Brevo delivery failed: "+(await sent.text()).slice(0,500));
   return res.status(200).json({ok:true,recipient_count:emails.length});
