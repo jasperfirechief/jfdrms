@@ -809,7 +809,7 @@ async function makeArchivePdf(kind,data){
   kv("Signed at",x.signed_at?date(x.signed_at)+" "+time(x.signed_at):"");
   section("PERSONNEL ATTENDANCE");
   const attendees=Array.isArray(x.training_attendees)?x.training_attendees:[];
-  if(attendees.length){for(const a of attendees){const name=[a.personnel?.first_name,a.personnel?.last_name].filter(Boolean).join(" ")||"Personnel";kv(name,Number(a.hours||0).toFixed(2)+" training hours");}}
+  if(attendees.length){for(const a of attendees){const name=a.personnel_name||[a.personnel?.first_name,a.personnel?.last_name].filter(Boolean).join(" ")||"Personnel";kv(name,(a.shift_at_training?a.shift_at_training+" Shift · ":"")+Number(a.hours||0).toFixed(2)+" training hours");}}
   else kv("Attendance","No personnel recorded.");
   safeDrawText(page,"JFD RMS • Training Report",{x:m,y:30,font:F.reg,size:7,color:rgb(.4,.4,.4)});
   return pdf.save({objectsPerTick:Infinity});
