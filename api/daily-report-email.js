@@ -187,14 +187,14 @@ async function makeStandaloneReportPdf(incident, report) {
   return makeIncidentPdf(synthetic);
 }
 
-async function sendEmail(attachments,shiftStart,shiftEnd,incidentCount,reportCount) {
+async function sendEmail(attachments,shiftStart,shiftEnd,incidentCount,reportCount,activitySummary) {
   const key=process.env.BREVO_API_KEY,from=process.env.BREVO_FROM_EMAIL;
   if(!key||!from) throw new Error("Brevo email is not configured. Add BREVO_API_KEY and BREVO_FROM_EMAIL in Vercel.");
   const payload={
     sender:{email:from,name:"Jasper Fire Department"},
     to:[{email:"firechief@jaspercity.com"}],
     subject:"Jasper Fire Department - Daily Shift Reports - "+shiftStart+" to "+shiftEnd,
-    textContent:"Daily shift package for "+shiftStart+" through "+shiftEnd+"\\n\\nIncidents: "+incidentCount+"\\nSubmitted reports: "+reportCount+"\\nAttachments: "+attachments.length,
+    textContent:"Daily shift package for "+shiftStart+" through "+shiftEnd+"\\n\\n"+activitySummary+"\\n\\nIncidents: "+incidentCount+"\\nSubmitted reports: "+reportCount+"\\nAttachments: "+attachments.length,
     attachment:attachments.map(a=>({content:a.content,name:a.filename}))
   };
   const r=await fetch("https://api.brevo.com/v3/smtp/email",{method:"POST",headers:{"api-key":key,"Content-Type":"application/json","accept":"application/json"},body:JSON.stringify(payload)});
@@ -225,6 +225,30 @@ export default async function handler(req,res) {
     const checks=await supa("apparatus_checks?select=*&check_date=eq."+shiftStart+"&order=apparatus_id,check_time");
     const incidents=await supa("incidents?select=*&dispatch_time=gte."+encodeURIComponent(startUtc)+"&dispatch_time=lt."+encodeURIComponent(endUtc)+"&order=dispatch_time");
     const standalone=await supa("standalone_reports?select=*&created_at=gte."+encodeURIComponent(startUtc)+"&created_at=lt."+encodeURIComponent(endUtc)+"&order=created_at");
+    const [hydrantInspections,hydrantFlowTests,preplans,activityPersonnel]=await Promise.all([
+      supa("hydrant_inspections?select=hydrant_id,inspected_at,inspector,created_by,created_at&created_at=gte."+encodeURIComponent(startUtc)+"&created_at=lt."+encodeURIComponent(endUtc)+"&order=created_at"),
+      supa("hydrant_flow_tests?select=hydrant_id,test_hydrant_id,flow_hydrant_id,tested_at,tester,created_by,created_at,static_pressure,residual_pressure,calculated_flow_gpm,rate_gpm&created_at=gte."+encodeURIComponent(startUtc)+"&created_at=lt."+encodeURIComponent(endUtc)+"&order=created_at"),
+      supa("preincident_plans?select=id,title,address,property_name,created_at,updated_at,created_by,updated_by"),
+      supa("personnel?select=id,first_name,last_name,auth_user_id")
+    ]);
+    const peopleByAuth=new Map((activityPersonnel||[]).filter(p=>p.auth_user_id).map(p=>[String(p.auth_user_id),[p.first_name,p.last_name].filter(Boolean).join(" ")]));
+    const withinShift=value=>!!value&&String(value)>=startUtc&&String(value)<endUtc;
+    const preplanActivity=[];
+    for(const p of preplans||[]){
+      if(withinShift(p.created_at))preplanActivity.push({plan:p,action:"Created",at:p.created_at,person:peopleByAuth.get(String(p.created_by))||""});
+      else if(withinShift(p.updated_at)&&String(p.updated_at)>String(p.created_at||""))preplanActivity.push({plan:p,action:"Updated",at:p.updated_at,person:peopleByAuth.get(String(p.updated_by))||""});
+    }
+    const activityLines=[
+      "HYDRANTS INSPECTED",
+      ...(hydrantInspections||[]).length?(hydrantInspections||[]).map(x=>"- "+x.hydrant_id+" | "+(x.inspected_at||"")+" | "+(x.inspector||peopleByAuth.get(String(x.created_by))||"Personnel not recorded")+" | "+fmtDateTime(x.created_at)):["- None recorded"],
+      "",
+      "HYDRANTS FLOW-TESTED",
+      ...(hydrantFlowTests||[]).length?(hydrantFlowTests||[]).map(x=>"- "+(x.test_hydrant_id||x.hydrant_id||"Hydrant not recorded")+" | Flow hydrant: "+(x.flow_hydrant_id||"Not recorded")+" | "+(x.tested_at||"")+" | "+(x.tester||peopleByAuth.get(String(x.created_by))||"Personnel not recorded")+" | "+([x.rate_gpm||x.calculated_flow_gpm?((x.rate_gpm||x.calculated_flow_gpm)+" GPM"):"",x.static_pressure?"Static "+x.static_pressure:"",x.residual_pressure?"Residual "+x.residual_pressure:""].filter(Boolean).join(", "))):["- None recorded"],
+      "",
+      "PREPLANS CREATED / UPDATED",
+      ...preplanActivity.length?preplanActivity.map(x=>"- "+(x.plan.property_name||x.plan.title||"Property")+" | "+(x.plan.address||"Address not recorded")+" | "+x.action+" | "+(x.person||"Personnel not recorded")+" | "+fmtDateTime(x.at)):["- None recorded"]
+    ];
+    const activitySummary=activityLines.join("\\n");
     const attachments=[];
     const staffingPdf=await makeStaffingPdf(shiftStart,staffing||[],staffAssignments||[],staffEvents||[],staffPeople||[],staffStations||[],staffApparatus||[]);
     attachments.push({content:Buffer.from(staffingPdf).toString("base64"),filename:"01 - Daily Staffing Report.pdf"});
@@ -247,7 +271,7 @@ export default async function handler(req,res) {
       attachments.push({content:Buffer.from(pdf).toString("base64"),filename:String(attachmentNumber++).padStart(2,"0")+" - Standalone - "+label+".pdf"});
       reportCount++;
     }
-    await sendEmail(attachments,shiftStart,shiftEnd,(incidents||[]).length,reportCount);
+    await sendEmail(attachments,shiftStart,shiftEnd,(incidents||[]).length,reportCount,activitySummary);
     return res.status(200).json({ok:true,shift_start:shiftStart,shift_end:shiftEnd,incidents:(incidents||[]).length,reports:reportCount,attachments:attachments.length});
   } catch(e) {
     console.error("Daily report email error",e);
