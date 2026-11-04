@@ -229,7 +229,8 @@
       const [schedule,staffed]=await Promise.all([getSchedule(date,shift),getStaffed(date,shift)]);
       $("trainingDailySubject").value=schedule?.subject||"";
       $("trainingDailyLesson").value=schedule?.lesson||"";
-      const curriculumDetails=scheduledCurriculum(schedule);\n      $("trainingDailyDetails").value=schedule?(schedule.details||curriculumDetails||[schedule.lesson,schedule.subject].filter(Boolean).join(" — ")):"";
+      const curriculumDetails=scheduledCurriculum(schedule);
+      $("trainingDailyDetails").value=schedule?(schedule.details||curriculumDetails||[schedule.lesson,schedule.subject].filter(Boolean).join(" — ")):"";
       $("trainingDailyLocation").value="Station 1";$("trainingDailyCategory").value=inferTrainingType(schedule);$("trainingDailyOfficer").value=signedName();
       $("trainingDailyStart").value=(schedule?.start_time||"09:00").slice(0,5);
       $("trainingDailyEnd").value=(schedule?.end_time||"12:00").slice(0,5);updateDailyHours();
