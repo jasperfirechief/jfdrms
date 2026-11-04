@@ -1,5 +1,5 @@
 const SUPABASE_URL = "https://audgtwcctdoiptuekqvn.supabase.co";
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+const SUPABASE_ANON_KEY = "sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz";
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 async function supa(path, opts = {}) {
