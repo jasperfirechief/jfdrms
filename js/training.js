@@ -209,12 +209,11 @@
     const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"})),a=document.createElement("a");a.href=url;a.download="JFD_Training_Records.csv";a.click();URL.revokeObjectURL(url);
   }
   function installAdminCard() {
-    const cards=$("adminSectionCards");if(!cards||$("adminTrainingCard"))return;
-    const b=document.createElement("button");b.id="adminTrainingCard";b.type="button";b.className="card p-4 text-left hover:border-red-400";b.innerHTML="<b>Training Reports</b><p class='text-xs text-slate-500 mt-1'>Search training by member, date, shift, subject, and download records.</p>";b.onclick=()=>window.adminOpenSection("adminTrainingReportsSection");cards.appendChild(b);
-    const panel=document.createElement("div");panel.innerHTML=adminPanelHtml();const node=panel.firstElementChild;
-    $("adminReportArchive")?.insertAdjacentElement("afterend",node);
-    $("adminTrainingSearchButton").onclick=searchAdminTraining;$("adminTrainingExport").onclick=exportAdminTraining;
-    $("adminTrainingMember").innerHTML='<option value="">All personnel</option>'+roster.map(p=>'<option value="'+p.id+'">'+esc(p.first_name+" "+p.last_name)+'</option>').join("");
+    const cards=$("adminSectionCards");if(!cards)return;
+    if(!$("adminTrainingCard")){const b=document.createElement("button");b.id="adminTrainingCard";b.type="button";b.className="card p-4 text-left hover:border-red-400";b.innerHTML="<b>Training Reports</b><p class='text-xs text-slate-500 mt-1'>Search training by member, date, shift, subject, and download records.</p>";b.onclick=()=>window.adminOpenSection("adminTrainingReportsSection");cards.appendChild(b);}
+    if(!$("adminTrainingReportsSection")){const panel=document.createElement("div");panel.innerHTML=adminPanelHtml();const node=panel.firstElementChild;$("adminReportArchive")?.insertAdjacentElement("afterend",node);}
+    if($("adminTrainingSearchButton"))$("adminTrainingSearchButton").onclick=searchAdminTraining;if($("adminTrainingExport"))$("adminTrainingExport").onclick=exportAdminTraining;
+    if($("adminTrainingMember"))$("adminTrainingMember").innerHTML='<option value="">All personnel</option>'+roster.map(p=>'<option value="'+p.id+'">'+esc(p.first_name+" "+p.last_name)+'</option>').join("");
   }
   function extendAdminNavigation() {
     const originalOpen=window.adminOpenSection,originalBack=window.adminShowSectionCards;
@@ -244,7 +243,7 @@
   window.jfdTrainingShiftForDate=shiftForDate;
   const originalTab=window.tab;
   if(originalTab&&!originalTab.__trainingWrapped){
-    const wrapped=function(t){const result=originalTab(t);if(t==="training")setTimeout(()=>window.jfdTrainingTabEntered?.(),0);return result;};
+    const wrapped=function(t){if(t==="training"&&!isManager()){alert("Training reports are available to officers and administrators.");return;}const result=originalTab(t);if(t==="training")setTimeout(()=>window.jfdTrainingTabEntered?.(),0);return result;};
     wrapped.__trainingWrapped=true;window.tab=wrapped;
   }
   document.addEventListener("DOMContentLoaded",()=>{
