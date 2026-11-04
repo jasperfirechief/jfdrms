@@ -1273,7 +1273,8 @@ async function renderStaffingCalendarDetails(date,shift){
       const ap=apparatus.find(z=>Number(z.apparatus_id)===Number(x.apparatus_id));
       const duration=staffEventDuration(x);
       const type=x.event_type==="swap"?"Personnel swap":(String(x.leave_type||"Leave").replace("_"," "));
-      return '<div class="rounded-lg border p-3 mb-2"><div class="font-semibold">'+esc(type)+'</div><div class="text-sm mt-1">'+esc((person?.first_name||"")+' '+(person?.last_name||""))+(replacement?' → '+esc(replacement.first_name+' '+replacement.last_name):'')+'</div><div class="text-xs text-slate-500 mt-1">'+esc([st?.station_name,ap?.unit_number,duration].filter(Boolean).join(' · '))+'</div>'+(x.notes?'<p class="text-sm mt-2">'+esc(x.notes)+'</p>':'')+'</div>';
+      const dateInfo=x.event_type==="swap"?("Effective "+(x.effective_date||"Not set")):("Leave "+(x.leave_start_date||"Not set")+(x.leave_end_date?" through "+x.leave_end_date:" (ongoing)"));
+      return '<div class="rounded-lg border p-3 mb-2"><div class="font-semibold">'+esc(type)+'</div><div class="text-sm mt-1">'+esc((person?.first_name||"")+' '+(person?.last_name||""))+(replacement?' → '+esc(replacement.first_name+' '+replacement.last_name):'')+'</div><div class="text-xs text-slate-500 mt-1">'+esc([dateInfo,st?.station_name,ap?.unit_number,duration].filter(Boolean).join(' · '))+'</div>'+(x.notes?'<p class="text-sm mt-2">'+esc(x.notes)+'</p>':'')+'</div>';
     }).join("");
     out.innerHTML='<h3 class="font-bold mb-3">'+esc(date)+' · '+esc(shift)+' Shift Staffing</h3>'+(sections||'<p class="text-sm text-slate-500">No apparatus assignments have been saved.</p>')+'<h4 class="font-bold mt-5 mb-2">Personnel Changes & Leave</h4>'+(eventHtml||'<p class="text-sm text-slate-500">No personnel changes or leave entries recorded.</p>');
   }catch(err){out.innerHTML='<p class="text-sm text-red-700">Unable to load staffing: '+esc(err.message||String(err))+'</p>'}
