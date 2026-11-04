@@ -185,8 +185,8 @@ async function makeChecksPdf(date, rows) {
 async function makeTrainingPdf(records) {
   const sections=(records||[]).map(r=>{
     const attendees=(r.training_attendees||[]).map(a=>{
-      const name=[a.personnel?.first_name,a.personnel?.last_name].filter(Boolean).join(" ")||"Personnel";
-      return name+" ("+Number(a.hours||0).toFixed(2)+" hrs)";
+      const name=a.personnel_name||[a.personnel?.first_name,a.personnel?.last_name].filter(Boolean).join(" ")||"Personnel";
+      return name+(a.shift_at_training?" · "+a.shift_at_training+" Shift":"")+" ("+Number(a.hours||0).toFixed(2)+" hrs)";
     }).join(", ");
     return {
       title:(r.shift?r.shift+" SHIFT":"TRAINING EVENT")+" • "+fmtDate(r.training_date),
