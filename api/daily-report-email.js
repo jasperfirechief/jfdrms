@@ -105,12 +105,56 @@ async function makeIncidentPdf(incident) {
   return makePdf(incident,reports);
 }
 
-async function makeStaffingPdf(date, rows) {
-  const sections=[{title:"SHIFT STAFFING • "+date,rows:[]}];
-  for(const r of rows||[]) sections[0].rows.push(
-    ["Shift",r.shift],["Staffing Record",r.staffing_id],["Managed By",r.managed_by_user_id],["Created",fmtDateTime(r.created_at)]
-  );
-  if(!rows?.length) sections[0].rows.push(["Result","No daily staffing record was recorded for this shift."]);
+async function makeStaffingPdf(date, rows, assignments, events, people, stations, apparatus) {
+  const sections=[];
+  const personName=id=>{const p=(people||[]).find(x=>Number(x.id)===Number(id));return p?[p.first_name,p.last_name].filter(Boolean).join(" "):"Unknown employee"};
+  const stationName=id=>(stations||[]).find(x=>Number(x.station_id)===Number(id))?.station_name||("Station "+id);
+  const apparatusName=id=>(apparatus||[]).find(x=>Number(x.apparatus_id)===Number(id))?.unit_number||("Apparatus "+id);
+  const personnelSeen=new Set();
+  let swapCount=0,leaveCount=0;
+  for(const r of rows||[]){
+    const section={title:(r.shift||"SHIFT")+" SHIFT • "+date,rows:[]};
+    section.rows.push(["Shift",r.shift],["Record",r.staffing_id],["Created",fmtDateTime(r.created_at)]);
+    const apps=(assignments||[]).filter(a=>Number(a.staffing_id)===Number(r.staffing_id));
+    const stationIds=[...new Set(apps.map(a=>Number(a.station_id)))].sort((a,b)=>a-b);
+    for(const stationId of stationIds){
+      const stationApps=apps.filter(a=>Number(a.station_id)===stationId);
+      section.rows.push(["",stationName(stationId)]);
+      for(const a of stationApps){
+        const crew=a.daily_personnel_assignments||[];
+        const roleOrder={driver:0,officer:1,firefighter:2};
+        crew.sort((x,y)=>(roleOrder[x.assignment_role]??9)-(roleOrder[y.assignment_role]??9));
+        const crewText=crew.map(p=>{
+          personnelSeen.add(Number(p.personnel_id));
+          const role=String(p.assignment_role||"crew").replace(/^./,s=>s.toUpperCase());
+          return role+": "+(p.personnel?.first_name||"")+" "+(p.personnel?.last_name||"");
+        }).join(" | ");
+        section.rows.push([apparatusName(a.apparatus_id),crewText||"No personnel assigned"]);
+      }
+    }
+    if(!apps.length)section.rows.push(["Apparatus assignments","No station/apparatus assignments saved."]);
+    const shiftEvents=(events||[]).filter(e=>Number(e.staffing_id)===Number(r.staffing_id));
+    section.rows.push(["PERSONNEL CHANGES & LEAVE",""]);
+    for(const e of shiftEvents){
+      if(e.event_type==="swap")swapCount++;else leaveCount++;
+      const person=personName(e.personnel_id);
+      const replacement=e.replacement_personnel_id?personName(e.replacement_personnel_id):"";
+      const kind=e.event_type==="swap"?"PERSONNEL SWAP":String(e.leave_type||"leave").replace(/_/g," ").toUpperCase();
+      const duration=e.is_full_shift?"Full shift":((e.start_time||"")+"–"+(e.end_time||""));
+      const location=[e.station_id?stationName(e.station_id):"",e.apparatus_id?apparatusName(e.apparatus_id):""].filter(Boolean).join(" / ");
+      const details=[person,replacement?("Replacement: "+replacement):"",location,duration,e.notes||""].filter(Boolean).join(" | ");
+      section.rows.push([kind,details]);
+    }
+    if(!shiftEvents.length)section.rows.push(["Personnel changes","No swaps or leave entries recorded."]);
+    sections.push(section);
+  }
+  const summaryRows=[
+    ["Assigned personnel (unique)",String(personnelSeen.size)],
+    ["Personnel swaps",String(swapCount)],
+    ["Leave entries",String(leaveCount)]
+  ];
+  sections.unshift({title:"SHIFT STAFFING SUMMARY • "+date,rows:summaryRows});
+  if(!rows?.length)sections.unshift({title:"SHIFT STAFFING • "+date,rows:[["Result","No daily staffing record was recorded for this shift."]]});
   return makeTablePdf("DAILY STAFFING REPORT",sections);
 }
 
@@ -158,11 +202,20 @@ export default async function handler(req,res) {
     const shiftEnd=chicagoDate(now),shiftStart=previousDate(shiftEnd);
     const startUtc=zoned7amUtc(shiftStart).toISOString(),endUtc=zoned7amUtc(shiftEnd).toISOString();
     const staffing=await supa("daily_staffing?select=*&staffing_date=eq."+shiftStart+"&order=shift");
+    const staffingIds=(staffing||[]).map(x=>x.staffing_id).filter(Boolean);
+    const staffingFilter=staffingIds.length?"&staffing_id=in.("+staffingIds.join(",")+")":"";
+    const [staffAssignments,staffEvents,staffPeople,staffStations,staffApparatus]=staffingIds.length?await Promise.all([
+      supa("daily_app_assignments?select=staffing_id,station_id,apparatus_id,daily_personnel_assignments(assignment_role,personnel_id,personnel(first_name,last_name))"+staffingFilter),
+      supa("daily_staffing_events?select=*"+staffingFilter+"&order=created_at"),
+      supa("personnel?select=id,first_name,last_name"),
+      supa("stations?select=station_id,station_name"),
+      supa("apparatus?select=apparatus_id,unit_number")
+    ]):[[],[],[],[],[]];
     const checks=await supa("apparatus_checks?select=*&check_date=eq."+shiftStart+"&order=apparatus_id,check_time");
     const incidents=await supa("incidents?select=*&dispatch_time=gte."+encodeURIComponent(startUtc)+"&dispatch_time=lt."+encodeURIComponent(endUtc)+"&order=dispatch_time");
     const standalone=await supa("standalone_reports?select=*&created_at=gte."+encodeURIComponent(startUtc)+"&created_at=lt."+encodeURIComponent(endUtc)+"&order=created_at");
     const attachments=[];
-    const staffingPdf=await makeStaffingPdf(shiftStart,staffing||[]);
+    const staffingPdf=await makeStaffingPdf(shiftStart,staffing||[],staffAssignments||[],staffEvents||[],staffPeople||[],staffStations||[],staffApparatus||[]);
     attachments.push({content:Buffer.from(staffingPdf).toString("base64"),filename:"01 - Daily Staffing Report.pdf"});
     const checksPdf=await makeChecksPdf(shiftStart,checks||[]);
     attachments.push({content:Buffer.from(checksPdf).toString("base64"),filename:"02 - Apparatus Checks.pdf"});
