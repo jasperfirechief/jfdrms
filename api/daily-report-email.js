@@ -246,7 +246,7 @@ export default async function handler(req,res) {
       supa("apparatus?select=apparatus_id,unit_number")
     ]):[[],[],[],[],[]];
     const checks=await supa("apparatus_checks?select=*&check_date=eq."+shiftStart+"&order=apparatus_id,check_time");
-    const training=await supa("training_records?select=*,training_attendees(hours,personnel(first_name,last_name))&training_date=eq."+shiftStart+"&conducted=eq.true&order=shift");
+    const training=await supa("training_records?select=*,training_attendees(hours,personnel_name,shift_at_training,personnel(first_name,last_name))&training_date=eq."+shiftStart+"&conducted=eq.true&order=shift");
     const incidents=await supa("incidents?select=*&dispatch_time=gte."+encodeURIComponent(startUtc)+"&dispatch_time=lt."+encodeURIComponent(endUtc)+"&order=dispatch_time");
     const standalone=await supa("standalone_reports?select=*&created_at=gte."+encodeURIComponent(startUtc)+"&created_at=lt."+encodeURIComponent(endUtc)+"&order=created_at");
     const [hydrantInspections,hydrantFlowTests,preplans,activityPersonnel]=await Promise.all([
