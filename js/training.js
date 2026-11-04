@@ -4,6 +4,23 @@
   let roster = [], dailyRecord = null, eventRecordId = null, eventSelected = new Set(), selectedTrainingView = "daily", scheduleCache = [];
   const trainingTypes=["Company Training (Fire)","EMS","Existing Driver Training","Facilities/Drill Training","Hazardous Materials","Inspector CE","Investigator CE","New Driver Training","Officer Training","Preplan","Public Educator CE","Recruit"];
   const typeOptions=(selected="")=>trainingTypes.map(x=>'<option value="'+esc(x)+'" '+(x===selected?"selected":"")+'>'+esc(x)+'</option>').join("");
+  function inferTrainingType(schedule){
+    const supplied=String(schedule?.category||schedule?.type||"").trim();
+    if(trainingTypes.includes(supplied))return supplied;
+    const text=[schedule?.subject,schedule?.lesson,schedule?.details].join(" ").toLowerCase();
+    if(/ems|medical|first aid|cpr|patient care/.test(text))return "EMS";
+    if(/new driver|driver recruit|driver training.*new/.test(text))return "New Driver Training";
+    if(/driver|operator|apparatus operation|pump operation/.test(text))return "Existing Driver Training";
+    if(/facility|station drill|drill training/.test(text))return "Facilities/Drill Training";
+    if(/hazmat|hazardous material/.test(text))return "Hazardous Materials";
+    if(/inspector|inspection ce|fire inspector/.test(text))return "Inspector CE";
+    if(/investigator|fire investigation/.test(text))return "Investigator CE";
+    if(/officer|command|leadership/.test(text))return "Officer Training";
+    if(/pre.?plan|preplan/.test(text))return "Preplan";
+    if(/public educator|public education/.test(text))return "Public Educator CE";
+    if(/recruit|academy|probationary/.test(text))return "Recruit";
+    return "Company Training (Fire)";
+  }
   const isManager = () => ["admin","officer"].includes(String(profile?.app_role || ""));
   const signedName = () => {const p=typeof currentPersonnel==="function"?currentPersonnel():null;return [p?.first_name,p?.last_name].filter(Boolean).join(" ") || [profile?.first_name,profile?.last_name].filter(Boolean).join(" ") || me?.email || "Officer";};
   const dateToday = () => typeof today === "function" ? today() : new Date().toISOString().slice(0,10);
@@ -133,7 +150,7 @@
       $("trainingDailySubject").value=schedule?.subject||"";
       $("trainingDailyLesson").value=schedule?.lesson||"";
       $("trainingDailyDetails").value=schedule?(schedule.details||[schedule.lesson,schedule.subject].filter(Boolean).join(" — ")):"";
-      $("trainingDailyLocation").value="Station 1";$("trainingDailyCategory").value="Company Training (Fire)";$("trainingDailyOfficer").value=signedName();
+      $("trainingDailyLocation").value="Station 1";$("trainingDailyCategory").value=inferTrainingType(schedule);$("trainingDailyOfficer").value=signedName();
       $("trainingDailyStart").value=(schedule?.start_time||"09:00").slice(0,5);
       $("trainingDailyEnd").value=(schedule?.end_time||"12:00").slice(0,5);updateDailyHours();
       $("trainingScheduleHint").textContent=schedule?"Scheduled subject and lesson loaded from the department training calendar.":"No scheduled lesson is listed for this date. The officer may enter the subject manually.";
