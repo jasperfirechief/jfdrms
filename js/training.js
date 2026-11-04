@@ -21,94 +21,162 @@
     if(/recruit|academy|probationary/.test(text))return "Recruit";
     return "Company Training (Fire)";
   }
-  const driverCurriculum = {
-    "1": {
-      title: "Apparatus Safety and Operating Emergency Vehicles",
-      reading: "Pumping and Aerial Apparatus Driver/Operator Handbook, 3rd Edition, pages 76–122",
-      objectives: [
-        "Detect reasons for accidents.",
-        "Review apparatus rider safety considerations.",
-        "Explain considerations for operation of an apparatus.",
-        "Explain apparatus emergency response considerations.",
-        "Explain considerations when backing apparatus."
-      ],
-      skills: [
-        "Drive a fire service apparatus (pages 126–127).",
-        "Back apparatus using mirrors (page 128).",
-        "Perform various driving exercises (pages 129–130)."
-      ]
+  const curriculumBySubject = {
+    "building construction": {
+      1:{title:"Construction Classifications",reading:"Essentials of Fire Fighting, 7th Ed., pp. 77–86",objectives:["Differentiate among types of building construction."],skills:[]},
+      2:{title:"Floors, Ceilings, and Walls / Basements and Stairs",reading:"Essentials of Fire Fighting, 7th Ed., pp. 87–90",objectives:["Describe the construction of floors, ceilings, and walls.","Describe how basements and stairs may impact firefighting operations."],skills:[]},
+      3:{title:"Roofs / Doors / Windows",reading:"Essentials of Fire Fighting, 7th Ed., pp. 90–111",objectives:["Compare the construction of different roof types.","Describe the construction and operation methods of different types of doors.","Describe the construction and operation methods of different types of windows."],skills:[]}
     },
-    "2": {
-      title: "Principles of Water/Hose Nozzles and Flow Rates",
-      reading: "Pumping and Aerial Apparatus Driver/Operator Handbook, 3rd Edition, pages 167–272",
-      objectives: [
-        "Describe characteristics of water.",
-        "Summarize facts about water pressure and velocity.",
-        "Summarize principles of friction loss.",
-        "Distinguish among types of fire hose nozzles.",
-        "Summarize facts about nozzle pressure and reaction."
-      ],
-      skills: []
+    "building materials, structural collapse, and effects of fire suppression": {
+      1:{title:"Building Materials",reading:"Essentials of Fire Fighting, 7th Ed., pp. 783–793",objectives:["Describe the effects of fire on various building materials."],skills:[]},
+      2:{title:"Structural Collapse / Dangerous Building Conditions and Fire Suppression Activities",reading:"Essentials of Fire Fighting, 7th Ed., pp. 794–801",objectives:["Describe factors that contribute to structural collapse.","Identify indicators of structural instability and collapse.","Explain considerations to be taken when establishing collapse zones.","Describe actions that should be taken when structural collapse is imminent.","Describe building conditions and fire suppression activities that can impact fire spread and structural stability."],skills:[]}
     },
-    "3": {
-      title: "Fire Pump Theory/Operating Fire Pumps",
-      reading: "Pumping and Aerial Apparatus Driver/Operator Handbook, 3rd Edition, pages 292–366",
-      objectives: [
-        "Describe intake and discharge piping.",
-        "Explain operation of automatic pressure control devices.",
-        "Describe types of auxiliary cooling devices.",
-        "Explain making the pump operational.",
-        "Explain considerations when operating from a pressurized water source.",
-        "Describe actions taken for sprinkler and standpipe support."
-      ],
-      skills: [
-        "Perform operations from the apparatus water tank (pages 392–393).",
-        "Make the transition from apparatus water tank to external pressurized water supply (page 394).",
-        "Operate from a pressurized water source (page 395)."
-      ]
+    "communications": {
+      1:{title:"Receiving Emergency Calls",reading:"Essentials of Fire Fighting, 7th Ed., pp. 58–62",objectives:["Explain the procedures for receiving and dispatching emergency calls."],skills:["Skill Sheet 2-1: Handle nonemergency and emergency phone calls."]},
+      2:{title:"Radio Communications",reading:"Essentials of Fire Fighting, 7th Ed., pp. 63–70",objectives:["Describe radio equipment and procedures used for internal fire department communications."],skills:["Skill Sheet 2-2: Use a portable radio for routine and emergency traffic."]}
     },
-    "4": {
-      title: "Relay Pumping Operations/Water Shuttle Operations",
-      reading: "Pumping and Aerial Apparatus Driver/Operator Handbook, 3rd Edition, pages 422–468",
-      objectives: [
-        "Describe relay apparatus and equipment.",
-        "Explain relay pumping operational considerations.",
-        "Identify water shuttle apparatus.",
-        "Describe fill site operations."
-      ],
-      skills: [
-        "Operate in a closed relay (page 438)."
-      ]
+    "community risk reduction": {
+      1:{title:"Importance of Fire and Life Safety Programs / Private Dwelling Surveys / Presentations",reading:"Essentials of Fire Fighting, 7th Ed., pp. 975–990",objectives:["Explain the importance of fire and life safety programs.","Describe fire safety surveys for private dwellings.","Explain the role of a Firefighter II with regard to fire and life safety presentations."],skills:["Conduct a fire and life safety survey in an occupied dwelling (p. 1015).","Deliver a fire and life safety presentation (p. 1016).","Conduct a fire station tour (p. 1017)."]},
+      2:{title:"Pre-incident Surveys",reading:"Essentials of Fire Fighting, 7th Ed., pp. 991–1011",objectives:["Explain the process of conducting and documenting a pre-incident survey."],skills:["Prepare a pre-incident planning survey (p. 1018)."]}
+    },
+    "fire dynamics": {
+      1:{title:"Fire Science / Thermal Energy / Fuel / Oxygen / Self-Sustained Chemical Reaction",reading:"Essentials of Fire Fighting, 7th Ed., pp. 117–144",objectives:["Explain the basic principles of fire science.","Describe how thermal energy impacts fire behavior.","Explain the function of fuel within the combustion process.","Explain the function of oxygen within the combustion process.","Explain the self-sustained chemical reaction involved in flaming combustion."],skills:[]},
+      2:{title:"Compartment Fire Development / Structure Fire Development",reading:"Essentials of Fire Fighting, 7th Ed., pp. 144–160",objectives:["Differentiate among the stages of fire development.","Explain how firefighting operations can influence fire behavior in a structure."],skills:[]},
+      3:{title:"Reaction of Building Construction to Fire",reading:"Essentials of Fire Fighting, 7th Ed., pp. 160–175",objectives:["Describe how building construction and layout affects fire development."],skills:[]}
+    },
+    "fire hose": {
+      1:{title:"Fire Hose Characteristics / Inspection, Care, and Maintenance",reading:"Essentials of Fire Fighting, 7th Ed., pp. 541–555",objectives:["Describe characteristics of fire hose.","Describe the inspection, care, and maintenance of fire hose."],skills:["Couple and uncouple a hose (pp. 568–569).","Inspect, clean, and maintain a hose (pp. 570–572)."]},
+      2:{title:"Hose Rolls / Hose Loads",reading:"Essentials of Fire Fighting, 7th Ed., pp. 556–565",objectives:["Explain methods of rolling hose.","Describe hose loads."],skills:["Make a straight hose roll (p. 573).","Make a donut hose roll (pp. 574–576).","Make a flat hose load (p. 577).","Make an accordion hose load (p. 578).","Make the preconnected flat hose load (p. 579).","Make the triple layer hose load (pp. 580–581).","Make the minuteman hose load (pp. 582–583)."]}
+    },
+    "fire origin and cause determination": {
+      1:{title:"Fire Investigation Roles and Responsibilities / Area of Origin Assessment",reading:"Essentials of Fire Fighting, 7th Ed., pp. 933–942",objectives:["Identify the roles and responsibilities of firefighters and fire investigators at a fire investigation.","Explain the process of determining the area of origin."],skills:[]},
+      2:{title:"Fire Cause Assessment / Evidence Preservation",reading:"Essentials of Fire Fighting, 7th Ed., pp. 942–952",objectives:["Explain the process of cause determination.","Describe considerations related to evidence preservation."],skills:["Protect and document evidence of fire origin and cause (pp. 955–956)."]}
+    },
+    "firefighter personal protective equipment": {
+      1:{title:"Personal Protective Equipment",reading:"Essentials of Fire Fighting, 7th Ed., pp. 183–200",objectives:["Describe the various types and uses of PPE worn by firefighters.","Describe the inspection, cleaning, and maintenance of PPE."],skills:["Don structural PPE (p. 232)."]},
+      2:{title:"SCBA / Donning and Doffing / Inspection and Maintenance",reading:"Essentials of Fire Fighting, 7th Ed., pp. 201–225",objectives:["Describe conditions that require the use of respiratory protection equipment.","Identify SCBA components.","Describe SCBA limitations.","Describe the procedures for donning and doffing SCBA.","Describe the process of inspecting and cleaning SCBA.","Describe methods of refilling, replacing, and storing SCBA cylinders.","Describe safety considerations for working in and exiting a hazardous atmosphere while wearing SCBA."],skills:["Don SCBA (pp. 233–236).","Inspect SCBA (pp. 241–242).","Fill an SCBA cylinder (pp. 244–247)."]}
+    },
+    "firefighter safety": {
+      1:{title:"Firefighter Safety, Health, and Wellness",reading:"Essentials of Fire Fighting, 7th Ed., pp. 25–36",objectives:["Describe fire and life safety initiatives aimed at reducing firefighter illnesses, injuries, and fatalities.","Describe the aspects of NFPA 1500 related to firefighter safety and health.","Describe fire department programs intended to reduce firefighter illnesses, injuries, and fatalities."],skills:[]},
+      2:{title:"Operational Safety and Scene Management",reading:"Essentials of Fire Fighting, 7th Ed., pp. 37–45",objectives:["Summarize general guidelines for operating safely at structural fire scenes.","Summarize safe practices for riding in fire service vehicles and apparatus.","Explain the use of emergency scene lighting and equipment.","Explain the importance of personnel accountability systems.","Summarize general guidelines for operating safely at highway/roadway incidents."],skills:["Skill Sheet 1-1: Mount and dismount an apparatus for incident response.","Skill Sheet 1-2: Deploy and operate a portable electrical power supply unit.","Skill Sheet 1-3: Deploy lighting equipment.","Skill Sheet 1-4: Demonstrate scene management at a roadway incident using traffic and scene safety control devices."]}
+    },
+    "forcible entry": {
+      1:{title:"Basic Principles of Forcible Entry / Forcible Entry Tools",reading:"Essentials of Fire Fighting, 7th Ed., pp. 371–385",objectives:["Describe the basic principles of forcible entry.","Describe forcible entry tools.","Explain considerations for forcible entry tool safety.","Explain how to carry forcible entry tools."],skills:["Clean, inspect, and maintain hand tools and equipment (pp. 413–414)."]},
+      2:{title:"Forcing Entry Through Doors",reading:"Essentials of Fire Fighting, 7th Ed., pp. 387–403",objectives:["Describe methods of forcing entry through doors."],skills:["Force entry through an inward swinging door (pp. 415–416).","Force entry through an outward swinging door (pp. 417–418).","Force entry through a door lock (pp. 419–421).","Force entry through a padlock (source document lists pp. 422–224)."]},
+      3:{title:"Forcing Entry Through Windows / Breaching Walls",reading:"Essentials of Fire Fighting, 7th Ed., pp. 404–410",objectives:["Describe methods for forcing entry through windows.","Describe methods for breaching walls."],skills:["Force entry through a window (pp. 425–426).","Force entry through a wood-framed wall (pp. 427–428).","Breach a masonry wall with hand tools (p. 429).","Breach a metal wall with a rotary saw (p. 430)."]}
+    },
+    "foam firefighting, liquid fires, and gas fires": {
+      1:{title:"Foam Firefighting / Liquid and Gas Fuel Fires",reading:"Essentials of Fire Fighting, 7th Ed., pp. 871–889",objectives:["Describe methods used to generate firefighting foam.","Identify materials and equipment needed to generate firefighting foam.","Describe methods of foam application.","Describe operations involving liquid and gas fuel fires."],skills:[]}
+    },
+    "ground ladders": {
+      1:{title:"Parts of a Ladder / Ladder Types / Inspection, Cleaning, Maintenance, and Safety",reading:"Essentials of Fire Fighting, 7th Ed., pp. 315–325",objectives:["Identify the parts of a ladder.","Differentiate among types of ladders.","Describe the process of inspecting, cleaning, and maintaining a ladder.","Describe safe practices for using a ladder."],skills:["Clean, inspect, and maintain a ladder (source document lists pp. 345–345)."]},
+      2:{title:"Carrying Ladders / Placing Ground Ladders / Securing Ground Ladders",reading:"Essentials of Fire Fighting, 7th Ed., pp. 326–335",objectives:["Describe the process of carrying a ladder.","Describe the proper procedure for placing a ground ladder.","Describe ways to secure a ground ladder."],skills:["Carry a ladder using the one-firefighter low shoulder method (p. 347).","Carry a ladder using a two-firefighter carry (p. 348)."]},
+      3:{title:"Ladder Raises / Working from a Ladder",reading:"Essentials of Fire Fighting, 7th Ed., pp. 336–342",objectives:["Describe methods for raising and lowering a ladder.","Describe how to safely work from a ladder.","Describe methods to assist a victim down a ladder."],skills:["Raise and lower a ladder using a one-firefighter method (pp. 349–356).","Raise and lower a ladder using a two-firefighter method (pp. 357–359).","Shift a ladder (pp. 360–361).","Pivot a ladder (p. 362).","Leg lock on a ground ladder (p. 363).","Deploy a roof ladder (pp. 364–366).","Assist a victim down a ground ladder (pp. 367–368)."]}
+    },
+    "hazardous material: analyzing the incident (awareness)": {
+      1:{title:"APIE Response Model / Hazardous Materials Fundamentals and Properties",reading:"Essentials of Fire Fighting, 7th Ed., pp. 1047–1078",objectives:["Explain the APIE process at hazardous materials incidents.","Define a hazardous material incident.","Recognize ways that hazardous materials harm people.","Identify states of matter as they relate to hazardous materials.","Explain physical properties that aid in identifying potential hazards and predicting behavior of hazardous materials."],skills:["Analyze a hazardous materials scenario to identify potential hazards (pp. 1211–1212).","Identify indicators and hazards present at a hazardous materials incident using approved reference sources (p. 1213)."]},
+      2:{title:"General Hazardous Materials Behavior Model / Seven Clues / Preincident Plans",reading:"Essentials of Fire Fighting, 7th Ed., pp. 1079–1095",objectives:["Explain the role of the General Hazardous Materials Model in predicting the behavior of containers.","Identify the seven clues to the presence of hazardous materials.","Explain how preincident plans, occupancy types, and locations may indicate the presence and hazards of hazardous materials."],skills:["Analyze a hazardous materials scenario to identify potential hazards (pp. 1211–1212).","Identify indicators and hazards present at a hazardous materials incident using approved reference sources (p. 1213)."]},
+      3:{title:"Container Types and Behavior",reading:"Essentials of Fire Fighting, 7th Ed., pp. 1096–1151",objectives:["Recognize general container types and their associated behaviors and hazards."],skills:["Analyze a hazardous materials scenario to identify potential hazards (pp. 1211–1212).","Identify indicators and hazards present at a hazardous materials incident using approved reference sources (p. 1213)."]},
+      4:{title:"Transportation Placards, Labels, and Markings / Written Resources",reading:"Essentials of Fire Fighting, 7th Ed., pp. 1151–1204",objectives:["Describe ways that transportation placards, labels, and markings indicate the presence and hazards of hazardous materials.","Define the hazard classes.","Identify other markings and colors that indicate the presence of hazardous materials.","Describe ways written resources are used to identify hazardous materials and their hazards."],skills:["Analyze a hazardous materials scenario to identify potential hazards (pp. 1211–1212).","Identify indicators and hazards present at a hazardous materials incident using approved reference sources (p. 1213)."]}
+    },
+    "hazardous material: action options and response objectives (operations)": {
+      1:{title:"Predetermined Procedures / Protective Actions / Size-Up and Risk Assessment / Incident Levels / Operational Strategies / Initial Response",reading:"Essentials of Fire Fighting, 7th Ed., pp. 1217–1237",objectives:["Explain predetermined procedures.","Explain the role of first responders in initiating protective actions.","Describe the process of size-up and risk assessment.","Differentiate among hazardous materials incident levels.","Explain the three modes of operation at hazardous materials incidents.","Explain the process of planning the initial response at hazardous materials incidents."],skills:["Make appropriate notifications of a hazardous materials incident (p. 1298).","Implement protective actions at a hazardous materials incident (p. 1299).","Provide scene control at a hazardous materials incident (p. 1300)."]},
+      2:{title:"Implementing Response Objectives and Action Options",reading:"Essentials of Fire Fighting, 7th Ed., pp. 1238–1253",objectives:["Explain ways of implementing response objectives and action options."],skills:["Identify actions available at a hazardous materials incident (p. 1301)."]},
+      3:{title:"Terrorist Attacks",reading:"Essentials of Fire Fighting, 7th Ed., pp. 1254–1288",objectives:["Differentiate among types of terrorist attacks and their associated hazards."],skills:[]},
+      4:{title:"Other Criminal Activities and Natural Disasters / Evaluating Progress",reading:"Essentials of Fire Fighting, 7th Ed., pp. 1289–1293",objectives:["Identify hazards at illicit laboratories.","Recognize illegal hazmat dumps.","Describe hazardous materials response during and after natural disasters.","Identify process for evaluating progress at a hazardous materials incident."],skills:["Evaluate progress made at a hazardous materials incident (p. 1302)."]}
+    },
+    "hose operations and hose streams": {
+      1:{title:"Supplying Water / Deploying Hose",reading:"Essentials of Fire Fighting, 7th Ed., pp. 587–607",objectives:["Describe methods of supplying water for firefighting operations.","Describe methods used to deploy fire hose."],skills:["Make a hydrant connection from a forward lay (pp. 638–639).","Make a reverse hose lay (p. 640)."]},
+      2:{title:"Advancing Hose Lines / Hose Streams and Nozzles",reading:"Essentials of Fire Fighting, 7th Ed., pp. 607–624",objectives:["Describe methods of advancing hoselines.","Differentiate among types of hose streams and nozzles."],skills:["Advance a hose load using the flat hose method (p. 641).","Extend a hoseline (pp. 646–647).","Advance a hoseline up or down an interior stairway (pp. 655–656).","Advance an uncharged line up a ladder into a window (p. 658)."]},
+      3:{title:"Applying Hose Streams",reading:"Essentials of Fire Fighting, 7th Ed., pp. 625–631",objectives:["Explain how to operate different types of hoselines, nozzles, and master stream devices."],skills:["Operate a charged attack line from a ladder (p. 660).","Operate a large hoseline for exposure protection using the one-firefighter method (p. 663).","Deploy and operate a master stream device (p. 665)."]}
+    },
+    "incident scene operations": {
+      1:{title:"Initiating Operations / Transferring Command",reading:"Essentials of Fire Fighting, 7th Ed., pp. 899–911",objectives:["Explain the process of initiating incident operations.","Explain the process of transferring command."],skills:["Establish incident command and coordinate interior attack of a structure fire (p. 929)."]},
+      2:{title:"Coordinating Unit Operations / Post-incident Reports",reading:"Essentials of Fire Fighting, 7th Ed., pp. 912–926",objectives:["Describe the duties of a unit or team leader during fireground operations.","Explain the use of post-incident reports."],skills:["Create a post-incident report (p. 930)."]}
+    },
+    "maintenance and testing responsibilities": {
+      1:{title:"Equipment Maintenance / Service Testing Fire Hose",reading:"Essentials of Fire Fighting, 7th Ed., pp. 959–963",objectives:["Describe equipment maintenance procedures.","Describe the process of service testing fire hose."],skills:["Clean, inspect, and maintain power tools and equipment (pp. 965–966).","Inspect and maintain a portable generator and lighting equipment (pp. 967–968).","Service test fire hose (pp. 969–971)."]}
+    },
+    "overhaul, property conservation, and scene preservation": {
+      1:{title:"Overhaul / Property Conservation / Scene Preservation and Protection",reading:"Essentials of Fire Fighting, 7th Ed., pp. 740–762",objectives:["Describe overhaul.","Explain how to conserve property at a fire scene.","Describe the duties that firefighters must perform to protect and preserve a fire scene."],skills:["Spread a folded salvage cover using a one-firefighter method (p. 769).","Spread a folded salvage cover using the two-firefighter method (pp. 772–773).","Construct a water chute and attach it to a catch-all (p. 777).","Clean, inspect, and repair a salvage cover (p. 779)."]}
+    },
+    "portable fire extinguishers": {
+      1:{title:"Fire Extinguishers / Types / Selecting and Using Portable Fire Extinguishers",reading:"Essentials of Fire Fighting, 7th Ed., pp. 254–268",objectives:["Distinguish among the five classifications of portable fire extinguishers.","Distinguish among the various types of portable fire extinguishers.","Describe the process of selecting and using a portable fire extinguisher."],skills:["Extinguish an incipient Class A, B, or C fire with a portable fire extinguisher (pp. 270–271)."]}
+    },
+    "ropes and knots": {
+      1:{title:"Ropes and Webbing",reading:"Essentials of Fire Fighting, 7th Ed., pp. 277–286",objectives:["Differentiate between life safety rope and utility rope.","Describe the various materials and methods used to construct rope.","Describe the procedures for inspecting, cleaning, and maintaining ropes."],skills:["Inspect, clean, and store rope (p. 298)."]},
+      2:{title:"Knots",reading:"Essentials of Fire Fighting, 7th Ed., pp. 287–290",objectives:["Identify types of knots."],skills:["Tie an overhand knot (p. 299).","Tie a clove hitch around an object (p. 301).","Tie a figure-eight on a bight (p. 303).","Tie a figure-eight follow through (p. 304)."]},
+      3:{title:"Hoisting Tools and Equipment / Other Emergency Scene Uses",reading:"Essentials of Fire Fighting, 7th Ed., pp. 291–296",objectives:["Describe the procedure for hoisting various tools and equipment.","Explain how ropes and knots are used during rescues and at other emergencies."],skills:["Hoist a pike pole (pp. 307–308).","Hoist a ladder (p. 309).","Hoist a dry hoseline (p. 310).","Hoist a power saw (p. 311)."]}
+    },
+    "structural search and rescue": {
+      1:{title:"Firefighter Survival During Interior Operations / Air Monitoring",reading:"Essentials of Fire Fighting, 7th Ed., pp. 433–449",objectives:["Explain best practices to ensure firefighter survival during interior operations.","Describe air-monitoring operations."],skills:["Enact the proper procedures for an SCBA air emergency (p. 478).","Operate an air-monitoring device (p. 479)."]},
+      2:{title:"Structural Searches / Victim Removal",reading:"Essentials of Fire Fighting, 7th Ed., pp. 450–466",objectives:["Describe structural search and rescue operations.","Describe victim removal methods."],skills:["Conduct a primary or secondary search (p. 480).","Perform an incline drag (p. 481).","Perform the extremities lift/carry using the two-rescuer method (p. 482).","Perform the webbing drag (p. 483)."]},
+      3:{title:"Emergency Calls for Assistance / MAYDAY Protocols / Evacuation / Rapid Intervention",reading:"Essentials of Fire Fighting, 7th Ed., pp. 467–474",objectives:["Describe MAYDAY protocols.","Describe emergency evacuation methods.","Describe rapid intervention crew equipment and duties."],skills:["Transmit a MAYDAY report (p. 484).","Follow a hoseline or search line out as a withdrawal procedure (p. 485).","Perform reduced profile maneuvers without removal of SCBA using the side technique (p. 486).","Breach an interior wall (p. 487).","Perform low profile maneuvers without SCBA removal using the SCBA-first technique (p. 488).","Disentangle from debris or wires (p. 489)."]}
+    },
+    "tactical ventilation": {
+      1:{title:"Reasons for Tactical Ventilation / Safety / Tools and Equipment",reading:"Essentials of Fire Fighting, 7th Ed., pp. 493–505",objectives:["Explain why tactical ventilation is performed at a structure fire.","Describe safety considerations related to tactical ventilation.","Describe ventilation tools and equipment."],skills:["Locate and explain the use of tools and equipment used for tactical ventilation carried on department apparatus."]},
+      2:{title:"Horizontal Ventilation / Vertical Ventilation / Special Compartments and Structures",reading:"Essentials of Fire Fighting, 7th Ed., pp. 506–526",objectives:["Describe horizontal ventilation.","Describe vertical ventilation.","Describe considerations related to the ventilation of basements and other special compartments."],skills:["Locate and explain the use of tools and equipment used for mechanical positive pressure ventilation carried on department apparatus.","Locate and explain the use of tools and equipment used for horizontal hydraulic ventilation carried on department apparatus.","Locate and explain the use of tools and equipment used to ventilate a flat roof carried on department apparatus.","Locate and explain the use of tools and equipment used to ventilate a pitched roof carried on department apparatus."]}
+    },
+    "technical rescue support and vehicle extrication operations": {
+      1:{title:"Assistance at Technical Rescue Incidents / Rescue Tools",reading:"Essentials of Fire Fighting, 7th Ed., pp. 807–833",objectives:["Describe the duties of a Firefighter at a technical rescue incident.","Describe rescue practices and goals at various types of rescue incidents.","Identify tools used at technical rescues."],skills:[]},
+      2:{title:"General Vehicle Anatomy / Extrication Size-Up, Stabilization, and Victim Access",reading:"Essentials of Fire Fighting, 7th Ed., pp. 834–854",objectives:["Identify vehicle construction methods and components.","Describe size-up and hazard recognition at a vehicle extrication incident.","Describe vehicle stabilization operations.","Describe techniques used to access victims at a vehicle extrication incident."],skills:[]}
+    },
+    "first aid provider": {
+      1:{title:"Fire-Service-Based Emergency Medical Care / Confidentiality / Infection Control",reading:"Essentials of Fire Fighting, 7th Ed., pp. 1021–1029",objectives:["Describe the role of the fire service in providing emergency medical care.","Explain patient confidentiality requirements.","Identify communicable diseases that first responders commonly encounter.","Explain ways to prevent the spread of communicable diseases during emergency medical care."],skills:["Remove soiled gloves as outlined on p. 1028.","Clean a contaminated item as outlined on pp. 1029–1030."]},
+      2:{title:"Patient Assessment / Cardiac Arrest and CPR",reading:"Essentials of Fire Fighting, 7th Ed., pp. 1030–1037",objectives:["Explain the process of patient assessment.","Describe CPR."],skills:["Assess a patient as outlined on pp. 1030–1031.","Perform manual chest compressions on a CPR mannequin.","Perform rescue breaths using a BVM on a CPR mannequin."]},
+      3:{title:"Bleeding Control / Shock Management",reading:"Essentials of Fire Fighting, 7th Ed., pp. 1037–1041",objectives:["Describe methods of controlling bleeding.","Explain shock management."],skills:[]}
+    },
+    "fire suppression": {
+      1:{title:"The Science Behind Fire Suppression / Structural Fire Attack",reading:"Essentials of Fire Fighting, 7th Ed., pp. 669–684",objectives:["Explain the science behind fire suppression.","Describe methods for suppressing structural fires."],skills:["Simulate an interior structure fire attack at ground level using direct, indirect, and combination attack (pp. 720–722).","Simulate a structure fire attack using a transitional attack (p. 723)."]},
+      2:{title:"Supporting Fire Protection Systems / Building Utilities",reading:"Essentials of Fire Fighting, 7th Ed., pp. 685–693",objectives:["Explain the role of firefighters with regard to supporting fire protection systems during fire suppression.","Explain the duties of firefighters related to building utilities."],skills:["Simulate or operate sprinkler system control valves (p. 726).","Stop the flow of water from an activated sprinkler (pp. 727–728).","Simulate or turn off building utilities (p. 729)."]},
+      3:{title:"Vehicle Fires / Exterior Class A Fires / Ground Cover Fires",reading:"Essentials of Fire Fighting, 7th Ed., pp. 694–716",objectives:["Describe the process of attacking a vehicle fire.","Describe the process of attacking fires in exterior Class A materials.","Describe ground cover fire attack."],skills:["Simulate an attack on a passenger vehicle fire (p. 730).","Simulate an attack on a fire in exterior stacked or piled Class A materials (p. 731).","Simulate an attack on a fire in a trash container (p. 734).","Simulate an attack on a ground cover fire (p. 735)."]}
     }
   };
+  const driverCurriculum = {
+    "1":{title:"Apparatus Safety and Operating Emergency Vehicles",reading:"Pumping and Aerial Apparatus Driver/Operator Handbook, 3rd Edition, pp. 76–122",objectives:["Detect reasons for accidents.","Review apparatus rider safety considerations.","Explain considerations for operation of an apparatus.","Explain apparatus emergency response considerations.","Explain considerations when backing apparatus."],skills:["Drive a fire service apparatus (pp. 126–127).","Back apparatus using mirrors (p. 128).","Perform various driving exercises (pp. 129–130)."]},
+    "2":{title:"Principles of Water/Hose Nozzles and Flow Rates",reading:"Pumping and Aerial Apparatus Driver/Operator Handbook, 3rd Edition, pp. 167–272",objectives:["Describe characteristics of water.","Summarize facts about water pressure and velocity.","Summarize principles of friction loss.","Distinguish among types of fire hose nozzles.","Summarize facts about nozzle pressure and reaction."],skills:[]},
+    "3":{title:"Fire Pump Theory/Operating Fire Pumps",reading:"Pumping and Aerial Apparatus Driver/Operator Handbook, 3rd Edition, pp. 292–366",objectives:["Describe intake and discharge piping.","Explain operation of automatic pressure control devices.","Describe types of auxiliary cooling devices.","Explain making the pump operational.","Explain considerations when operating from a pressurized water source.","Describe actions taken for sprinkler and standpipe support."],skills:["Perform operations from the apparatus water tank (pp. 392–393).","Make the transition from apparatus water tank to external pressurized water supply (p. 394).","Operate from a pressurized water source (p. 395)."]},
+    "4":{title:"Relay Pumping Operations/Water Shuttle Operations",reading:"Pumping and Aerial Apparatus Driver/Operator Handbook, 3rd Edition, pp. 422–468",objectives:["Describe relay apparatus and equipment.","Explain relay pumping operational considerations.","Identify water shuttle apparatus.","Describe fill site operations."],skills:["Operate in a closed relay (p. 438)."]}
+  };
+  function curriculumKey(subject) {
+    return String(subject||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim().replace(/\\s+/g," ");
+  }
   function scheduledCurriculum(schedule) {
     if (!schedule) return "";
-    const subject = String(schedule.subject || "").trim();
-    const lessonText = String(schedule.lesson || "").trim();
-    const normalized = subject.toLowerCase();
-    const match = lessonText.match(/(?:lesson\s*)?(\d+)/i);
-    const lessonNumber = match ? match[1] : "";
-    const isDriver = normalized.includes("driver training") || normalized.includes("driver/operator") || normalized.includes("apparatus driver");
-    const item = isDriver ? driverCurriculum[lessonNumber] : null;
-    if (item) {
-      const lines = [
-        item.title,
-        "Scheduled subject: " + subject,
-        "Scheduled lesson: " + lessonText,
-        "Assigned textbook reading: " + item.reading,
-        "",
-        "Learning objectives:",
-        ...item.objectives.map(x => "• " + x)
-      ];
-      if (item.skills.length) lines.push("", "Hands-on skills / JPR practice:", ...item.skills.map(x => "• " + x));
-      else lines.push("", "Hands-on skills / JPR practice: No specific skills practice was listed in the curriculum document for this lesson.");
-      return lines.join("\n");
+    const subject=String(schedule.subject||"").trim(), lessonText=String(schedule.lesson||"").trim();
+    const lessonMatch=lessonText.match(/(?:lesson\\s*)?(\\d+)/i) || String(schedule.details||"").match(/lesson\\s*(\\d+)/i);
+    const lessonNumber=lessonMatch?lessonMatch[1]:"";
+    const key=curriculumKey(subject);
+    let item=null;
+    if (/driver training|driver operator|apparatus driver/.test(key)) item=driverCurriculum[lessonNumber];
+    if (!item) {
+      const normalized=key.replace(/^hazardous material /,"hazardous material ");
+      item=curriculumBySubject[normalized]?.[lessonNumber] || curriculumBySubject[key]?.[lessonNumber] || null;
     }
-    const lines = [];
-    if (subject) lines.push("Scheduled subject: " + subject);
-    if (lessonText) lines.push("Scheduled lesson: " + lessonText);
-    lines.push("Shift Officer is to direct training on applicable aspects of the scheduled subject and lesson, as appropriate.");
-    return lines.join("\n");
+    const lines=[];
+    if(item?.title)lines.push(item.title);
+    if(subject)lines.push("Scheduled subject: "+subject);
+    if(lessonText)lines.push("Scheduled lesson: "+lessonText);
+    if(item?.reading)lines.push("Assigned textbook reading: "+item.reading);
+    if(item?.objectives?.length)lines.push("","Learning objectives:",...item.objectives.map(x=>"• "+x));
+    else if(item)lines.push("","Learning objectives: No learning objectives are listed for this lesson in the curriculum document.");
+    if(item?.skills?.length)lines.push("","Hands-on skills / JPR practice:",...item.skills.map(x=>"• "+x));
+    else if(item)lines.push("","Hands-on skills / JPR practice: No specific skills practice was listed in the curriculum document for this lesson.");
+    if(!item)lines.push("","Curriculum details for this subject/lesson were not found in the uploaded source document. Keep the scheduled subject and lesson and verify the curriculum before conducting training.");
+    return lines.join("\\n");
+  }
+  let curriculumScheduleSynced=false;
+  async function syncScheduledCurriculum() {
+    if(curriculumScheduleSynced || profile?.app_role!=="admin" || !db)return;
+    const q=await db.from("training_schedule").select("id,subject,lesson,details").limit(5000);
+    if(q.error)throw q.error;
+    const changes=(q.data||[]).map(row=>({id:row.id,details:scheduledCurriculum(row)})).filter(x=>x.details && x.details!==String((q.data||[]).find(y=>String(y.id)===String(x.id))?.details||""));
+    for(let i=0;i<changes.length;i+=40){
+      const batch=changes.slice(i,i+40);
+      const results=await Promise.all(batch.map(x=>db.from("training_schedule").update({details:x.details}).eq("id",x.id)));
+      const failed=results.find(x=>x.error);if(failed)throw failed.error;
+    }
+    curriculumScheduleSynced=true;
   }
   const isManager = () => ["admin","officer"].includes(String(profile?.app_role || ""));
   const signedName = () => {const p=typeof currentPersonnel==="function"?currentPersonnel():null;return [p?.first_name,p?.last_name].filter(Boolean).join(" ") || [profile?.first_name,profile?.last_name].filter(Boolean).join(" ") || me?.email || "Officer";};
