@@ -3,7 +3,7 @@
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   let roster = [], dailyRecord = null, eventRecordId = null, eventSelected = new Set(), selectedTrainingView = "daily", scheduleCache = [];
   const trainingTypes=["Company Training (Fire)","EMS","Existing Driver Training","Facilities/Drill Training","Hazardous Materials","Inspector CE","Investigator CE","New Driver Training","Officer Training","Preplan","Public Educator CE","Recruit"];
-  const typeOptions=(selected="")=>trainingTypes.map(x=>'<option value="'+esc(x)+'" '+(x===selected?"selected":"")+">'+esc(x)+"</option>").join("");
+  const typeOptions=(selected="")=>trainingTypes.map(x=>'<option value="'+esc(x)+'" '+(x===selected?"selected":"")+'>'+esc(x)+'</option>').join("");
   const isManager = () => ["admin","officer"].includes(String(profile?.app_role || ""));
   const signedName = () => {const p=typeof currentPersonnel==="function"?currentPersonnel():null;return [p?.first_name,p?.last_name].filter(Boolean).join(" ") || [profile?.first_name,profile?.last_name].filter(Boolean).join(" ") || me?.email || "Officer";};
   const dateToday = () => typeof today === "function" ? today() : new Date().toISOString().slice(0,10);
