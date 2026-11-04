@@ -46,6 +46,13 @@ function zoned7amUtc(isoDate) {
   return new Date(Date.UTC(Number(isoDate.slice(0,4)), Number(isoDate.slice(5,7))-1, Number(isoDate.slice(8,10)), 7) - offsetMs);
 }
 function clean(v) { return String(v ?? "").replace(/\\s+/g, " ").trim(); }
+function fmtShiftDuration(event) {
+  if (event.is_full_shift) return "Full shift";
+  const start=String(event.start_time||"").slice(0,5),end=String(event.end_time||"").slice(0,5);
+  const mins=v=>{const p=v.split(":").map(Number);return p.length===2&&p.every(Number.isFinite)?p[0]*60+p[1]:null};
+  const a=mins(start),b=mins(end),hours=a===null||b===null?null:((b-a+1440)%1440)/60;
+  return start+"–"+end+(hours===null?"":" ("+hours.toFixed(1)+" hrs)");
+}
 function fmtDate(iso) {
   if (!iso) return "";
   return new Intl.DateTimeFormat("en-US",{timeZone:"America/Chicago",month:"2-digit",day:"2-digit",year:"numeric"}).format(new Date(iso));
@@ -111,7 +118,8 @@ async function makeStaffingPdf(date, rows, assignments, events, people, stations
   const stationName=id=>(stations||[]).find(x=>Number(x.station_id)===Number(id))?.station_name||("Station "+id);
   const apparatusName=id=>(apparatus||[]).find(x=>Number(x.apparatus_id)===Number(id))?.unit_number||("Apparatus "+id);
   const personnelSeen=new Set();
-  let swapCount=0,leaveCount=0;
+  let swapCount=0;
+  const leaveCounts={sick:0,vacation:0,kelly_day:0,other:0};
   for(const r of rows||[]){
     const section={title:(r.shift||"SHIFT")+" SHIFT • "+date,rows:[]};
     section.rows.push(["Shift",r.shift],["Record",r.staffing_id],["Created",fmtDateTime(r.created_at)]);
@@ -136,11 +144,11 @@ async function makeStaffingPdf(date, rows, assignments, events, people, stations
     const shiftEvents=(events||[]).filter(e=>Number(e.staffing_id)===Number(r.staffing_id));
     section.rows.push(["PERSONNEL CHANGES & LEAVE",""]);
     for(const e of shiftEvents){
-      if(e.event_type==="swap")swapCount++;else leaveCount++;
+      if(e.event_type==="swap")swapCount++;else leaveCounts[e.leave_type]=(leaveCounts[e.leave_type]||0)+1;
       const person=personName(e.personnel_id);
       const replacement=e.replacement_personnel_id?personName(e.replacement_personnel_id):"";
       const kind=e.event_type==="swap"?"PERSONNEL SWAP":String(e.leave_type||"leave").replace(/_/g," ").toUpperCase();
-      const duration=e.is_full_shift?"Full shift":((e.start_time||"")+"–"+(e.end_time||""));
+      const duration=fmtShiftDuration(e);
       const location=[e.station_id?stationName(e.station_id):"",e.apparatus_id?apparatusName(e.apparatus_id):""].filter(Boolean).join(" / ");
       const details=[person,replacement?("Replacement: "+replacement):"",location,duration,e.notes||""].filter(Boolean).join(" | ");
       section.rows.push([kind,details]);
@@ -151,7 +159,10 @@ async function makeStaffingPdf(date, rows, assignments, events, people, stations
   const summaryRows=[
     ["Assigned personnel (unique)",String(personnelSeen.size)],
     ["Personnel swaps",String(swapCount)],
-    ["Leave entries",String(leaveCount)]
+    ["Sick leave",String(leaveCounts.sick)],
+    ["Vacation leave",String(leaveCounts.vacation)],
+    ["Kelly Days",String(leaveCounts.kelly_day)],
+    ["Other leave",String(leaveCounts.other)]
   ];
   sections.unshift({title:"SHIFT STAFFING SUMMARY • "+date,rows:summaryRows});
   if(!rows?.length)sections.unshift({title:"SHIFT STAFFING • "+date,rows:[["Result","No daily staffing record was recorded for this shift."]]});
