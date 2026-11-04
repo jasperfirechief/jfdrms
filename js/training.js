@@ -86,7 +86,7 @@
     const subject = String(schedule.subject || "").toLowerCase();
     if (!/driver training|driver\/operator|apparatus driver/.test(subject)) return "";
     const lessonText = String(schedule.lesson || "");
-    const match = lessonText.match(/(?:lesson\\s*)?(\\d+)/i);
+    const match = lessonText.match(/(?:lesson\s*)?(\d+)/i);
     const lessonNumber = match ? match[1] : "";
     const item = driverCurriculum[lessonNumber];
     if (!item) return "";
@@ -99,7 +99,7 @@
     ];
     if (item.skills.length) lines.push("", "Hands-on skills / JPR practice:", ...item.skills.map(x => "• " + x));
     else lines.push("", "Hands-on skills / JPR practice: No specific skills practice was listed in the curriculum document for this lesson.");
-    return lines.join("\\n");
+    return lines.join("\n");
   }
   const isManager = () => ["admin","officer"].includes(String(profile?.app_role || ""));
   const signedName = () => {const p=typeof currentPersonnel==="function"?currentPersonnel():null;return [p?.first_name,p?.last_name].filter(Boolean).join(" ") || [profile?.first_name,profile?.last_name].filter(Boolean).join(" ") || me?.email || "Officer";};
