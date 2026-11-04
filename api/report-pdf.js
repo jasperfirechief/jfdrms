@@ -789,10 +789,9 @@ let page,y,pageNo=0;
 async function makeArchivePdf(kind,data){
  const pdf=await PDFDocument.create(),reg=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
  const W=612,H=792,m=42,usable=W-2*m;let page,y;const F={reg,bold};const newPage=()=>{page=pdf.addPage([W,H]);y=H-m};const wrap=(s,size=9,lh=13,b=false)=>{const font=b?F.bold:F.reg;let line="";for(const word of String(s??"").split(/\s+/)){const n=line?line+" "+word:word;if(font.widthOfTextAtSize(n,size)>usable&&line){safeDrawText(page,line,{x:m,y,font,size});y-=lh;line=word}else line=n}if(line){safeDrawText(page,line,{x:m,y,font,size});y-=lh}};const top=title=>{newPage();safeDrawText(page,"JASPER FIRE DEPARTMENT",{x:m,y,font:F.bold,size:16,color:rgb(.12,.16,.22)});y-=20;safeDrawText(page,title,{x:m,y,font:F.bold,size:11,color:rgb(.65,.02,.02)});y-=24};const section=title=>{if(y<80)newPage();safeDrawText(page,title,{x:m,y,font:F.bold,size:11});y-=17};const kv=(k,v)=>{if(y<55)newPage();safeDrawText(page,k+":",{x:m,y,font:F.bold,size:8});wrap(v||"—",8,10);};
- top(kind==="staffing"?"DAILY STAFFING REPORT":kind==="check"?"APPARATUS CHECK REPORT":kind==="inspection"?"FIRE INSPECTION REPORT":"INCIDENT REPORT");
+ top(kind==="staffing"?"DAILY STAFFING REPORT":kind==="check"?"APPARATUS CHECK REPORT":kind==="inspection"?"FIRE INSPECTION REPORT":kind==="training"?"TRAINING REPORT":"INCIDENT REPORT");
  const x=data||{};
  if(kind==="training"){
-  top("TRAINING REPORT");
   kv("Training date",date(x.training_date));
   kv("Record type",x.record_type==="daily"?"Scheduled Daily Training":"Additional Training Event");
   kv("Shift",x.shift?x.shift+" Shift":"");
