@@ -2,9 +2,9 @@
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   let roster = [], dailyRecord = null, selectedTrainingView = "daily", scheduleCache = [];
-  const isManager = () => ["admin","officer"].includes(String(window.profile?.app_role || ""));
-  const signedName = () => [window.profile?.first_name,window.profile?.last_name].filter(Boolean).join(" ") || window.me?.email || "Officer";
-  const dateToday = () => typeof window.today === "function" ? window.today() : new Date().toISOString().slice(0,10);
+  const isManager = () => ["admin","officer"].includes(String(profile?.app_role || ""));
+  const signedName = () => [profile?.first_name,profile?.last_name].filter(Boolean).join(" ") || me?.email || "Officer";
+  const dateToday = () => typeof today === "function" ? today() : new Date().toISOString().slice(0,10);
   const isoDate = d => d.toISOString().slice(0,10);
   const addDays = (date,n) => { const d=new Date(date+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+n);return isoDate(d); };
   function shiftForDate(date) {
@@ -27,20 +27,20 @@
     return rows.concat(next.A,next.B,next.C);
   }
   async function seedSchedule() {
-    if(window.profile?.app_role!=="admin" || !window.db) return;
-    const existing=await window.db.from("training_schedule").select("id").limit(1);
+    if(profile?.app_role!=="admin" || !db) return;
+    const existing=await db.from("training_schedule").select("id").limit(1);
     if(existing.error)throw existing.error;
     if(existing.data?.length)return;
     const response=await fetch("/training-schedule-2026.json",{cache:"no-store"});
     if(!response.ok)throw new Error("The department training schedule source file could not be loaded.");
     const source=await response.json(),rows=buildScheduleRows(source);
     for(let i=0;i<rows.length;i+=100){
-      const result=await window.db.from("training_schedule").upsert(rows.slice(i,i+100),{onConflict:"schedule_date,shift",ignoreDuplicates:true});
+      const result=await db.from("training_schedule").upsert(rows.slice(i,i+100),{onConflict:"schedule_date,shift",ignoreDuplicates:true});
       if(result.error)throw result.error;
     }
   }
   async function loadRoster() {
-    const r=await window.db.from("personnel").select("id,first_name,last_name,shift,active").eq("active",true).order("last_name").order("first_name");
+    const r=await db.from("personnel").select("id,first_name,last_name,shift,active").eq("active",true).order("last_name").order("first_name");
     if(r.error)throw r.error;roster=r.data||[];
   }
   function personnelChecks(id,people,checkedIds) {
@@ -49,13 +49,13 @@
   }
   function checkedIds(id){return Array.from($(id)?.querySelectorAll('input[type="checkbox"]:checked')||[]).map(x=>Number(x.value));}
   async function getSchedule(date,shift) {
-    const r=await window.db.from("training_schedule").select("*").eq("schedule_date",date).eq("shift",shift).maybeSingle();
+    const r=await db.from("training_schedule").select("*").eq("schedule_date",date).eq("shift",shift).maybeSingle();
     if(r.error)throw r.error;return r.data||null;
   }
   async function getStaffed(date,shift) {
-    const s=await window.db.from("daily_staffing").select("staffing_id").eq("staffing_date",date).eq("shift",shift).maybeSingle();
+    const s=await db.from("daily_staffing").select("staffing_id").eq("staffing_date",date).eq("shift",shift).maybeSingle();
     if(s.error)throw s.error;if(!s.data)return {staffingId:null,people:[]};
-    const a=await window.db.from("daily_app_assignments").select("daily_personnel_assignments(personnel_id,personnel(id,first_name,last_name,shift))").eq("staffing_id",s.data.staffing_id);
+    const a=await db.from("daily_app_assignments").select("daily_personnel_assignments(personnel_id,personnel(id,first_name,last_name,shift))").eq("staffing_id",s.data.staffing_id);
     if(a.error)throw a.error;
     const map=new Map();(a.data||[]).forEach(x=>(x.daily_personnel_assignments||[]).forEach(y=>{if(y.personnel_id&&y.personnel)map.set(Number(y.personnel_id),y.personnel)}));
     return {staffingId:s.data.staffing_id,people:Array.from(map.values()).sort((a,b)=>(a.last_name||"").localeCompare(b.last_name||""))};
@@ -93,7 +93,7 @@
     $("trainingEventPeople").innerHTML=personnelChecks("trainingEventPeopleChecks",filtered,selected);
   }
   async function loadDailyForm() {
-    if(!window.db)return;
+    if(!db)return;
     const date=$("trainingDailyDate").value||dateToday(),shift=shiftForDate(date);
     $("trainingDailyShift").value=shift+" Shift";
     $("trainingDailyOfficer").value=signedName();
@@ -109,7 +109,7 @@
       $("trainingStaffingHint").textContent=staffed.staffingId?"Staffing record loaded":"No daily staffing record found for this date and shift";
       const ids=staffed.people.map(p=>Number(p.id));
       $("trainingDailyPeople").innerHTML=staffed.people.length?personnelChecks("trainingDailyPeopleChecks",staffed.people,ids):'<p class="text-amber-700 bg-amber-50 rounded-lg p-3">No personnel are assigned in the daily staffing record. Update Staffing first, or contact an administrator.</p>';
-      const q=await window.db.from("training_records").select("*,training_attendees(id,personnel_id,hours)").eq("record_type","daily").eq("training_date",date).eq("shift",shift).maybeSingle();
+      const q=await db.from("training_records").select("*,training_attendees(id,personnel_id,hours)").eq("record_type","daily").eq("training_date",date).eq("shift",shift).maybeSingle();
       if(q.error)throw q.error;dailyRecord=q.data||null;
       if(dailyRecord){
         $("trainingDailySubject").value=dailyRecord.subject||$("trainingDailySubject").value;
@@ -121,7 +121,7 @@
         $("trainingDailyPeople").innerHTML=personnelChecks("trainingDailyPeopleChecks",staffed.people,attended);
         $("trainingDailyStatus").textContent=dailyRecord.signed_at?"Signed · "+(dailyRecord.signed_by_name||"Officer"): "Draft saved";
       } else {$("trainingDailyNotes").value="";$("trainingDailyStatus").textContent="Not submitted";}
-      const locked=!!dailyRecord?.signed_at&&window.profile?.app_role!=="admin";
+      const locked=!!dailyRecord?.signed_at&&profile?.app_role!=="admin";
       $("trainingDailySave").disabled=!isManager()||locked;$("trainingDailySign").disabled=!isManager()||locked;
     } catch(e){console.error(e);$("trainingDailyPeople").textContent="Unable to load training details: "+(e.message||e);}
   }
@@ -135,27 +135,27 @@
     if(!payload.subject.trim())throw new Error("Enter a training subject.");
     if(!payload.start_time||!payload.end_time||durationHours(payload.start_time,payload.end_time)<=0)throw new Error("Enter a valid start and end time.");
     if(!attendees.length)throw new Error("Select at least one attending firefighter.");
-    if(sign){payload.conducted=true;payload.signed_by=window.me?.id||null;payload.signed_by_name=signedName();payload.signed_at=new Date().toISOString();}
+    if(sign){payload.conducted=true;payload.signed_by=me?.id||null;payload.signed_by_name=signedName();payload.signed_at=new Date().toISOString();}
     payload.updated_at=new Date().toISOString();
     let record;
     if(payload.id){
-      const u=await window.db.from("training_records").update(payload).eq("id",payload.id).select("id").single();
+      const u=await db.from("training_records").update(payload).eq("id",payload.id).select("id").single();
       if(u.error)throw u.error;record=u.data;
     } else {
-      payload.created_by=window.me?.id||null;
-      const i=await window.db.from("training_records").insert(payload).select("id").single();
+      payload.created_by=me?.id||null;
+      const i=await db.from("training_records").insert(payload).select("id").single();
       if(i.error)throw i.error;record=i.data;
     }
-    const del=await window.db.from("training_attendees").delete().eq("training_record_id",record.id);
+    const del=await db.from("training_attendees").delete().eq("training_record_id",record.id);
     if(del.error)throw del.error;
     const hours=durationHours(payload.start_time,payload.end_time);
-    const ins=await window.db.from("training_attendees").insert(attendees.map(id=>({training_record_id:record.id,personnel_id:id,hours})));
+    const ins=await db.from("training_attendees").insert(attendees.map(id=>({training_record_id:record.id,personnel_id:id,hours})));
     if(ins.error)throw ins.error;
     return record.id;
   }
   async function saveDaily(sign) {
     try {
-      if(dailyRecord?.signed_at&&window.profile?.app_role!=="admin")throw new Error("This report has already been signed and is locked.");
+      if(dailyRecord?.signed_at&&profile?.app_role!=="admin")throw new Error("This report has already been signed and is locked.");
       const date=$("trainingDailyDate").value,shift=shiftForDate(date),schedule=await getSchedule(date,shift),staffed=await getStaffed(date,shift);
       const payload={...(dailyRecord||{}),record_type:"daily",training_date:date,shift,staffing_id:staffed.staffingId,schedule_id:schedule?.id||dailyRecord?.schedule_id||null,subject:$("trainingDailySubject").value.trim(),lesson:$("trainingDailyLesson").value||null,start_time:$("trainingDailyStart").value,end_time:$("trainingDailyEnd").value,description:schedule?.details||null,notes:$("trainingDailyNotes").value||null};
       delete payload.training_attendees;delete payload.id;
@@ -187,7 +187,7 @@
   async function searchAdminTraining() {
     const el=$("adminTrainingResults");el.innerHTML='<p class="text-sm text-slate-500">Searching…</p>';
     try {
-      let q=window.db.from("training_records").select("*,training_attendees(id,personnel_id,hours,personnel(id,first_name,last_name,shift))").order("training_date",{ascending:false}).limit(1000);
+      let q=db.from("training_records").select("*,training_attendees(id,personnel_id,hours,personnel(id,first_name,last_name,shift))").order("training_date",{ascending:false}).limit(1000);
       if($("adminTrainingFrom").value)q=q.gte("training_date",$("adminTrainingFrom").value);
       if($("adminTrainingTo").value)q=q.lte("training_date",$("adminTrainingTo").value);
       if($("adminTrainingShift").value)q=q.eq("shift",$("adminTrainingShift").value);
@@ -221,7 +221,7 @@
     if(originalOpen&&!originalOpen.__trainingWrapped){
       const wrapped=function(id){
         if(id!=="adminTrainingReportsSection")return originalOpen(id);
-        if(window.profile?.app_role!=="admin")return;
+        if(profile?.app_role!=="admin")return;
         const ids=["adminReportArchive","adminStationsSection","adminApparatusSection","adminPersonnelSection","adminApparatusChecklistSection","adminInspectionChecklistSection","adminCallAnalysisPanel","adminHydrantReports","adminTrainingReportsSection"];
         $("adminSectionCards")?.classList.add("hiddenx");ids.forEach(k=>$(k)?.classList.toggle("hiddenx",k!==id));$("adminBackToCards")?.classList.remove("hiddenx");$("adminTrainingReportsSection")?.scrollIntoView({behavior:"smooth",block:"start"});
       };wrapped.__trainingWrapped=true;window.adminOpenSection=wrapped;
@@ -231,10 +231,10 @@
     }
   }
   async function init() {
-    if(!window.db||!window.me)return;
+    if(!db||!me)return;
     try {
       await loadRoster();
-      if(window.profile?.app_role==="admin")await seedSchedule();
+      if(profile?.app_role==="admin")await seedSchedule();
       renderShell();
       installAdminCard();extendAdminNavigation();
       await loadDailyForm();
