@@ -3,7 +3,7 @@
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   let roster = [], dailyRecord = null, eventRecordId = null, eventSelected = new Set(), selectedTrainingView = "daily", scheduleCache = [];
   const isManager = () => ["admin","officer"].includes(String(profile?.app_role || ""));
-  const signedName = () => [profile?.first_name,profile?.last_name].filter(Boolean).join(" ") || me?.email || "Officer";
+  const signedName = () => {const p=typeof currentPersonnel==="function"?currentPersonnel():null;return [p?.first_name,p?.last_name].filter(Boolean).join(" ") || [profile?.first_name,profile?.last_name].filter(Boolean).join(" ") || me?.email || "Officer";};
   const dateToday = () => typeof today === "function" ? today() : new Date().toISOString().slice(0,10);
   const isoDate = d => d.toISOString().slice(0,10);
   const addDays = (date,n) => { const d=new Date(date+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+n);return isoDate(d); };
