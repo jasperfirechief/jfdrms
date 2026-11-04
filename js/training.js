@@ -139,12 +139,12 @@
     "4":{title:"Relay Pumping Operations/Water Shuttle Operations",reading:"Pumping and Aerial Apparatus Driver/Operator Handbook, 3rd Edition, pp. 422–468",objectives:["Describe relay apparatus and equipment.","Explain relay pumping operational considerations.","Identify water shuttle apparatus.","Describe fill site operations."],skills:["Operate in a closed relay (p. 438)."]}
   };
   function curriculumKey(subject) {
-    return String(subject||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim().replace(/\\s+/g," ");
+    return String(subject||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ");
   }
   function scheduledCurriculum(schedule) {
     if (!schedule) return "";
     const subject=String(schedule.subject||"").trim(), lessonText=String(schedule.lesson||"").trim();
-    const lessonMatch=lessonText.match(/(?:lesson\\s*)?(\\d+)/i) || String(schedule.details||"").match(/lesson\\s*(\\d+)/i);
+    const lessonMatch=lessonText.match(/(?:lesson\s*)?(\d+)/i) || String(schedule.details||"").match(/lesson\s*(\d+)/i);
     const lessonNumber=lessonMatch?lessonMatch[1]:"";
     const key=curriculumKey(subject);
     let item=null;
@@ -163,7 +163,7 @@
     if(item?.skills?.length)lines.push("","Hands-on skills / JPR practice:",...item.skills.map(x=>"• "+x));
     else if(item)lines.push("","Hands-on skills / JPR practice: No specific skills practice was listed in the curriculum document for this lesson.");
     if(!item)lines.push("","Curriculum details for this subject/lesson were not found in the uploaded source document. Keep the scheduled subject and lesson and verify the curriculum before conducting training.");
-    return lines.join("\\n");
+    return lines.join("\n");
   }
   let curriculumScheduleSynced=false;
   async function syncScheduledCurriculum() {
@@ -303,6 +303,7 @@
     $("trainingDailyPeople").textContent="Loading staffed personnel…";
     try {
       await ensureScheduleYear(Number(date.slice(0,4)));
+      await syncScheduledCurriculum();
       const [schedule,staffed]=await Promise.all([getSchedule(date,shift),getStaffed(date,shift)]);
       $("trainingDailySubject").value=schedule?.subject||"";
       $("trainingDailyLesson").value=schedule?.lesson||"";
