@@ -213,23 +213,27 @@
   }
   async function refreshAdminTrainingMembers() {
     if(!$("adminTrainingMember")||!db)return;
-    const r=await db.from("training_attendees").select("personnel_name,personnel(first_name,last_name)");
-    if(r.error)throw r.error;
+    const attendeeRows=[];for(let offset=0;;offset+=1000){
+      const r=await db.from("training_attendees").select("personnel_name,personnel(first_name,last_name)").range(offset,offset+999);
+      if(r.error)throw r.error;attendeeRows.push(...(r.data||[]));if((r.data||[]).length<1000)break;
+    }
     const names=new Set(roster.map(p=>[p.first_name,p.last_name].filter(Boolean).join(" ")));
-    (r.data||[]).forEach(a=>{const name=a.personnel_name||[a.personnel?.first_name,a.personnel?.last_name].filter(Boolean).join(" ");if(name)names.add(name);});
+    attendeeRows.forEach(a=>{const name=a.personnel_name||[a.personnel?.first_name,a.personnel?.last_name].filter(Boolean).join(" ");if(name)names.add(name);});
     $("adminTrainingMember").innerHTML='<option value="">All personnel</option>'+Array.from(names).sort((a,b)=>a.localeCompare(b)).map(name=>'<option value="'+esc(name)+'">'+esc(name)+'</option>').join("");
   }
   let adminRows=[];
   async function searchAdminTraining() {
     const el=$("adminTrainingResults");el.innerHTML='<p class="text-sm text-slate-500">Searching…</p>';
     try {
-      let q=db.from("training_records").select("*,training_attendees(id,personnel_id,hours,personnel_name,shift_at_training,personnel(id,first_name,last_name,shift))").order("training_date",{ascending:false}).limit(1000);
-      if($("adminTrainingFrom").value)q=q.gte("training_date",$("adminTrainingFrom").value);
-      if($("adminTrainingTo").value)q=q.lte("training_date",$("adminTrainingTo").value);
-      if($("adminTrainingShift").value)q=q.eq("shift",$("adminTrainingShift").value);
-      const r=await q;if(r.error)throw r.error;
+      const allRecords=[];for(let offset=0;;offset+=1000){
+        let q=db.from("training_records").select("*,training_attendees(id,personnel_id,hours,personnel_name,shift_at_training,personnel(id,first_name,last_name,shift))").order("training_date",{ascending:false});
+        if($("adminTrainingFrom").value)q=q.gte("training_date",$("adminTrainingFrom").value);
+        if($("adminTrainingTo").value)q=q.lte("training_date",$("adminTrainingTo").value);
+        if($("adminTrainingShift").value)q=q.eq("shift",$("adminTrainingShift").value);
+        const page=await q.range(offset,offset+999);if(page.error)throw page.error;allRecords.push(...(page.data||[]));if((page.data||[]).length<1000)break;
+      }
       const term=$("adminTrainingSearch").value.toLowerCase().trim(),member=$("adminTrainingMember").value;
-      adminRows=(r.data||[]).filter(x=>{
+      adminRows=allRecords.filter(x=>{
         const people=x.training_attendees||[];
         const text=[x.subject,x.lesson,x.category,x.description,x.notes,x.instructor,x.signed_by_name].join(" ").toLowerCase();
         return (!term||text.includes(term))&&(!member||people.some(p=>(p.personnel_name||[p.personnel?.first_name,p.personnel?.last_name].filter(Boolean).join(" "))===member));
