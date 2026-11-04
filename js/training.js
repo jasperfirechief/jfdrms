@@ -1,7 +1,7 @@
 (() => {
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-  let roster = [], dailyRecord = null, selectedTrainingView = "daily", scheduleCache = [];
+  let roster = [], dailyRecord = null, eventRecordId = null, selectedTrainingView = "daily", scheduleCache = [];
   const isManager = () => ["admin","officer"].includes(String(profile?.app_role || ""));
   const signedName = () => [profile?.first_name,profile?.last_name].filter(Boolean).join(" ") || me?.email || "Officer";
   const dateToday = () => typeof today === "function" ? today() : new Date().toISOString().slice(0,10);
@@ -168,11 +168,11 @@
   }
   async function saveEvent(sign) {
     try {
-      const payload={record_type:"event",training_date:$("trainingEventDate").value,shift:null,staffing_id:null,schedule_id:null,subject:$("trainingEventSubject").value.trim(),lesson:$("trainingEventLesson").value||null,category:$("trainingEventCategory").value||null,start_time:$("trainingEventStart").value,end_time:$("trainingEventEnd").value,location:$("trainingEventLocation").value||null,instructor:$("trainingEventInstructor").value||null,description:$("trainingEventDescription").value||null,notes:$("trainingEventNotes").value||null};
+      const payload={id:eventRecordId||undefined,record_type:"event",training_date:$("trainingEventDate").value,shift:null,staffing_id:null,schedule_id:null,subject:$("trainingEventSubject").value.trim(),lesson:$("trainingEventLesson").value||null,category:$("trainingEventCategory").value||null,start_time:$("trainingEventStart").value,end_time:$("trainingEventEnd").value,location:$("trainingEventLocation").value||null,instructor:$("trainingEventInstructor").value||null,description:$("trainingEventDescription").value||null,notes:$("trainingEventNotes").value||null};
       const ids=checkedIds("trainingEventPeopleChecks");
-      const id=await saveRecord(payload,ids,sign);
+      const id=await saveRecord(payload,ids,sign);eventRecordId=id;
       alert(sign?"Training event signed and completed.":"Training event draft saved.");
-      if(sign){$("trainingEventSubject").value="";$("trainingEventLesson").value="";$("trainingEventCategory").value="";$("trainingEventLocation").value="";$("trainingEventInstructor").value="";$("trainingEventDescription").value="";$("trainingEventNotes").value="";roster=roster.slice();$("trainingEventPeople").innerHTML=personnelChecks("trainingEventPeopleChecks",roster,[]);}
+      if(sign){eventRecordId=null;$("trainingEventSubject").value="";$("trainingEventLesson").value="";$("trainingEventCategory").value="";$("trainingEventLocation").value="";$("trainingEventInstructor").value="";$("trainingEventDescription").value="";$("trainingEventNotes").value="";roster=roster.slice();$("trainingEventPeople").innerHTML=personnelChecks("trainingEventPeopleChecks",roster,[]);}
     } catch(e){console.error(e);alert("Training event could not be saved: "+(e.message||e));}
   }
   function printReport(r) {
@@ -221,6 +221,8 @@
       const wrapped=function(id){
         if(id!=="adminTrainingReportsSection")return originalOpen(id);
         if(profile?.app_role!=="admin")return;
+        loadRoster().then(()=>{if($("adminTrainingMember"))$("adminTrainingMember").innerHTML='<option value="">All personnel</option>'+roster.map(p=>'<option value="'+p.id+'">'+esc(p.first_name+" "+p.last_name)+'</option>').join("");}).catch(console.error);
+        seedSchedule().catch(console.error);
         const ids=["adminReportArchive","adminStationsSection","adminApparatusSection","adminPersonnelSection","adminApparatusChecklistSection","adminInspectionChecklistSection","adminCallAnalysisPanel","adminHydrantReports","adminTrainingReportsSection"];
         $("adminSectionCards")?.classList.add("hiddenx");ids.forEach(k=>$(k)?.classList.toggle("hiddenx",k!==id));$("adminBackToCards")?.classList.remove("hiddenx");$("adminTrainingReportsSection")?.scrollIntoView({behavior:"smooth",block:"start"});
       };wrapped.__trainingWrapped=true;window.adminOpenSection=wrapped;
