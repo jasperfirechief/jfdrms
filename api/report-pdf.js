@@ -790,7 +790,31 @@ async function makeArchivePdf(kind,data){
  const pdf=await PDFDocument.create(),reg=await pdf.embedFont(StandardFonts.Helvetica),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
  const W=612,H=792,m=42,usable=W-2*m;let page,y;const F={reg,bold};const newPage=()=>{page=pdf.addPage([W,H]);y=H-m};const wrap=(s,size=9,lh=13,b=false)=>{const font=b?F.bold:F.reg;let line="";for(const word of String(s??"").split(/\s+/)){const n=line?line+" "+word:word;if(font.widthOfTextAtSize(n,size)>usable&&line){safeDrawText(page,line,{x:m,y,font,size});y-=lh;line=word}else line=n}if(line){safeDrawText(page,line,{x:m,y,font,size});y-=lh}};const top=title=>{newPage();safeDrawText(page,"JASPER FIRE DEPARTMENT",{x:m,y,font:F.bold,size:16,color:rgb(.12,.16,.22)});y-=20;safeDrawText(page,title,{x:m,y,font:F.bold,size:11,color:rgb(.65,.02,.02)});y-=24};const section=title=>{if(y<80)newPage();safeDrawText(page,title,{x:m,y,font:F.bold,size:11});y-=17};const kv=(k,v)=>{if(y<55)newPage();safeDrawText(page,k+":",{x:m,y,font:F.bold,size:8});wrap(v||"—",8,10);};
  top(kind==="staffing"?"DAILY STAFFING REPORT":kind==="check"?"APPARATUS CHECK REPORT":kind==="inspection"?"FIRE INSPECTION REPORT":"INCIDENT REPORT");
- const x=data||{};for(const [k,v] of Object.entries(x)){if(v===null||v===undefined||v==="")continue;if(Array.isArray(v)||typeof v==="object"){section(k.replace(/[_-]/g," ").toUpperCase());wrap(JSON.stringify(v,null,2),7,9)}else kv(k.replace(/[_-]/g," "),v)}
+ const x=data||{};
+ if(kind==="training"){
+  top("TRAINING REPORT");
+  kv("Training date",date(x.training_date));
+  kv("Record type",x.record_type==="daily"?"Scheduled Daily Training":"Additional Training Event");
+  kv("Shift",x.shift?x.shift+" Shift":"");
+  kv("Subject",x.subject);
+  kv("Lesson / Course",x.lesson||"");
+  kv("Category",x.category||"");
+  kv("Time",time(x.start_time)+" - "+time(x.end_time));
+  kv("Location",x.location||"");
+  kv("Instructor",x.instructor||"");
+  kv("Training description",x.description||"");
+  kv("Additional notes",x.notes||"");
+  kv("Status",x.signed_at?"Completed / signed":"Draft");
+  kv("Officer sign-off",x.signed_by_name||"");
+  kv("Signed at",x.signed_at?date(x.signed_at)+" "+time(x.signed_at):"");
+  section("PERSONNEL ATTENDANCE");
+  const attendees=Array.isArray(x.training_attendees)?x.training_attendees:[];
+  if(attendees.length){for(const a of attendees){const name=[a.personnel?.first_name,a.personnel?.last_name].filter(Boolean).join(" ")||"Personnel";kv(name,Number(a.hours||0).toFixed(2)+" training hours");}}
+  else kv("Attendance","No personnel recorded.");
+  safeDrawText(page,"JFD RMS • Training Report",{x:m,y:30,font:F.reg,size:7,color:rgb(.4,.4,.4)});
+  return pdf.save({objectsPerTick:Infinity});
+ }
+ for(const [k,v] of Object.entries(x)){if(v===null||v===undefined||v==="")continue;if(Array.isArray(v)||typeof v==="object"){section(k.replace(/[_-]/g," ").toUpperCase());wrap(JSON.stringify(v,null,2),7,9)}else kv(k.replace(/[_-]/g," "),v)}
  if(kind==="incident"&&x.reports){for(const r of x.reports||[]){section(r.report_type||"Report");for(const [k,v] of Object.entries(r.data||{})){if(v===null||v===undefined||v==="")continue;if(Array.isArray(v)||typeof v==="object")wrap(k+": "+JSON.stringify(v),7,9);else kv(k,v)}}}
  safeDrawText(page,"JFD RMS • Administrative Report Archive",{x:m,y:30,font:F.reg,size:7,color:rgb(.4,.4,.4)});return pdf.save({objectsPerTick:Infinity});
 }
