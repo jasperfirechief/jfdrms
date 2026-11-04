@@ -151,7 +151,8 @@
     if (/driver training|driver operator|apparatus driver/.test(key)) item=driverCurriculum[lessonNumber];
     if (!item) {
       const normalized=key.replace(/^hazardous material /,"hazardous material ");
-      item=curriculumBySubject[normalized]?.[lessonNumber] || curriculumBySubject[key]?.[lessonNumber] || null;
+      const matchedSubject=Object.keys(curriculumBySubject).find(name=>curriculumKey(name)===key);
+      item=curriculumBySubject[normalized]?.[lessonNumber] || curriculumBySubject[key]?.[lessonNumber] || (matchedSubject?curriculumBySubject[matchedSubject]?.[lessonNumber]:null) || null;
     }
     const lines=[];
     if(item?.title)lines.push(item.title);
