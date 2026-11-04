@@ -182,19 +182,41 @@ async function makeChecksPdf(date, rows) {
   return makeTablePdf("APPARATUS CHECKS REPORT",sections);
 }
 
+async function makeTrainingPdf(records) {
+  const sections=(records||[]).map(r=>{
+    const attendees=(r.training_attendees||[]).map(a=>{
+      const name=[a.personnel?.first_name,a.personnel?.last_name].filter(Boolean).join(" ")||"Personnel";
+      return name+" ("+Number(a.hours||0).toFixed(2)+" hrs)";
+    }).join(", ");
+    return {
+      title:(r.shift?r.shift+" SHIFT":"TRAINING EVENT")+" • "+fmtDate(r.training_date),
+      rows:[
+        ["Training Type",r.record_type==="daily"?"Scheduled Daily Training":"Additional Training Event"],
+        ["Subject",r.subject],["Lesson / Course",r.lesson||r.category||""],
+        ["Time",String(r.start_time||"").slice(0,5)+" – "+String(r.end_time||"").slice(0,5)],
+        ["Location",r.location||""],["Instructor",r.instructor||""],
+        ["Training Details",r.description||""],["Additional Notes",r.notes||""],
+        ["Personnel Attending",attendees],["Officer Sign-off",r.signed_by_name||""],
+        ["Signed At",fmtDateTime(r.signed_at)]
+      ]
+    };
+  });
+  return makeTablePdf("DAILY TRAINING REPORTS",sections.length?sections:[{title:"TRAINING",rows:[["Status","No completed training reports were submitted for this shift."]]}]);
+}
+
 async function makeStandaloneReportPdf(incident, report) {
   const synthetic={...incident, reports:[report]};
   return makeIncidentPdf(synthetic);
 }
 
-async function sendEmail(attachments,shiftStart,shiftEnd,incidentCount,reportCount,activitySummary) {
+async function sendEmail(attachments,shiftStart,shiftEnd,incidentCount,reportCount,activitySummary,trainingCount=0) {
   const key=process.env.BREVO_API_KEY,from=process.env.BREVO_FROM_EMAIL;
   if(!key||!from) throw new Error("Brevo email is not configured. Add BREVO_API_KEY and BREVO_FROM_EMAIL in Vercel.");
   const payload={
     sender:{email:from,name:"Jasper Fire Department"},
     to:[{email:"firechief@jaspercity.com"}],
     subject:"Jasper Fire Department - Daily Shift Reports - "+shiftStart+" to "+shiftEnd,
-    textContent:"Daily shift package for "+shiftStart+" through "+shiftEnd+"\\n\\n"+activitySummary+"\\n\\nIncidents: "+incidentCount+"\\nSubmitted reports: "+reportCount+"\\nAttachments: "+attachments.length,
+    textContent:"Daily shift package for "+shiftStart+" through "+shiftEnd+"\\n\\n"+activitySummary+"\\n\\nIncidents: "+incidentCount+"\\nSubmitted reports: "+reportCount+"\\nTraining reports: "+trainingCount+"\\nAttachments: "+attachments.length,
     attachment:attachments.map(a=>({content:a.content,name:a.filename}))
   };
   const r=await fetch("https://api.brevo.com/v3/smtp/email",{method:"POST",headers:{"api-key":key,"Content-Type":"application/json","accept":"application/json"},body:JSON.stringify(payload)});
@@ -224,6 +246,7 @@ export default async function handler(req,res) {
       supa("apparatus?select=apparatus_id,unit_number")
     ]):[[],[],[],[],[]];
     const checks=await supa("apparatus_checks?select=*&check_date=eq."+shiftStart+"&order=apparatus_id,check_time");
+    const training=await supa("training_records?select=*,training_attendees(hours,personnel(first_name,last_name))&training_date=eq."+shiftStart+"&conducted=eq.true&order=shift");
     const incidents=await supa("incidents?select=*&dispatch_time=gte."+encodeURIComponent(startUtc)+"&dispatch_time=lt."+encodeURIComponent(endUtc)+"&order=dispatch_time");
     const standalone=await supa("standalone_reports?select=*&created_at=gte."+encodeURIComponent(startUtc)+"&created_at=lt."+encodeURIComponent(endUtc)+"&order=created_at");
     const [hydrantInspections,hydrantFlowTests,preplans,activityPersonnel]=await Promise.all([
@@ -256,6 +279,11 @@ export default async function handler(req,res) {
     const checksPdf=await makeChecksPdf(shiftStart,checks||[]);
     attachments.push({content:Buffer.from(checksPdf).toString("base64"),filename:"02 - Apparatus Checks.pdf"});
     let reportCount=0,attachmentNumber=3;
+    if((training||[]).length){
+      const trainingPdf=await makeTrainingPdf(training);
+      attachments.push({content:Buffer.from(trainingPdf).toString("base64"),filename:"03 - Training Reports.pdf"});
+      attachmentNumber=4;
+    }
     for(const incident of incidents||[]){
       const reports=Array.isArray(incident.reports)?incident.reports:[];
       if(!reports.length) continue;
@@ -272,8 +300,8 @@ export default async function handler(req,res) {
       attachments.push({content:Buffer.from(pdf).toString("base64"),filename:String(attachmentNumber++).padStart(2,"0")+" - Standalone - "+label+".pdf"});
       reportCount++;
     }
-    await sendEmail(attachments,shiftStart,shiftEnd,(incidents||[]).length,reportCount,activitySummary);
-    return res.status(200).json({ok:true,shift_start:shiftStart,shift_end:shiftEnd,incidents:(incidents||[]).length,reports:reportCount,attachments:attachments.length});
+    await sendEmail(attachments,shiftStart,shiftEnd,(incidents||[]).length,reportCount,activitySummary,(training||[]).length);
+    return res.status(200).json({ok:true,shift_start:shiftStart,shift_end:shiftEnd,incidents:(incidents||[]).length,reports:reportCount,training_reports:(training||[]).length,attachments:attachments.length});
   } catch(e) {
     console.error("Daily report email error",e);
     return res.status(500).json({ok:false,error:e?.message||"Daily report email failed."});
