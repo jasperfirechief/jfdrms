@@ -83,22 +83,31 @@
   };
   function scheduledCurriculum(schedule) {
     if (!schedule) return "";
-    const subject = String(schedule.subject || "").toLowerCase();
-    if (!/driver training|driver\/operator|apparatus driver/.test(subject)) return "";
-    const lessonText = String(schedule.lesson || "");
+    const subject = String(schedule.subject || "").trim();
+    const lessonText = String(schedule.lesson || "").trim();
+    const normalized = subject.toLowerCase();
     const match = lessonText.match(/(?:lesson\s*)?(\d+)/i);
     const lessonNumber = match ? match[1] : "";
-    const item = driverCurriculum[lessonNumber];
-    if (!item) return "";
-    const lines = [
-      item.title,
-      "Assigned textbook reading: " + item.reading,
-      "",
-      "Learning objectives:",
-      ...item.objectives.map(x => "• " + x)
-    ];
-    if (item.skills.length) lines.push("", "Hands-on skills / JPR practice:", ...item.skills.map(x => "• " + x));
-    else lines.push("", "Hands-on skills / JPR practice: No specific skills practice was listed in the curriculum document for this lesson.");
+    const isDriver = normalized.includes("driver training") || normalized.includes("driver/operator") || normalized.includes("apparatus driver");
+    const item = isDriver ? driverCurriculum[lessonNumber] : null;
+    if (item) {
+      const lines = [
+        item.title,
+        "Scheduled subject: " + subject,
+        "Scheduled lesson: " + lessonText,
+        "Assigned textbook reading: " + item.reading,
+        "",
+        "Learning objectives:",
+        ...item.objectives.map(x => "• " + x)
+      ];
+      if (item.skills.length) lines.push("", "Hands-on skills / JPR practice:", ...item.skills.map(x => "• " + x));
+      else lines.push("", "Hands-on skills / JPR practice: No specific skills practice was listed in the curriculum document for this lesson.");
+      return lines.join("\n");
+    }
+    const lines = [];
+    if (subject) lines.push("Scheduled subject: " + subject);
+    if (lessonText) lines.push("Scheduled lesson: " + lessonText);
+    lines.push("Shift Officer is to direct training on applicable aspects of the scheduled subject and lesson, as appropriate.");
     return lines.join("\n");
   }
   const isManager = () => ["admin","officer"].includes(String(profile?.app_role || ""));
@@ -230,7 +239,7 @@
       $("trainingDailySubject").value=schedule?.subject||"";
       $("trainingDailyLesson").value=schedule?.lesson||"";
       const curriculumDetails=scheduledCurriculum(schedule);
-      $("trainingDailyDetails").value=schedule?(schedule.details||curriculumDetails||[schedule.lesson,schedule.subject].filter(Boolean).join(" — ")):"";
+      $("trainingDailyDetails").value=schedule?(String(schedule.details||"").trim()||curriculumDetails):"";
       $("trainingDailyLocation").value="Station 1";$("trainingDailyCategory").value=inferTrainingType(schedule);$("trainingDailyOfficer").value=signedName();
       $("trainingDailyStart").value=(schedule?.start_time||"09:00").slice(0,5);
       $("trainingDailyEnd").value=(schedule?.end_time||"12:00").slice(0,5);updateDailyHours();
