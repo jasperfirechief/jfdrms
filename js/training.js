@@ -21,6 +21,86 @@
     if(/recruit|academy|probationary/.test(text))return "Recruit";
     return "Company Training (Fire)";
   }
+  const driverCurriculum = {
+    "1": {
+      title: "Apparatus Safety and Operating Emergency Vehicles",
+      reading: "Pumping and Aerial Apparatus Driver/Operator Handbook, 3rd Edition, pages 76–122",
+      objectives: [
+        "Detect reasons for accidents.",
+        "Review apparatus rider safety considerations.",
+        "Explain considerations for operation of an apparatus.",
+        "Explain apparatus emergency response considerations.",
+        "Explain considerations when backing apparatus."
+      ],
+      skills: [
+        "Drive a fire service apparatus (pages 126–127).",
+        "Back apparatus using mirrors (page 128).",
+        "Perform various driving exercises (pages 129–130)."
+      ]
+    },
+    "2": {
+      title: "Principles of Water/Hose Nozzles and Flow Rates",
+      reading: "Pumping and Aerial Apparatus Driver/Operator Handbook, 3rd Edition, pages 167–272",
+      objectives: [
+        "Describe characteristics of water.",
+        "Summarize facts about water pressure and velocity.",
+        "Summarize principles of friction loss.",
+        "Distinguish among types of fire hose nozzles.",
+        "Summarize facts about nozzle pressure and reaction."
+      ],
+      skills: []
+    },
+    "3": {
+      title: "Fire Pump Theory/Operating Fire Pumps",
+      reading: "Pumping and Aerial Apparatus Driver/Operator Handbook, 3rd Edition, pages 292–366",
+      objectives: [
+        "Describe intake and discharge piping.",
+        "Explain operation of automatic pressure control devices.",
+        "Describe types of auxiliary cooling devices.",
+        "Explain making the pump operational.",
+        "Explain considerations when operating from a pressurized water source.",
+        "Describe actions taken for sprinkler and standpipe support."
+      ],
+      skills: [
+        "Perform operations from the apparatus water tank (pages 392–393).",
+        "Make the transition from apparatus water tank to external pressurized water supply (page 394).",
+        "Operate from a pressurized water source (page 395)."
+      ]
+    },
+    "4": {
+      title: "Relay Pumping Operations/Water Shuttle Operations",
+      reading: "Pumping and Aerial Apparatus Driver/Operator Handbook, 3rd Edition, pages 422–468",
+      objectives: [
+        "Describe relay apparatus and equipment.",
+        "Explain relay pumping operational considerations.",
+        "Identify water shuttle apparatus.",
+        "Describe fill site operations."
+      ],
+      skills: [
+        "Operate in a closed relay (page 438)."
+      ]
+    }
+  };
+  function scheduledCurriculum(schedule) {
+    if (!schedule) return "";
+    const subject = String(schedule.subject || "").toLowerCase();
+    if (!/driver training|driver\/operator|apparatus driver/.test(subject)) return "";
+    const lessonText = String(schedule.lesson || "");
+    const match = lessonText.match(/(?:lesson\\s*)?(\\d+)/i);
+    const lessonNumber = match ? match[1] : "";
+    const item = driverCurriculum[lessonNumber];
+    if (!item) return "";
+    const lines = [
+      item.title,
+      "Assigned textbook reading: " + item.reading,
+      "",
+      "Learning objectives:",
+      ...item.objectives.map(x => "• " + x)
+    ];
+    if (item.skills.length) lines.push("", "Hands-on skills / JPR practice:", ...item.skills.map(x => "• " + x));
+    else lines.push("", "Hands-on skills / JPR practice: No specific skills practice was listed in the curriculum document for this lesson.");
+    return lines.join("\\n");
+  }
   const isManager = () => ["admin","officer"].includes(String(profile?.app_role || ""));
   const signedName = () => {const p=typeof currentPersonnel==="function"?currentPersonnel():null;return [p?.first_name,p?.last_name].filter(Boolean).join(" ") || [profile?.first_name,profile?.last_name].filter(Boolean).join(" ") || me?.email || "Officer";};
   const dateToday = () => typeof today === "function" ? today() : new Date().toISOString().slice(0,10);
@@ -149,7 +229,7 @@
       const [schedule,staffed]=await Promise.all([getSchedule(date,shift),getStaffed(date,shift)]);
       $("trainingDailySubject").value=schedule?.subject||"";
       $("trainingDailyLesson").value=schedule?.lesson||"";
-      $("trainingDailyDetails").value=schedule?(schedule.details||[schedule.lesson,schedule.subject].filter(Boolean).join(" — ")):"";
+      const curriculumDetails=scheduledCurriculum(schedule);\n      $("trainingDailyDetails").value=schedule?(schedule.details||curriculumDetails||[schedule.lesson,schedule.subject].filter(Boolean).join(" — ")):"";
       $("trainingDailyLocation").value="Station 1";$("trainingDailyCategory").value=inferTrainingType(schedule);$("trainingDailyOfficer").value=signedName();
       $("trainingDailyStart").value=(schedule?.start_time||"09:00").slice(0,5);
       $("trainingDailyEnd").value=(schedule?.end_time||"12:00").slice(0,5);updateDailyHours();
