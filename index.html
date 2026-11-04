@@ -3116,6 +3116,7 @@ async function adminArchivePdf(kind,id,email){
   if(kind==="incident"){const r=await db.from("incidents").select("*").eq("cad",id).maybeSingle();if(r.error||!r.data)return alert(r.error?.message||"Incident not found.");payload.archiveData=r.data;}
   else if(kind==="staffing"){const r=await db.from("daily_staffing").select("*").eq("staffing_id",id).maybeSingle();if(r.error||!r.data)return alert(r.error?.message||"Staffing record not found.");payload.archiveData=r.data;}
   else if(kind==="check"){const r=await db.from("apparatus_checks").select("*").eq("check_id",id).maybeSingle();if(r.error||!r.data)return alert(r.error?.message||"Apparatus check not found.");payload.archiveData=r.data;}
+  else if(kind==="training"){const r=await db.from("training_records").select("*,training_attendees(hours,personnel(first_name,last_name))").eq("id",id).maybeSingle();if(r.error||!r.data)return alert(r.error?.message||"Training report not found.");payload.archiveData=r.data;}
   else {const r=await db.from("inspections").select("*").eq("inspection_id",id).maybeSingle();if(r.error||!r.data)return alert(r.error?.message||"Inspection not found.");payload.archiveData=r.data;}
   const s=(await db.auth.getSession()).data?.session;if(!s)throw new Error("Authentication required.");
   const resp=await fetch("/api/report-pdf",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+s.access_token},body:JSON.stringify(payload)});
