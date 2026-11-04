@@ -38,6 +38,9 @@ window.rmsLogin=async function(e){
   <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
     <label class="text-sm font-semibold">Entry type<select id="staffEventType" onchange="updateStaffEventForm()" class="block w-full border rounded-lg p-2 mt-1 bg-white"><option value="leave">Personnel off / leave</option><option value="swap">Personnel swap</option></select></label>
     <label class="text-sm font-semibold">Employee<select id="staffEventPerson" class="block w-full border rounded-lg p-2 mt-1 bg-white"><option value="">Select employee</option></select></label>
+    <label class="text-sm font-semibold" id="staffEventEffectiveWrap">Effective Date<input id="staffEventEffectiveDate" type="date" required class="block w-full border rounded-lg p-2 mt-1 bg-white"></label>
+    <label id="staffEventLeaveStartWrap" class="text-sm font-semibold">Leave Start Date<input id="staffEventLeaveStartDate" type="date" required class="block w-full border rounded-lg p-2 mt-1 bg-white"></label>
+    <label id="staffEventLeaveEndWrap" class="text-sm font-semibold">Leave End Date <span class="font-normal text-slate-500">(optional if ongoing)</span><input id="staffEventLeaveEndDate" type="date" class="block w-full border rounded-lg p-2 mt-1 bg-white"></label>
     <label class="text-sm font-semibold" id="staffEventReplacementWrap">Replacement / swapped with<select id="staffEventReplacement" class="block w-full border rounded-lg p-2 mt-1 bg-white"><option value="">Select replacement</option></select></label>
     <label id="staffEventLeaveTypeWrap" class="text-sm font-semibold">Leave type<select id="staffEventLeaveType" class="block w-full border rounded-lg p-2 mt-1 bg-white"><option value="sick">Sick</option><option value="vacation">Vacation</option><option value="kelly_day">Kelly Day</option><option value="other">Other</option></select></label>
     <label class="text-sm font-semibold">Station<select id="staffEventStation" class="block w-full border rounded-lg p-2 mt-1 bg-white"><option value="">Not specified</option></select></label>
@@ -1105,6 +1108,9 @@ function renderStaffingEventOptions(){
   fill("staffEventReplacement",active,"Select replacement",p=>({id:p.id,label:[p.first_name,p.last_name].filter(Boolean).join(" ")}));
   fill("staffEventStation",stations||[],"Not specified",s=>({id:s.station_id,label:s.station_name}));
   fill("staffEventApparatus",apparatus||[],"Not specified",a=>({id:a.apparatus_id,label:a.unit_number}));
+  const defaultDate=$("staffDate")?.value||today();
+  if($("staffEventEffectiveDate")&&!$("staffEventEffectiveDate").value)$("staffEventEffectiveDate").value=defaultDate;
+  if($("staffEventLeaveStartDate")&&!$("staffEventLeaveStartDate").value)$("staffEventLeaveStartDate").value=defaultDate;
   updateStaffEventForm();
 }
 function updateStaffEventForm(){
@@ -1112,6 +1118,9 @@ function updateStaffEventForm(){
   $("staffEventReplacementWrap")?.classList.toggle("hiddenx",false);
   $("staffEventReplacement")?.toggleAttribute("required",swap);
   $("staffEventLeaveTypeWrap")?.classList.toggle("hiddenx",swap);
+  $("staffEventEffectiveWrap")?.classList.toggle("hiddenx",!swap);
+  $("staffEventLeaveStartWrap")?.classList.toggle("hiddenx",swap);
+  $("staffEventLeaveEndWrap")?.classList.toggle("hiddenx",swap);
   $("staffEventStartWrap")?.classList.toggle("hiddenx",full);
   $("staffEventEndWrap")?.classList.toggle("hiddenx",full);
 }
@@ -1121,6 +1130,10 @@ function resetStaffEventForm(){
   if($("staffEventPerson"))$("staffEventPerson").value="";
   if($("staffEventReplacement"))$("staffEventReplacement").value="";
   if($("staffEventLeaveType"))$("staffEventLeaveType").value="sick";
+  const defaultDate=$("staffDate")?.value||today();
+  if($("staffEventEffectiveDate"))$("staffEventEffectiveDate").value=defaultDate;
+  if($("staffEventLeaveStartDate"))$("staffEventLeaveStartDate").value=defaultDate;
+  if($("staffEventLeaveEndDate"))$("staffEventLeaveEndDate").value="";
   if($("staffEventStation"))$("staffEventStation").value="";
   if($("staffEventApparatus"))$("staffEventApparatus").value="";
   if($("staffEventFullShift"))$("staffEventFullShift").checked=true;
@@ -1140,7 +1153,9 @@ async function renderStaffingEventList(staffingId){
     const type=x.event_type==="swap"?"Personnel swap":(String(x.leave_type||"Leave").replace("_"," "));
     const station=stations.find(s=>Number(s.station_id)===Number(x.station_id))?.station_name||"";
     const unit=apparatus.find(a=>Number(a.apparatus_id)===Number(x.apparatus_id))?.unit_number||"";
-    return '<div class="flex flex-wrap items-start justify-between gap-3 border rounded-lg p-3 mb-2"><div class="min-w-0"><div class="font-semibold">'+esc(type)+' · '+esc([x.person?.first_name,x.person?.last_name].filter(Boolean).join(" ")||"Unknown employee")+(x.replacement_personnel_id?' → '+esc([x.replacement?.first_name,x.replacement?.last_name].filter(Boolean).join(" ")||"Unknown employee"):'')+'</div><div class="text-xs text-slate-500 mt-1">'+esc([station,unit,duration].filter(Boolean).join(" · "))+'</div>'+(x.notes?'<div class="text-sm mt-1">'+esc(x.notes)+'</div>':'')+'</div><div class="flex gap-2 shrink-0"><button type="button" onclick="editStaffingEvent(\''+x.event_id+'\')" class="border rounded px-3 py-1 text-sm font-semibold">Edit</button><button type="button" onclick="deleteStaffingEvent(\''+x.event_id+'\')" class="border border-red-200 text-red-700 rounded px-3 py-1 text-sm font-semibold">Delete</button></div></div>';
+    const dateInfo=x.event_type==="swap"?("Effective "+(x.effective_date||"Not set")):("Leave "+(x.leave_start_date||"Not set")+(x.leave_end_date?" through "+x.leave_end_date:" (ongoing)"));
+    const submitted=x.created_at?("Submitted "+new Date(x.created_at).toLocaleDateString("en-US",{timeZone:JFD_TIME_ZONE})):"";
+    return '<div class="flex flex-wrap items-start justify-between gap-3 border rounded-lg p-3 mb-2"><div class="min-w-0"><div class="font-semibold">'+esc(type)+' · '+esc([x.person?.first_name,x.person?.last_name].filter(Boolean).join(" ")||"Unknown employee")+(x.replacement_personnel_id?' → '+esc([x.replacement?.first_name,x.replacement?.last_name].filter(Boolean).join(" ")||"Unknown employee"):'')+'</div><div class="text-xs text-slate-500 mt-1">'+esc([dateInfo,station,unit,duration,submitted].filter(Boolean).join(" · "))+'</div>'+(x.notes?'<div class="text-sm mt-1">'+esc(x.notes)+'</div>':'')+'</div>';<div class="flex gap-2 shrink-0"><button type="button" onclick="editStaffingEvent(\''+x.event_id+'\')" class="border rounded px-3 py-1 text-sm font-semibold">Edit</button><button type="button" onclick="deleteStaffingEvent(\''+x.event_id+'\')" class="border border-red-200 text-red-700 rounded px-3 py-1 text-sm font-semibold">Delete</button></div></div>';
   }).join(""):'<p class="text-sm text-slate-500">No personnel changes or leave entries recorded for this shift.</p>');
 }
 async function saveStaffingEvent(){
@@ -1148,11 +1163,17 @@ async function saveStaffingEvent(){
   const date=$("staffDate").value||today(),shift=$("staffShift").value||"A";
   const eventType=$("staffEventType").value,personnelId=Number($("staffEventPerson").value||0),replacementId=Number($("staffEventReplacement").value||0);
   const full=$("staffEventFullShift").checked;
+  const effectiveDate=$("staffEventEffectiveDate").value;
+  const leaveStartDate=$("staffEventLeaveStartDate").value;
+  const leaveEndDate=$("staffEventLeaveEndDate").value||null;
   if(!personnelId)return alert("Select the employee.");
   if(eventType==="swap"&&(!replacementId||replacementId===personnelId))return alert("Select a different replacement employee for this swap.");
+  if(eventType==="swap"&&!effectiveDate)return alert("Select the effective date for this personnel change.");
+  if(eventType==="leave"&&!leaveStartDate)return alert("Select the leave start date.");
+  if(eventType==="leave"&&leaveEndDate&&leaveEndDate<leaveStartDate)return alert("Leave end date cannot be before the start date.");
   if(!full&&(!$("staffEventStart").value||!$("staffEventEnd").value))return alert("Enter both start and end times for a partial-shift entry.");
   const base=await getOrCreateStaffing(date,shift);if(base.error)return alert(base.error.message);
-  const payload={staffing_id:base.data.staffing_id,event_type:eventType,personnel_id:personnelId,replacement_personnel_id:replacementId||null,station_id:Number($("staffEventStation").value)||null,apparatus_id:Number($("staffEventApparatus").value)||null,leave_type:eventType==="swap"?"swap":$("staffEventLeaveType").value,is_full_shift:full,start_time:full?null:$("staffEventStart").value,end_time:full?null:$("staffEventEnd").value,notes:$("staffEventNotes").value.trim()||null,created_by:me?.id||null};
+  const payload={staffing_id:base.data.staffing_id,event_type:eventType,effective_date:eventType==="swap"?effectiveDate:leaveStartDate,leave_start_date:eventType==="leave"?leaveStartDate:null,leave_end_date:eventType==="leave"?leaveEndDate:null,personnel_id:personnelId,replacement_personnel_id:replacementId||null,station_id:Number($("staffEventStation").value)||null,apparatus_id:Number($("staffEventApparatus").value)||null,leave_type:eventType==="swap"?"swap":$("staffEventLeaveType").value,is_full_shift:full,start_time:full?null:$("staffEventStart").value,end_time:full?null:$("staffEventEnd").value,notes:$("staffEventNotes").value.trim()||null,created_by:me?.id||null};
   const id=$("staffEventId").value;
   const result=id?await db.from("daily_staffing_events").update(payload).eq("event_id",id):await db.from("daily_staffing_events").insert(payload);
   if(result.error)return alert("Could not save personnel entry: "+result.error.message);
@@ -1166,6 +1187,9 @@ async function editStaffingEvent(id){
   const x=r.data;
   $("staffEventId").value=x.event_id;$("staffEventType").value=x.event_type;$("staffEventPerson").value=String(x.personnel_id);$("staffEventReplacement").value=x.replacement_personnel_id?String(x.replacement_personnel_id):"";
   if(x.leave_type!=="swap")$("staffEventLeaveType").value=x.leave_type;
+  $("staffEventEffectiveDate").value=x.effective_date||x.leave_start_date||"";
+  $("staffEventLeaveStartDate").value=x.leave_start_date||x.effective_date||"";
+  $("staffEventLeaveEndDate").value=x.leave_end_date||"";
   $("staffEventStation").value=x.station_id?String(x.station_id):"";$("staffEventApparatus").value=x.apparatus_id?String(x.apparatus_id):"";
   $("staffEventFullShift").checked=!!x.is_full_shift;$("staffEventStart").value=x.start_time||"";$("staffEventEnd").value=x.end_time||"";$("staffEventNotes").value=x.notes||"";
   $("staffEventCancel")?.classList.remove("hiddenx");updateStaffEventForm();
