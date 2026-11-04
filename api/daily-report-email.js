@@ -188,12 +188,14 @@ async function makeTrainingPdf(records) {
       const name=a.personnel_name||[a.personnel?.first_name,a.personnel?.last_name].filter(Boolean).join(" ")||"Personnel";
       return name+(a.shift_at_training?" · "+a.shift_at_training+" Shift":"")+" ("+Number(a.hours||0).toFixed(2)+" hrs)";
     }).join(", ");
+    const start=String(r.start_time||"").split(":").map(Number),end=String(r.end_time||"").split(":").map(Number);
+    const hours=start.length===2&&end.length===2?Math.max(0,(end[0]*60+end[1]-start[0]*60-start[1])/60):0;
     return {
       title:(r.shift?r.shift+" SHIFT":"TRAINING EVENT")+" • "+fmtDate(r.training_date),
       rows:[
-        ["Training Type",r.record_type==="daily"?"Scheduled Daily Training":"Additional Training Event"],
-        ["Subject",r.subject],["Lesson / Course",r.lesson||r.category||""],
-        ["Time",String(r.start_time||"").slice(0,5)+" – "+String(r.end_time||"").slice(0,5)],
+        ["Type",r.category||""],["Report",r.record_type==="daily"?"Scheduled Daily Training":"Additional Training Event"],
+        ["Subject",r.subject],["Lesson / Course",r.lesson||""],
+        ["Time",String(r.start_time||"").slice(0,5)+" – "+String(r.end_time||"").slice(0,5)],["HOURS",hours.toFixed(2)],
         ["Location",r.location||""],["Instructor",r.instructor||""],
         ["Training Details",r.description||""],["Additional Notes",r.notes||""],
         ["Personnel Attending",attendees],["Officer Sign-off",r.signed_by_name||""],
