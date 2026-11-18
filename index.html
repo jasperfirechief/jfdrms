@@ -828,9 +828,10 @@ async function loadStaffing(preferred={}){
   localStorage.setItem("jfd_staff_shift",shift);
   $("staffDate").value=date;
   $("staffShift").value=shift;
-  const r=await getOrCreateStaffing(date,shift);if(r.error)return alert(r.error.message);
+  const r=await db.from("daily_staffing").select("staffing_id").eq("staffing_date",date).eq("shift",shift).maybeSingle();if(r.error)return alert(r.error.message);
   if(loadToken!==window.jfdStaffingLoadToken)return;
   if($("staffDate").value!==date||$("staffShift").value!==shift||window.jfdSelectedStaffShift!==shift)return;
+  if(!r.data){$("staffGrid").innerHTML=stations.map(st=>'<button onclick="openStationStaffing('+Number(st.station_id)+')" class="card p-5 text-left hover:border-red-400 transition"><div class="font-black text-lg">'+esc(st.station_name)+'</div><div class="text-sm text-slate-500 mt-2">No staffing saved · Manage →</div></button>').join("");$("staffEventExisting").innerHTML='<p class="text-sm text-slate-500">No staffing record exists for this date yet. Select a station above to begin staffing it.</p>';return;}
   const sid=r.data.staffing_id;
   const a=await db.from("daily_app_assignments").select("assignment_id,station_id,apparatus_id,daily_personnel_assignments(assignment_id,personnel_id,assignment_role,personnel(id,first_name,last_name,shift))").eq("staffing_id",sid);
   if(a.error)return alert(a.error.message);
