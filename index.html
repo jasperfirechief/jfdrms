@@ -529,9 +529,58 @@ function adminShowSectionCards(){if(profile?.app_role!=="admin")return;["adminRe
 function tab(t){if(t==="admin"&&profile?.app_role!=="admin"){alert("Administration is available only to administrators.");return}if(t==="reports"&&!["admin","officer"].includes(String(profile?.app_role||""))){alert("Reports are available to officers and administrators.");return}if(t==="incidents"&&!canOps()){alert("Incidents are available only to on-duty personnel and administrators.");return}if(t==="inspections"&&!canInspect()){alert("Only administrators and on-duty inspectors can access inspections.");return}if(t==="hydrants"&&!["admin","officer"].includes(String(profile?.app_role||""))){alert("Hydrants are available to administrators and officers.");return}if(t==="staffing"){window.jfdStaffingDateSelected=false;$("staffingManagement")?.classList.add("hiddenx");$("staffCalendarDetails").innerHTML="";}activeTab=t;document.querySelectorAll("main>section").forEach(s=>s.classList.add("hiddenx"));$("t-"+t).classList.remove("hiddenx");document.querySelectorAll(".admin-only-panel").forEach(p=>{p.classList.toggle("hiddenx",t!=="admin");p.style.setProperty("display",t==="admin"?"":"none","important")});document.querySelectorAll(".navbtn").forEach(b=>b.classList.remove("active"));$("n-"+t)?.classList.add("active");if(t==="staffing")renderStaffCalendar();if(t==="hydrants")window.jfdHydrantTabEntered?.();if(t==="preplans")window.jfdPreplansEnter?.();if(t==="incidents")loadIncidents();if(t==="reports")renderReports();if(t==="inspections")loadInspections();if(t==="checks")renderChecks();if(t==="admin"){initAdminHydrantReportDates();document.querySelectorAll(".admin-only-panel").forEach(p=>{p.classList.remove("hiddenx");p.style.setProperty("display","","important")});adminShowSectionCards();renderAdmin()}}
 async function boot(){if(loginInProgress||starting||me)return;try{await supabaseReady;let session=null,lastError=null;try{const raw=sessionStorage.getItem("rmsAuthSession");if(raw){const saved=JSON.parse(raw);sessionStorage.removeItem("rmsAuthSession");const restored=await db.auth.setSession({access_token:saved.access_token,refresh_token:saved.refresh_token});if(restored.error)lastError=restored.error;session=restored.data?.session||null}}catch(e){lastError=e}for(let attempt=0;attempt<6&&!session;attempt++){const g=await db.auth.getSession();if(g.error)lastError=g.error;session=g.data?.session||null;if(!session)await new Promise(r=>setTimeout(r,300))}if(!session){const rr=await db.auth.refreshSession();if(rr.error)lastError=rr.error;session=rr.data?.session||null}if(session&&!me){await start(session.user)}else if(!me&&!loginInProgress){$("login").classList.remove("hiddenx");$("loginError").textContent=lastError?"Unable to restore sign-in session: "+lastError.message:"Your sign-in session was not restored. Please sign in again."}}catch(err){console.error("RMS auth bootstrap error",err);if(!me&&!loginInProgress){$("loginError").textContent="Unable to initialize sign-in: "+(err?.message||"Unknown error");$("login").classList.remove("hiddenx")}}}
 window.rmsBoot=boot;
-async function start(u){if(starting)return;starting=true;me=u;try{let p=null,lastError=null;for(let attempt=0;attempt<3;attempt++){const s=await db.auth.getSession();if(!s.data?.session)throw new Error("Authentication session was not established. Please try signing in again.");const q=await db.from("users").select("*").eq("user_id",u.id).maybeSingle();if(q.data){p=q.data;break}lastError=q.error;if(attempt<2)await new Promise(r=>setTimeout(r,400))}if(!p)throw new Error("Profile load failed: "+(lastError?.message||"No matching RMS user profile was returned."));if(!p.active)throw new Error("Your account is not active.");profile=p;$("login").classList.add("hiddenx");$("app").classList.remove("hiddenx");$("userLabel").textContent=(profile.first_name||"")+" "+(profile.last_name||"")+" · "+String(profile.app_role||"").toUpperCase();$("appError").classList.add("hiddenx");tab("home");try{await refresh();await renderStaffCalendar()}catch(err){console.error("RMS data startup error",err);$("appError").textContent="Signed in successfully, but some department data could not load: "+(err?.message||"Unknown error");$("appError").classList.remove("hiddenx")}}catch(err){console.error("RMS startup error",err);me=null;profile=null;$("app").classList.add("hiddenx");$("login").classList.remove("hiddenx");$("loginError").textContent=err?.message||"Unable to finish sign-in. Please try again."}finally{starting=false}}
+const JFD_SESSION_GUARD_KEY="jfdRmsSessionGuardV1";
+const JFD_SESSION_IDLE_MS=30*60*1000;
+const JFD_SESSION_MAX_MS=12*60*60*1000;
+let jfdSessionGuardTimer=null,jfdSessionGuardUserId=null,jfdSessionGuardLastWrite=0,jfdSessionStorageHandler=null,jfdSessionActivityHandler=null;
+function jfdStopSessionGuard(clearStored=true){
+  if(jfdSessionGuardTimer){clearInterval(jfdSessionGuardTimer);jfdSessionGuardTimer=null}
+  if(jfdSessionStorageHandler){window.removeEventListener("storage",jfdSessionStorageHandler);jfdSessionStorageHandler=null}
+  if(jfdSessionActivityHandler){["pointerdown","keydown","scroll","touchstart","click"].forEach(type=>document.removeEventListener(type,jfdSessionActivityHandler,true));jfdSessionActivityHandler=null}
+  jfdSessionGuardUserId=null;jfdSessionGuardLastWrite=0;
+  if(clearStored){try{localStorage.removeItem(JFD_SESSION_GUARD_KEY)}catch(e){console.warn("Could not clear RMS session timer metadata",e)}}
+}
+function jfdStartSessionGuard(user){
+  jfdStopSessionGuard(true);
+  const email=String(user?.email||"").trim().toLowerCase();
+  if(email==="firechief@jaspercity.com")return;
+  const uid=String(user?.id||"");if(!uid)return;
+  jfdSessionGuardUserId=uid;
+  const read=()=>{try{const raw=localStorage.getItem(JFD_SESSION_GUARD_KEY);if(!raw)return null;const x=JSON.parse(raw);return x&&x.uid===uid&&Number.isFinite(Number(x.startedAt))&&Number.isFinite(Number(x.lastActivityAt))?x:null}catch(e){return null}};
+  let record=read();
+  if(!record){record={uid,startedAt:Date.now(),lastActivityAt:Date.now()};try{localStorage.setItem(JFD_SESSION_GUARD_KEY,JSON.stringify(record))}catch(e){console.warn("RMS session timer will run only in this tab",e)}}
+  jfdSessionGuardLastWrite=Date.now();
+  const saveActivity=()=>{
+    if(jfdSessionGuardUserId!==uid)return;
+    const now=Date.now();if(now-jfdSessionGuardLastWrite<5000)return;
+    const current=read()||record;
+    record={uid,startedAt:current.startedAt,lastActivityAt:now};jfdSessionGuardLastWrite=now;
+    try{localStorage.setItem(JFD_SESSION_GUARD_KEY,JSON.stringify(record))}catch(e){}
+  };
+  jfdSessionActivityHandler=saveActivity;
+  ["pointerdown","keydown","scroll","touchstart","click"].forEach(type=>document.addEventListener(type,saveActivity,{capture:true,passive:true}));
+  jfdSessionStorageHandler=event=>{
+    if(event.key!==JFD_SESSION_GUARD_KEY||!event.newValue)return;
+    try{const other=JSON.parse(event.newValue);if(other?.uid===uid&&Number.isFinite(Number(other.lastActivityAt)))record=other}catch(e){}
+  };
+  window.addEventListener("storage",jfdSessionStorageHandler);
+  jfdSessionGuardTimer=setInterval(async()=>{
+    if(jfdSessionGuardUserId!==uid)return;
+    const current=read()||record,now=Date.now();
+    if(now-Number(current.startedAt)>=JFD_SESSION_MAX_MS||now-Number(current.lastActivityAt)>=JFD_SESSION_IDLE_MS){
+      jfdStopSessionGuard(true);
+      const reason=now-Number(current.startedAt)>=JFD_SESSION_MAX_MS
+        ?"Your RMS session reached the 12-hour maximum. Please sign in again."
+        :"You were signed out after 30 minutes of inactivity.";
+      await window.rmsLogout?.();
+      const message=document.getElementById("loginError");if(message)message.textContent=reason;
+    }
+  },10000);
+}
+async function start(u){if(starting)return;starting=true;me=u;try{let p=null,lastError=null;for(let attempt=0;attempt<3;attempt++){const s=await db.auth.getSession();if(!s.data?.session)throw new Error("Authentication session was not established. Please try signing in again.");const q=await db.from("users").select("*").eq("user_id",u.id).maybeSingle();if(q.data){p=q.data;break}lastError=q.error;if(attempt<2)await new Promise(r=>setTimeout(r,400))}if(!p)throw new Error("Profile load failed: "+(lastError?.message||"No matching RMS user profile was returned."));if(!p.active)throw new Error("Your account is not active.");profile=p;jfdStartSessionGuard(u);$("login").classList.add("hiddenx");$("app").classList.remove("hiddenx");$("userLabel").textContent=(profile.first_name||"")+" "+(profile.last_name||"")+" · "+String(profile.app_role||"").toUpperCase();$("appError").classList.add("hiddenx");tab("home");try{await refresh();await renderStaffCalendar()}catch(err){console.error("RMS data startup error",err);$("appError").textContent="Signed in successfully, but some department data could not load: "+(err?.message||"Unknown error");$("appError").classList.remove("hiddenx")}}catch(err){console.error("RMS startup error",err);me=null;profile=null;$("app").classList.add("hiddenx");$("login").classList.remove("hiddenx");$("loginError").textContent=err?.message||"Unable to finish sign-in. Please try again."}finally{starting=false}}
 window.__rmsStartImpl=start;
 window.rmsLogout=async function(){
+  jfdStopSessionGuard(true);
   const signoutButton=document.getElementById("signOutButton");
   if(signoutButton){signoutButton.disabled=true;signoutButton.textContent="Signing out…";}
   let signoutError=null;
