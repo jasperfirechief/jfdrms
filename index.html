@@ -2073,7 +2073,7 @@ async function openSavedReport(cad,reportId){
     m.classList.remove("hiddenx");
   }catch(e){console.error("openSavedReport failed:",e);alert("Unable to open the saved report: "+(e?.message||String(e)));}
 }
-async async function fetchAllIncidentsForReports(){
+async function fetchAllIncidentsForReports(){
   if(profile?.app_role==="clerk"){const safe=await db.rpc("clerk_search_incident_reports");if(safe.error)throw new Error(safe.error.message);return safe.data||[];}
   const rows=[];const pageSize=1000;let from=0;
   while(true){const r=await db.from("incidents").select("cad,type,location,dispatch_time,updated_at,reports").order("updated_at",{ascending:false}).range(from,from+pageSize-1);if(r.error)throw new Error(r.error.message);const page=r.data||[];rows.push(...page);if(page.length<pageSize)break;from+=pageSize;}
