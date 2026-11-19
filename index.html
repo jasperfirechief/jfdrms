@@ -1046,7 +1046,7 @@ function updateInspectionIfcLifeSafetyWarning(){
   const type=$("inType")?.value||"",sq=Number($("inSqFt")?.value||0),stories=Number($("inStories")?.value||0),scope=$("inProjectScope")?.value||"";
   const box=$("ifcLifeSafetyWarning"),msg=$("ifcLifeSafetyWarningText"),flags=$("ifcLifeSafetySystemFlags"),ack=$("inIfcWarningAck");
   if(!box||!msg||!flags)return;
-  const match=type.match(/^([A-Z](?:-\\d)?)/),g=match?match[1]:"";
+  const match=type.match(/^([A-Z](?:-\d)?)/),g=match?match[1]:"";
   if(!g||!sq||!scope){box.classList.add("hiddenx");if(ack)ack.checked=false;window.jfdIfcWarningDetails=null;return;}
   const sprinklerRefs=[],alarmRefs=[];
   const addSpr=(ref)=>sprinklerRefs.push(ref),addAl=(ref)=>alarmRefs.push(ref);
@@ -1073,7 +1073,7 @@ function updateInspectionIfcLifeSafetyWarning(){
   msg.textContent="Based on the selected occupancy ("+g+"), "+sq.toLocaleString()+" sq ft, and project status ("+scope+"), review the following IFC 2021 provisions before completing this inspection.";
   flags.innerHTML=lines.map(x=>'<div class="mb-1">'+esc(x)+'</div>').join("");
   box.classList.remove("hiddenx");
-  window.jfdIfcWarningDetails={code_edition:"2021 IFC",occupancy_group:g,square_footage:sq,stories:stories||null,project_scope:scope,sprinkler_review:[...new Set(sprinklerRefs)],fire_alarm_review:[...new Set(alarmRefs)]};
+  const nextDetails={code_edition:"2021 IFC",occupancy_group:g,square_footage:sq,stories:stories||null,project_scope:scope,sprinkler_review:[...new Set(sprinklerRefs)],fire_alarm_review:[...new Set(alarmRefs)]};if(JSON.stringify(window.jfdIfcWarningDetails)!==JSON.stringify(nextDetails)&&ack)ack.checked=false;window.jfdIfcWarningDetails=nextDetails;
 }
 function bindInspectionDimensions(){
   const l=$("inLengthFt"),w=$("inWidthFt"),s=$("inSqFt"),out=$("inSqFtCalc");if(!l||!w||!s)return;
