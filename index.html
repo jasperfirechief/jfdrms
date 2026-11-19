@@ -612,7 +612,7 @@ window.rmsLogout=async function(){
   if(btn){btn.disabled=false;btn.textContent="Sign in";}
   if(signoutButton){signoutButton.disabled=false;signoutButton.textContent="Sign out";}
 };
-async function refresh(){const [p,s,a]=await Promise.all([db.from("personnel").select("*").eq("active",true).order("last_name"),db.from("stations").select("*").eq("active",true).order("station_id"),db.from("apparatus").select("*").eq("active",true).order("apparatus_id")]);personnel=p.data||[];stations=s.data||[];apparatus=a.data||[];renderStaffingEventOptions();$("staffingActivityEditor")?.classList.toggle("hiddenx",!canStaff());$("staffingManagement")?.classList.toggle("hiddenx",!canStaff()||!window.jfdStaffingDateSelected);await loadCrew();renderHome();renderApparatus();renderPersonnel();renderAdmin();$("staffStationCards")?.classList.toggle("hiddenx",!canStaff());$("n-hydrants")?.classList.toggle("hiddenx",!["admin","officer"].includes(String(profile?.app_role||"")));$("n-inspections")?.classList.toggle("hiddenx",!canInspect());$("n-reports")?.classList.toggle("hiddenx",!["admin","officer"].includes(String(profile?.app_role||"")));$("n-admin")?.classList.toggle("hiddenx",profile?.app_role!=="admin");if(profile?.app_role!=="admin"&&activeTab==="admin")tab("home");await renderStaffCalendar()}
+async function refresh(){if(profile?.app_role==="clerk"){personnel=[];stations=[];apparatus=[];crew=[];document.querySelectorAll(".navbtn").forEach(x=>x.classList.add("hiddenx"));$("n-reports")?.classList.remove("hiddenx");await renderReports();return;}const [p,s,a]=await Promise.all([db.from("personnel").select("*").eq("active",true).order("last_name"),db.from("stations").select("*").eq("active",true).order("station_id"),db.from("apparatus").select("*").eq("active",true).order("apparatus_id")]);personnel=p.data||[];stations=s.data||[];apparatus=a.data||[];renderStaffingEventOptions();$("staffingActivityEditor")?.classList.toggle("hiddenx",!canStaff());$("staffingManagement")?.classList.toggle("hiddenx",!canStaff()||!window.jfdStaffingDateSelected);await loadCrew();renderHome();renderApparatus();renderPersonnel();renderAdmin();$("staffStationCards")?.classList.toggle("hiddenx",!canStaff());$("n-hydrants")?.classList.toggle("hiddenx",!["admin","officer"].includes(String(profile?.app_role||"")));$("n-inspections")?.classList.toggle("hiddenx",!canInspect());$("n-reports")?.classList.toggle("hiddenx",!["admin","officer"].includes(String(profile?.app_role||"")));$("n-admin")?.classList.toggle("hiddenx",profile?.app_role!=="admin");if(profile?.app_role!=="admin"&&activeTab==="admin")tab("home");await renderStaffCalendar()}
 async function loadCrew(){crew=[];if(!me)return;const cp=await db.from("personnel").select("id,shift").eq("auth_user_id",me.id).maybeSingle();if(cp.error||!cp.data?.id)return;const shift=String(cp.data.shift||"A").trim()||"A";const r=await db.from("daily_staffing").select("staffing_id").eq("staffing_date",today()).eq("shift",shift).maybeSingle();if(r.error||!r.data)return;const x=await db.from("daily_personnel_assignments").select("*,daily_app_assignments!inner(apparatus_id,staffing_id)").eq("daily_app_assignments.staffing_id",r.data.staffing_id).eq("personnel_id",cp.data.id);crew=x.data||[]}
 async function loadAdminData(){
   if(!db)return;
@@ -1126,10 +1126,12 @@ async function renderNerisReviewQueue(){
 }
 window.adminSubmitReport=async function(cad,idx){
   try{
-  if(profile?.app_role!=="admin")return alert("Administrator access required.");
-  const incident=await db.from("incidents").select("*").eq("cad",cad).maybeSingle();
-  if(incident.error||!incident.data)return alert(incident.error?.message||"Incident not found.");
-  const reports=Array.isArray(incident.data.reports)?incident.data.reports:[],rep=reports[idx];if(!rep)return alert("Report not found.");
+  if(!["admin","clerk"].includes(String(profile?.app_role||"")))return alert("Administrator or Clerk access required.");
+  let incidentData=null;
+  if(profile?.app_role==="clerk"){const safe=await db.rpc("clerk_search_incident_reports");if(safe.error)return alert(safe.error.message);incidentData=(safe.data||[]).find(x=>String(x.cad)===String(cad));}
+  else{const incident=await db.from("incidents").select("*").eq("cad",cad).maybeSingle();if(incident.error||!incident.data)return alert(incident.error?.message||"Incident not found.");incidentData=incident.data;}
+  if(!incidentData)return alert("Incident not found.");
+  const reports=Array.isArray(incidentData.reports)?incidentData.reports:[],rep=reports[idx];if(!rep)return alert("Report not found.");
   if(rep.status!=="ready_for_neris")return alert("This report is not awaiting NERIS review. It cannot be submitted from this action.");
   const details=await db.from("incident_details").select("*").eq("cad",cad).maybeSingle();
   if(details.error)return alert(details.error.message);
@@ -1144,11 +1146,11 @@ window.adminSubmitReport=async function(cad,idx){
   const apiValidation=await validateNerisPayloadWithApi(merged);
   if(!apiValidation.ok)return alert("NERIS API validation failed:\n\n"+apiValidation.errors.join("\n"));
   // This is the only client path authorized to submit to live NERIS.
-  const result=await submitReportToNeris(merged,details.data?.incident_id||null,true);
+  const result=await submitReportToNeris(merged,details.data?.incident_id||null,true,rep.report_id,cad);
   if(!result.ok)return alert(result.error);
-  reports[idx]={...rep,status:"submitted_to_neris",neris:result.neris,updated_at:new Date().toISOString(),email_status:"pending"};
-  const u=await db.from("incidents").update({reports,updated_at:new Date().toISOString()}).eq("cad",cad);
-  if(u.error)return alert(u.error.message);
+  reports[idx]={...rep,status:"submitted_to_neris",neris:result.neris,updated_at:new Date().toISOString()};
+  if(profile?.app_role==="clerk"){alert("Submitted to NERIS.");await renderReports();return;}
+  reports[idx]={...reports[idx],email_status:"pending"};
   let emailMessage="";
   try{
     const session=(await db.auth.getSession()).data?.session;if(!session)throw new Error("Authentication required.");const er=await fetch("/api/report-pdf",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({action:"email",incident:incident.data,reports})});
@@ -2138,7 +2140,7 @@ function openReportView(view){
 }
 async function renderReports(){
  if(!["admin","officer","clerk"].includes(String(profile?.app_role||"")))return alert("Reports are available to officers, administrators, and Clerks.");
- const list=$("reportsList");if(!list)return;list.innerHTML='<div class="card p-5 text-sm text-slate-500">Loading reports...</div>';let incidentRows=[];try{incidentRows=await fetchAllIncidentsForReports()}catch(e){list.innerHTML='<div class="card p-5 text-red-600">'+esc(e?.message||String(e))+'</div>';return;}const rows=[];(incidentRows||[]).forEach(i=>(Array.isArray(i.reports)?i.reports:[]).forEach((rep,idx)=>rows.push({i,rep,idx,locked:false})));window._jfdReportRows=rows;list.innerHTML=reportsHome();
+ const list=$("reportsList");if(!list)return;list.innerHTML='<div class="card p-5 text-sm text-slate-500">Loading reports...</div>';let incidentRows=[];try{incidentRows=await fetchAllIncidentsForReports()}catch(e){list.innerHTML='<div class="card p-5 text-red-600">'+esc(e?.message||String(e))+'</div>';return;}const rows=[];(incidentRows||[]).forEach(i=>(Array.isArray(i.reports)?i.reports:[]).forEach((rep,idx)=>{if(profile?.app_role==="clerk"&&(String(rep?.report_type||"").startsWith("pcr_")||rep?.status==="draft"))return;rows.push({i,rep,idx,locked:false})}));window._jfdReportRows=rows;list.innerHTML=reportsHome();
 }
 async function adminSubmitReportFromButton(btn){
   if(profile?.app_role!=="admin")return alert("Administrator access required.");
