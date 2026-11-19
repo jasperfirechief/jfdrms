@@ -92,6 +92,20 @@ window.rmsLogin=async function(e){
 </select></label>
 <div class="md:col-span-2 grid sm:grid-cols-2 gap-3"><label class="text-sm font-semibold">Building Dimensions (feet)<div class="flex items-center gap-2 mt-1"><input id="inLengthFt" type="number" min="0" step="0.01" placeholder="Length" class="w-full border rounded p-2"><span class="font-black">×</span><input id="inWidthFt" type="number" min="0" step="0.01" placeholder="Width" class="w-full border rounded p-2"></div><span class="text-xs text-slate-500">Enter length × width. Square footage calculates automatically.</span></label><label class="text-sm font-semibold">Square Footage<input id="inSqFt" type="number" min="0" step="1" class="w-full border rounded p-2 mt-1"><span id="inSqFtCalc" class="text-xs text-slate-500"></span></label></div>
 <label class="text-sm font-semibold">Stories<input id="inStories" type="number" min="1" step="1" class="w-full border rounded p-2 mt-1"></label>
+<label class="text-sm font-semibold">Project / Building Status<select id="inProjectScope" class="w-full border rounded p-2 mt-1" required>
+<option value="">Select project type</option>
+<option value="New construction">New construction</option>
+<option value="Remodel / alteration">Remodel / alteration</option>
+<option value="New occupancy / change of occupancy">New occupancy / change of occupancy</option>
+<option value="Existing building">Existing building</option>
+</select><span class="text-xs text-slate-500">Select the condition that best describes this inspection.</span></label>
+<div id="ifcLifeSafetyWarning" class="hiddenx md:col-span-2 border-2 border-amber-500 bg-amber-50 rounded-lg p-4" role="alert">
+<h3 class="font-black text-amber-900 mb-2">IFC 2021 — Life-Safety Systems Review Required</h3>
+<p id="ifcLifeSafetyWarningText" class="text-sm text-amber-950 mb-3"></p>
+<div id="ifcLifeSafetySystemFlags" class="text-sm font-semibold text-amber-950 mb-3"></div>
+<p class="text-xs text-amber-950 mb-3">This is a screening warning, not a determination of code compliance or a violation. Verify the applicable IFC 2021 provisions, fire-area size, occupant load, stories, building height, use, and exceptions. For existing buildings, review Chapter 11; for alterations or changes of occupancy, also review the applicable International Existing Building Code provisions and local amendments.</p>
+<label class="flex items-start gap-2 text-sm font-bold text-amber-950"><input id="inIfcWarningAck" type="checkbox" class="mt-1"><span>I acknowledge that I reviewed this warning and will verify whether automatic sprinkler and fire alarm systems are required for this building and project scope.</span></label>
+</div>
 <label class="text-sm font-semibold md:col-span-2">Address<input id="inAddress" class="w-full border rounded p-2 mt-1" required></label>
 <label class="text-sm font-semibold">Contact Name<input id="inContact" class="w-full border rounded p-2 mt-1"></label>
 <label class="text-sm font-semibold">City/St/Zip<input id="inCity" class="w-full border rounded p-2 mt-1"></label>
@@ -1028,17 +1042,50 @@ async function renderInspectionChecklist(){
     return '<div class="border-b last:border-0 py-3"><div class="font-semibold text-sm">'+esc(item.item_text)+'</div><div class="text-xs text-slate-500 mt-1">'+ref+'</div><div class="flex flex-wrap gap-4 items-center mt-2"><label class="flex items-center gap-2 text-sm font-medium"><input type="radio" name="inspection-result-'+esc(key)+'" data-inspection-check="'+esc(key)+'" value="Pass"> Pass</label><label class="flex items-center gap-2 text-sm font-medium"><input type="radio" name="inspection-result-'+esc(key)+'" data-inspection-check="'+esc(key)+'" value="Fail"> Fail</label><label class="flex items-center gap-2 text-sm font-medium"><input type="radio" name="inspection-result-'+esc(key)+'" data-inspection-check="'+esc(key)+'" value="N/A"> N/A</label><input data-inspection-note="'+esc(key)+'" class="border rounded p-2 text-sm min-w-[220px]" placeholder="Notes / violation details"></div></div>';
   }).join("")+'</div></div>').join("")||'<div class="card p-4 text-sm text-slate-500">No active inspection checklist points configured.</div>';
 }
+function updateInspectionIfcLifeSafetyWarning(){
+  const type=$("inType")?.value||"",sq=Number($("inSqFt")?.value||0),stories=Number($("inStories")?.value||0),scope=$("inProjectScope")?.value||"";
+  const box=$("ifcLifeSafetyWarning"),msg=$("ifcLifeSafetyWarningText"),flags=$("ifcLifeSafetySystemFlags"),ack=$("inIfcWarningAck");
+  if(!box||!msg||!flags)return;
+  const match=type.match(/^([A-Z](?:-\\d)?)/),g=match?match[1]:"";
+  if(!g||!sq||!scope){box.classList.add("hiddenx");if(ack)ack.checked=false;window.jfdIfcWarningDetails=null;return;}
+  const sprinklerRefs=[],alarmRefs=[];
+  const addSpr=(ref)=>sprinklerRefs.push(ref),addAl=(ref)=>alarmRefs.push(ref);
+  if(g==="A-1"){if(sq>=12000)addSpr("903.2.1.1 — Group A-1 fire-area threshold");addAl("907.2.1 — Group A occupant-load / exit-level thresholds");}
+  if(g==="A-2"){if(sq>=5000)addSpr("903.2.1.2 — Group A-2 fire-area threshold");addSpr("903.2.1.2 — verify occupant-load and other conditions");addAl("907.2.1 — Group A occupant-load / exit-level thresholds");}
+  if(["A-3","A-4","A-5"].includes(g)){if(sq>=12000)addSpr("903.2.1 — applicable Group A fire-area threshold");addAl("907.2.1 — Group A occupant-load / exit-level thresholds");}
+  if(g==="B"){if(sq>=12000)addSpr("903.2.2 — Group B fire-area threshold");addAl("907.2.2 — Group B occupant-load / ambulatory-care conditions");}
+  if(g==="E"){if(sq>=12000)addSpr("903.2.3 — Group E fire-area threshold");addSpr("903.2.3 — verify Group E occupant-load conditions");addAl("907.2.3 — Group E fire alarm requirements");}
+  if(g==="F-1"||g==="F-2"){if(sq>=12000)addSpr("903.2.4 — Group F fire-area threshold");if(g==="F-1")addAl("907.2.4 — Group F stories and occupant-load conditions");}
+  if(g.startsWith("H")){addSpr("903.2.5 — Group H sprinkler requirements");addAl("907.2.5 — Group H fire alarm / detection provisions");}
+  if(g.startsWith("I")){addSpr("903.2.6 — Group I sprinkler requirements");addAl("907.2.6 — Group I fire alarm requirements");}
+  if(g==="M"){if(sq>=12000)addSpr("903.2.7 — Group M fire-area threshold");addAl("907.2.7 — Group M occupant-load / exit-level conditions");}
+  if(g==="R-1"||g==="R-2"||g==="R-4"){addSpr("903.2.8 — Group R sprinkler requirements");addAl("907.2.8 / 907.2.9 — applicable Group R fire alarm provisions");}
+  if(g==="S-1"){if(sq>=12000)addSpr("903.2.9 — Group S-1 fire-area threshold");addAl("907.2.10 — Group S occupant-load / exit-level conditions");}
+  if(g==="S-2"){addAl("907.2.10 — verify applicable Group S fire alarm conditions");}
+  if(scope==="Existing building"){if(["A-2","I-2"].includes(g))addSpr("1103.5 — existing-building sprinkler provisions");if(g==="E")addAl("1103.7.1 — existing Group E fire alarm requirements");if(g==="I-2")addAl("1103.7 — existing-building fire alarm provisions");}
+  if(scope==="New occupancy / change of occupancy"){addSpr("Review IFC 903 and applicable IEBC change-of-occupancy provisions");addAl("Review IFC 907 and applicable IEBC change-of-occupancy provisions");}
+  if(scope==="Remodel / alteration"){addSpr("Review applicable IEBC alteration provisions and IFC 903");addAl("Review applicable IEBC alteration provisions and IFC 907");}
+  const any=sprinklerRefs.length||alarmRefs.length;
+  if(!any){box.classList.add("hiddenx");if(ack)ack.checked=false;window.jfdIfcWarningDetails=null;return;}
+  const lines=[];
+  if(sprinklerRefs.length)lines.push("AUTOMATIC SPRINKLER SYSTEM: Review may be required. "+[...new Set(sprinklerRefs)].join("; ")+".");
+  if(alarmRefs.length)lines.push("FIRE ALARM / DETECTION SYSTEM: Review may be required. "+[...new Set(alarmRefs)].join("; ")+".");
+  msg.textContent="Based on the selected occupancy ("+g+"), "+sq.toLocaleString()+" sq ft, and project status ("+scope+"), review the following IFC 2021 provisions before completing this inspection.";
+  flags.innerHTML=lines.map(x=>'<div class="mb-1">'+esc(x)+'</div>').join("");
+  box.classList.remove("hiddenx");
+  window.jfdIfcWarningDetails={code_edition:"2021 IFC",occupancy_group:g,square_footage:sq,stories:stories||null,project_scope:scope,sprinkler_review:[...new Set(sprinklerRefs)],fire_alarm_review:[...new Set(alarmRefs)]};
+}
 function bindInspectionDimensions(){
   const l=$("inLengthFt"),w=$("inWidthFt"),s=$("inSqFt"),out=$("inSqFtCalc");if(!l||!w||!s)return;
   const calc=()=>{const a=Number(l.value),b=Number(w.value);if(a>0&&b>0){const sqft=Math.round(a*b);s.value=sqft;if(out)out.textContent="Calculated: "+sqft.toLocaleString()+" sq ft";}else if(out)out.textContent="Enter both dimensions to calculate.";
   };
-  l.addEventListener("input",calc);w.addEventListener("input",calc);s.addEventListener("input",()=>{if(out&&!l.value&&!w.value)out.textContent="Manual square footage entry";});calc();
+  l.addEventListener("input",calc);w.addEventListener("input",calc);s.addEventListener("input",()=>{if(out&&!l.value&&!w.value)out.textContent="Manual square footage entry";updateInspectionIfcLifeSafetyWarning();});$("inType")?.addEventListener("change",updateInspectionIfcLifeSafetyWarning);$("inProjectScope")?.addEventListener("change",updateInspectionIfcLifeSafetyWarning);$("inStories")?.addEventListener("input",updateInspectionIfcLifeSafetyWarning);calc();updateInspectionIfcLifeSafetyWarning();
 }
 function collectInspectionData(){
   const sig=$("signaturePad")?.toDataURL("image/png")||null;
   const acceptance=[...document.querySelectorAll('input[name="acceptanceType"]:checked')].map(x=>({type:x.value,result:document.querySelector('[data-accept-result="'+CSS.escape(x.value)+'"]:checked')?.value||"",notes:document.querySelector('[data-accept-notes="'+CSS.escape(x.value)+'"]')?.value||""}));
   const checklist={};document.querySelectorAll("[data-inspection-check]:checked").forEach(x=>{checklist[x.dataset.inspectionCheck]={status:x.value,notes:document.querySelector('[data-inspection-note="'+CSS.escape(x.dataset.inspectionCheck)+'"]')?.value||""}});
-  return {inspector_id:Number($("inInspector")?.value||0)||null,date:$("inDate")?.value,time:$("inTime")?.value,occupancy_name:$("inOccupancy")?.value,type:$("inType")?.value,square_footage:$("inSqFt")?.value,stories:$("inStories")?.value,address:$("inAddress")?.value,city_state_zip:$("inCity")?.value,contact_name:$("inContact")?.value,contact_phone:$("inContactPhone")?.value,phone:$("inPhone")?.value,email:$("inEmail")?.value,inspection_types:[...document.querySelectorAll('input[name="inspectionType"]:checked')].map(x=>x.value),acceptance_tests:acceptance,checklist,building_length_ft:$("inLengthFt")?.value,building_width_ft:$("inWidthFt")?.value,remarks:$("inRemarks")?.value,reinspection_date:$("inReinspection")?.value,representative_signature:sig,representative_signature_date:$("inSignatureDate")?.value};
+  return {inspector_id:Number($("inInspector")?.value||0)||null,date:$("inDate")?.value,time:$("inTime")?.value,occupancy_name:$("inOccupancy")?.value,type:$("inType")?.value,project_scope:$("inProjectScope")?.value||"",life_safety_warning_acknowledged:$("inIfcWarningAck")?.checked===true,life_safety_warning_details:window.jfdIfcWarningDetails||null,square_footage:$("inSqFt")?.value,stories:$("inStories")?.value,address:$("inAddress")?.value,city_state_zip:$("inCity")?.value,contact_name:$("inContact")?.value,contact_phone:$("inContactPhone")?.value,phone:$("inPhone")?.value,email:$("inEmail")?.value,inspection_types:[...document.querySelectorAll('input[name="inspectionType"]:checked')].map(x=>x.value),acceptance_tests:acceptance,checklist,building_length_ft:$("inLengthFt")?.value,building_width_ft:$("inWidthFt")?.value,remarks:$("inRemarks")?.value,reinspection_date:$("inReinspection")?.value,representative_signature:sig,representative_signature_date:$("inSignatureDate")?.value};
 }
 async function loadInspections(){
   const list=$("inspectionHistory");if(!list)return;
@@ -1056,8 +1103,8 @@ function closeInspectionEditor(){$("inspectionEditor")?.classList.add("hiddenx")
 document.addEventListener("change",e=>{if(e.target.matches('input[name="acceptanceType"]'))renderAcceptancePanels();if(e.target.id==="rDate")jfdSyncResponseDates();});
 $("inspectionForm")?.addEventListener("submit",async e=>{
   e.preventDefault();if(!canInspect())return alert("Only administrators and on-duty inspectors can perform inspections.");
-  const d=collectInspectionData();if(!d.occupancy_name||!d.type||!d.address||!d.date||!d.time)return alert("Complete the required inspection fields.");
-  const r=await db.from("inspections").insert({apparatus_id:null,inspector_user_id:me?.id||null,inspection_date:d.date,inspection_time:d.time,status:"submitted",notes:d.remarks||null,checklist:d.checklist,occupancy_name:d.occupancy_name,inspection_type:d.inspection_types.join(", ")||null,acceptance_type:d.acceptance_tests.map(x=>x.type).join(", ")||null,address:d.address,city_state_zip:d.city_state_zip,contact_name:d.contact_name,contact_phone:d.contact_phone,phone:d.phone,email:d.email,acceptance_test_result:d.acceptance_tests.map(x=>x.result).filter(Boolean).join(", ")||null,results:d.checklist,remarks:d.remarks,reinspection_date:d.reinspection_date||null,representative_signature:d.representative_signature,representative_signature_date:d.representative_signature_date||null,square_footage:d.square_footage===""?null:Number(d.square_footage),stories:d.stories===""?null:Number(d.stories),occupancy_group:d.type,acceptance_tests:d.acceptance_tests,attachments:[],results:{checklist:d.checklist,building_dimensions:{length_ft:d.building_length_ft===""?null:Number(d.building_length_ft),width_ft:d.building_width_ft===""?null:Number(d.building_width_ft),square_footage:d.square_footage===""?null:Number(d.square_footage)}}}).select("inspection_id").maybeSingle();
+  const d=collectInspectionData();if(!d.occupancy_name||!d.type||!d.project_scope||!d.address||!d.date||!d.time)return alert("Complete the required inspection fields.");if(!$("ifcLifeSafetyWarning")?.classList.contains("hiddenx")&&!d.life_safety_warning_acknowledged)return alert("You must acknowledge the IFC 2021 life-safety systems warning before saving this inspection.");
+  const r=await db.from("inspections").insert({apparatus_id:null,inspector_user_id:me?.id||null,inspection_date:d.date,inspection_time:d.time,status:"submitted",notes:d.remarks||null,checklist:d.checklist,occupancy_name:d.occupancy_name,inspection_type:d.inspection_types.join(", ")||null,acceptance_type:d.acceptance_tests.map(x=>x.type).join(", ")||null,address:d.address,city_state_zip:d.city_state_zip,contact_name:d.contact_name,contact_phone:d.contact_phone,phone:d.phone,email:d.email,acceptance_test_result:d.acceptance_tests.map(x=>x.result).filter(Boolean).join(", ")||null,results:d.checklist,remarks:d.remarks,reinspection_date:d.reinspection_date||null,representative_signature:d.representative_signature,representative_signature_date:d.representative_signature_date||null,square_footage:d.square_footage===""?null:Number(d.square_footage),stories:d.stories===""?null:Number(d.stories),occupancy_group:d.type,project_scope:d.project_scope,life_safety_warning_acknowledged:d.life_safety_warning_acknowledged,life_safety_warning_details:d.life_safety_warning_details,acceptance_tests:d.acceptance_tests,attachments:[],results:{checklist:d.checklist,building_dimensions:{length_ft:d.building_length_ft===""?null:Number(d.building_length_ft),width_ft:d.building_width_ft===""?null:Number(d.building_width_ft),square_footage:d.square_footage===""?null:Number(d.square_footage)}}}).select("inspection_id").maybeSingle();
   if(r.error)return alert("Could not save inspection: "+r.error.message);alert("Inspection saved.");closeInspectionEditor();await loadInspections();
 });
 function renderChecks(){
