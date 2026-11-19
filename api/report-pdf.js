@@ -65,7 +65,12 @@ async function requirePdfAccess(req,body){
     const profile=(await pr.json())?.[0];
     if(profile?.active!==true)throw new Error("This RMS account is inactive.");
     if(profile.app_role==="admin")return {user};
-    if(profile.app_role!=="clerk")throw new Error("Administrator or Clerk access required.");
+    if(profile.app_role!=="clerk"){
+      if(action==="email_all"&&body?.incident?.incident_id){
+        // Preserve the existing on-duty officer self-report email permission below.
+      }else throw new Error("Administrator or Clerk access required.");
+    }
+    if(profile.app_role==="clerk"){
     if(body.archiveType)throw new Error("Clerk access is limited to incident report PDFs.");
     const cad=String(body?.incident?.cad||"").trim();
     if(!cad)throw new Error("Incident CAD number is required.");
@@ -80,6 +85,7 @@ async function requirePdfAccess(req,body){
     const trusted=(incident.reports||[]).filter(x=>requested.size===0||requested.has(String(x?.report_id||"")));
     if(!trusted.length)throw new Error("No authorized incident reports were selected.");
     return {user,incident,reports:trusted};
+    }
   }
   if(action==="email_all"&&body?.incident?.incident_id){
     if(!auth.startsWith("Bearer "))throw new Error("Authentication required.");
