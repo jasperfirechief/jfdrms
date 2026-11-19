@@ -25,9 +25,9 @@ window.jfdHandleReportAction=async function(button){
     if(action==="email")return await window.emailIncidentPdf(cad,reportId);
     if(action==="view"||action==="review")return await window.openSavedReport(cad,reportId);
     if(action==="submit"){
-      const q=await db.from("incidents").select("reports").eq("cad",cad).maybeSingle();
-      if(q.error||!q.data)throw new Error(q.error?.message||"Incident not found.");
-      const reports=Array.isArray(q.data.reports)?q.data.reports:[];
+      let reports=[];
+      if(profile?.app_role==="clerk"){const safe=await db.rpc("clerk_search_incident_reports");if(safe.error)throw new Error(safe.error.message);const row=(safe.data||[]).find(x=>String(x.cad)===String(cad));reports=Array.isArray(row?.reports)?row.reports:[];}
+      else{const q=await db.from("incidents").select("reports").eq("cad",cad).maybeSingle();if(q.error||!q.data)throw new Error(q.error?.message||"Incident not found.");reports=Array.isArray(q.data.reports)?q.data.reports:[];}
       const idx=reports.findIndex(x=>String(x?.report_id||"")===String(reportId));
       if(idx<0)throw new Error("Report not found.");
       return await window.adminSubmitReport(cad,idx);
