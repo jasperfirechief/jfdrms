@@ -220,7 +220,7 @@
   }
   function initMap(){
     const el=$("preplanMap");if(!el||!window.L)return;
-    if(!map){map=L.map(el).setView([33.875,-87.27],12);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:20,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'}).addTo(map);hydrantLayer=L.layerGroup().addTo(map);preplanLayer=L.layerGroup().addTo(map);
+    if(!map){map=L.map(el).setView([33.875,-87.27],12);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:20,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'}).addTo(map);hydrantLayer=L.layerGroup().addTo(map);preplanLayer=L.layerGroup().addTo(map);map._jfdPreplanLayerControl=L.control.layers(null,{"Hydrants":hydrantLayer,"Preplans (PP)":preplanLayer},{collapsed:false}).addTo(map);
       map.on("click",e=>{if(!placing||!canEdit())return;placing=false;$("preplanPlaceButton").textContent="Add Preplan Location";$("preplanPlaceHint").textContent="";createPlanAt(e.latlng.lat,e.latlng.lng)});
     }
     drawMarkers();setTimeout(()=>map.invalidateSize(),150);
