@@ -541,9 +541,9 @@ function jfdStopSessionGuard(clearStored=true){
   if(clearStored){try{localStorage.removeItem(JFD_SESSION_GUARD_KEY)}catch(e){console.warn("Could not clear RMS session timer metadata",e)}}
 }
 function jfdStartSessionGuard(user){
-  jfdStopSessionGuard(true);
+  jfdStopSessionGuard(false);
   const email=String(user?.email||"").trim().toLowerCase();
-  if(email==="firechief@jaspercity.com")return;
+  if(email==="firechief@jaspercity.com"){try{localStorage.removeItem(JFD_SESSION_GUARD_KEY)}catch(e){}return;}
   const uid=String(user?.id||"");if(!uid)return;
   jfdSessionGuardUserId=uid;
   const read=()=>{try{const raw=localStorage.getItem(JFD_SESSION_GUARD_KEY);if(!raw)return null;const x=JSON.parse(raw);return x&&x.uid===uid&&Number.isFinite(Number(x.startedAt))&&Number.isFinite(Number(x.lastActivityAt))?x:null}catch(e){return null}};
