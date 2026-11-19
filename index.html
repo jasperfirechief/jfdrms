@@ -1170,8 +1170,9 @@ async function incidentIdForCad(cad){const r=await db.from("incidents").select("
 async function validateIncidentForNeris(currentKind,currentData,incidentId,cad){
   const errors=[],warnings=[];
   if(!incidentId)return {ok:false,errors:["This report must be attached to an incident before NERIS review."],warnings};
-  const ir=await db.from("incidents").select("*").eq("cad",cad||"").maybeSingle();if(ir.error)throw new Error(ir.error.message);
-  const i=ir.data||{};
+  let i=null;
+  if(profile?.app_role==="clerk"){const safe=await db.rpc("clerk_search_incident_reports");if(safe.error)throw new Error(safe.error.message);i=(safe.data||[]).find(x=>String(x.cad)===String(cad||""))||{};}
+  else{const ir=await db.from("incidents").select("*").eq("cad",cad||"").maybeSingle();if(ir.error)throw new Error(ir.error.message);i=ir.data||{};}
   const dr=await db.from("incident_details").select("*").eq("incident_id",incidentId).maybeSingle();if(dr.error)throw new Error(dr.error.message);
   const d=dr.data||{},reports=Array.isArray(i.reports)?i.reports:[];
   const all=reports.map(x=>x?.data||{}).concat(currentData||{});
@@ -2096,7 +2097,7 @@ function reportRowsHtml(items){
  (items||[]).forEach(x=>{const cad=String(x.i?.cad||"NO-CAD-"+(x.i?.location||"incident"));(groups[cad]||(groups[cad]=[])).push(x);});
  const list=Object.values(groups);
  return list.length?list.map(group=>{
-   const primary=group.find(v=>!String(v.rep?.report_type||"").startsWith("pcr_")&&!v.rep?.data?.isPatientCareReport)||group[0];
+   const primary=group.find(v=>v.rep?.status==="ready_for_neris")||group.find(v=>!String(v.rep?.report_type||"").startsWith("pcr_")&&!v.rep?.data?.isPatientCareReport)||group[0];
    const x=primary,allReports=group.map(v=>v.rep),cad=String(x.i?.cad||""),rid=String(x.rep?.report_id||"");
    const ready=allReports.some(r=>r.status==="ready_for_neris"),submitted=allReports.some(r=>r.status==="submitted_to_neris"),drafts=allReports.some(r=>r.status==="draft");
    const status=ready?"Awaiting NERIS Review":submitted?"Submitted to NERIS":drafts?"Draft":reportStatusLabel(x.rep?.status)||"Saved";
