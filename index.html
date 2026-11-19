@@ -1153,7 +1153,7 @@ window.adminSubmitReport=async function(cad,idx){
   reports[idx]={...reports[idx],email_status:"pending"};
   let emailMessage="";
   try{
-    const session=(await db.auth.getSession()).data?.session;if(!session)throw new Error("Authentication required.");const er=await fetch("/api/report-pdf",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({action:"email",incident:incident.data,reports})});
+    const session=(await db.auth.getSession()).data?.session;if(!session)throw new Error("Authentication required.");const er=await fetch("/api/report-pdf",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({action:"email",incident:incidentData,reports})});
     let eb={};try{eb=await er.json()}catch{}
     if(er.ok&&eb.ok){reports[idx]={...reports[idx],email_status:"sent",email_id:eb.email_id||null,email_sent_at:new Date().toISOString()};emailMessage=" The PDF was also emailed to the department report address.";}else{reports[idx]={...reports[idx],email_status:"failed",email_error:eb.error||"Email failed."};emailMessage=" NERIS submission succeeded, but the PDF email failed: "+(eb.error||"unknown email error");}
     await db.from("incidents").update({reports,updated_at:new Date().toISOString()}).eq("cad",cad);
@@ -1202,8 +1202,8 @@ async function validateIncidentForNeris(currentKind,currentData,incidentId,cad){
   return {ok:errors.length===0,errors,warnings,incidentNumber,dispatchNumber};
 }
 async function validateNerisPayloadWithApi(data){
-  const payload=buildNerisPayload(data);
-  const r=await fetch("/api/neris",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"validate",payload})});
+  const payload=buildNerisPayload(data),session=(await db.auth.getSession()).data?.session;if(!session)throw new Error("Authentication required.");
+  const r=await fetch("/api/neris",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({action:"validate",payload})});
   let body={};try{body=await r.json();}catch{}
   if(r.ok&&body.ok!==false)return {ok:true,errors:[],details:body.details||null};
   const raw=body?.details;
@@ -2143,12 +2143,12 @@ async function renderReports(){
  const list=$("reportsList");if(!list)return;list.innerHTML='<div class="card p-5 text-sm text-slate-500">Loading reports...</div>';let incidentRows=[];try{incidentRows=await fetchAllIncidentsForReports()}catch(e){list.innerHTML='<div class="card p-5 text-red-600">'+esc(e?.message||String(e))+'</div>';return;}const rows=[];(incidentRows||[]).forEach(i=>(Array.isArray(i.reports)?i.reports:[]).forEach((rep,idx)=>{if(profile?.app_role==="clerk"&&(String(rep?.report_type||"").startsWith("pcr_")||rep?.status==="draft"))return;rows.push({i,rep,idx,locked:false})}));window._jfdReportRows=rows;list.innerHTML=reportsHome();
 }
 async function adminSubmitReportFromButton(btn){
-  if(profile?.app_role!=="admin")return alert("Administrator access required.");
+  if(!["admin","clerk"].includes(String(profile?.app_role||"")))return alert("Administrator or Clerk access required.");
   const cad=btn?.dataset.cad||"",reportId=btn?.dataset.reportId||"";
   if(!cad||!reportId)return alert("Report identifier is missing.");
-  const incident=await db.from("incidents").select("reports").eq("cad",cad).maybeSingle();
-  if(incident.error||!incident.data)return alert(incident.error?.message||"Incident not found.");
-  const reports=Array.isArray(incident.data.reports)?incident.data.reports:[];
+  let reports=[];
+  if(profile?.app_role==="clerk"){const safe=await db.rpc("clerk_search_incident_reports");if(safe.error)return alert(safe.error.message);const row=(safe.data||[]).find(x=>String(x.cad)===String(cad));reports=Array.isArray(row?.reports)?row.reports:[];}
+  else{const incident=await db.from("incidents").select("reports").eq("cad",cad).maybeSingle();if(incident.error||!incident.data)return alert(incident.error?.message||"Incident not found.");reports=Array.isArray(incident.data.reports)?incident.data.reports:[];}
   const idx=reports.findIndex(x=>String(x?.report_id||"")===String(reportId));
   if(idx<0)return alert("Report not found.");
   return adminSubmitReport(cad,idx);
@@ -2402,20 +2402,18 @@ function buildNerisPayload(data){
   if(nonfd.length)payload.nonfd_aids=nonfd;
   return payload;
 }
-async function submitReportToNeris(data,incidentId,explicitAdminReview=false){
-  // NERIS submission is a privileged review action. Finishing a report must
-  // never be able to reach the live NERIS submit endpoint, even if another
-  // client workflow accidentally calls this helper.
-  if(!explicitAdminReview)return {ok:false,error:"NERIS submission requires an explicit administrator review/submit action."};
-  if(profile?.app_role!=="admin")return {ok:false,error:"Administrator access required for NERIS submission."};
-  if(!incidentId)return {ok:false,error:"NERIS submission requires an incident record."};
+async function submitReportToNeris(data,incidentId,explicitAdminReview=false,reportId=null,cad=null){
+  if(!explicitAdminReview)return {ok:false,error:"NERIS submission requires an explicit administrator or Clerk review/submit action."};
+  if(!["admin","clerk"].includes(String(profile?.app_role||"")))return {ok:false,error:"Administrator or Clerk access required for NERIS submission."};
+  if(!incidentId||!reportId||!cad)return {ok:false,error:"Incident and report identifiers are required."};
   if(!data.rLocation)return {ok:false,error:"Incident location is required before NERIS submission."};
-  const payload=buildNerisPayload(data);
-  const check=await fetch("/api/neris",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"submit",payload})});
+  const payload=buildNerisPayload(data),session=(await db.auth.getSession()).data?.session;
+  if(!session)return {ok:false,error:"Authentication required."};
+  const check=await fetch("/api/neris",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({action:"submit",payload,incident_id:incidentId,cad,report_id:reportId})});
   let body={};try{body=await check.json();}catch{}
   if(!check.ok||body.ok===false)return {ok:false,error:body.error||"NERIS submission failed",details:body.details||body.response||null};
-  const ins=await db.from("neris_submissions").insert({incident_id:Number(incidentId),status:"submitted",neris_incident_id:body.neris_incident_id||body.id||null,request_metadata:{payload},response_metadata:body,submitted_by:me?.id||null,submitted_at:new Date().toISOString()});
-  if(ins.error)return {ok:false,error:"NERIS accepted the incident, but RMS could not save the submission record: "+ins.error.message,neris:body};
+  const ins=await db.rpc("record_neris_submission",{p_incident_id:Number(incidentId),p_cad:String(cad),p_report_id:String(reportId),p_neris:{...body,neris_incident_id:body.neris_incident_id||body.id||null},p_payload:{payload}});
+  if(ins.error)return {ok:false,error:"NERIS accepted the incident, but RMS could not record the submission: "+ins.error.message,neris:body};
   return {ok:true,neris:body};
 }
 async function saveReportDraft(kind,silent=false){
