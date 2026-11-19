@@ -257,6 +257,33 @@ async function handleDepartmentEmail(req,res) {
   }catch(e){return res.status(500).json({error:e.message||"Email failed."})}
 }
 
+
+async function sendReinspectionReminders(now = new Date()) {
+  if (!SUPABASE_SERVICE_KEY || !process.env.BREVO_API_KEY || !process.env.BREVO_FROM_EMAIL) return {sent:0,skipped:0,reason:"Email service is not configured."};
+  const d=new Date(chicagoDate(now)+"T12:00:00Z"); d.setUTCDate(d.getUTCDate()+1);
+  const tomorrow=d.toISOString().slice(0,10);
+  const [items,people]=await Promise.all([
+    supa("inspections?select=inspection_id,inspector_user_id,occupancy_name,address,reinspection_date,reinspection_time&reinspection_date=eq."+tomorrow+"&reinspection_reminder_sent_at=is.null&inspector_user_id=not.is.null"),
+    supa("personnel?select=auth_user_id,email,active&active=eq.true&auth_user_id=not.is.null")
+  ]);
+  const emails=new Map((people||[]).map(p=>[String(p.auth_user_id),String(p.email||"").trim()]));
+  let sent=0,skipped=0;
+  for(const item of items||[]){
+    const email=emails.get(String(item.inspector_user_id))||"";
+    if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)){skipped++;continue;}
+    const dateLabel=fmtDate(item.reinspection_date);
+    const clock=String(item.reinspection_time||"").slice(0,5);
+    let timeLabel="Time not recorded";
+    if(/^\\d{2}:\\d{2}$/.test(clock)){const [h,m]=clock.split(":").map(Number);timeLabel=(h%12||12)+":"+String(m).padStart(2,"0")+" "+(h>=12?"PM":"AM");}
+    const body="This is a reminder of your scheduled fire reinspection tomorrow.\\n\\nOccupancy: "+(item.occupancy_name||"Not recorded")+"\\nAddress: "+(item.address||"Not recorded")+"\\nReinspection: "+dateLabel+" at "+timeLabel+"\\n\\nPlease review the prior inspection report in JFDRMS before the appointment.\\n\\nJasper Fire Department";
+    const result=await fetch("https://api.brevo.com/v3/smtp/email",{method:"POST",headers:{"api-key":process.env.BREVO_API_KEY,"Content-Type":"application/json","accept":"application/json"},body:JSON.stringify({sender:{email:process.env.BREVO_FROM_EMAIL,name:"Jasper Fire Department"},to:[{email}],subject:"Jasper Fire Department: Reinspection Tomorrow",textContent:body})});
+    if(!result.ok)throw new Error("Reinspection reminder email failed: "+(await result.text()).slice(0,300));
+    await supa("inspections?inspection_id=eq."+encodeURIComponent(item.inspection_id),{method:"PATCH",body:JSON.stringify({reinspection_reminder_sent_at:new Date().toISOString()})});
+    sent++;
+  }
+  return {sent,skipped,checked:(items||[]).length};
+}
+
 export default async function handler(req,res) {
   if(req.method!=="GET"&&req.method!=="POST") return res.status(405).json({error:"Method not allowed"});
   if(req.method==="POST"&&req.body?.action==="department_email")return handleDepartmentEmail(req,res);
@@ -264,9 +291,10 @@ export default async function handler(req,res) {
   if(process.env.CRON_SECRET && !testMva && (req.headers.authorization||"")!=="Bearer "+process.env.CRON_SECRET) return res.status(401).json({error:"Unauthorized"});
   if(testMva && (req.query?.cad||"")!=="2026-22608") return res.status(400).json({error:"Invalid test request"});
   try {
-    if(!testMva && process.env.RMS_EMAILS_ENABLED!=="true") return res.status(200).json({ok:true,skipped:true,reason:"Automatic RMS emails are disabled until the department authorizes go-live."});
     const now=new Date();
     if(!testMva && chicagoHour(now)!==9) return res.status(200).json({ok:true,skipped:true,reason:"Outside 9 AM America/Chicago delivery window."});
+    const reinspectionReminders=testMva?{sent:0,skipped:0}:await sendReinspectionReminders(now);
+    if(!testMva && process.env.RMS_EMAILS_ENABLED!=="true") return res.status(200).json({ok:true,shift_packet_skipped:true,reason:"Automatic RMS shift-package emails are disabled until the department authorizes go-live.",reinspection_reminders:reinspectionReminders});
     if(!SUPABASE_SERVICE_KEY) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured in Vercel.");
     const shiftEnd=chicagoDate(now),shiftStart=previousDate(shiftEnd);
     const startUtc=zoned7amUtc(shiftStart).toISOString(),endUtc=zoned7amUtc(shiftEnd).toISOString();
@@ -336,7 +364,7 @@ export default async function handler(req,res) {
       reportCount++;
     }
     await sendEmail(attachments,shiftStart,shiftEnd,(incidents||[]).length,reportCount,activitySummary,(training||[]).length);
-    return res.status(200).json({ok:true,shift_start:shiftStart,shift_end:shiftEnd,incidents:(incidents||[]).length,reports:reportCount,training_reports:(training||[]).length,attachments:attachments.length});
+    return res.status(200).json({ok:true,shift_start:shiftStart,shift_end:shiftEnd,incidents:(incidents||[]).length,reports:reportCount,training_reports:(training||[]).length,attachments:attachments.length,reinspection_reminders:reinspectionReminders});
   } catch(e) {
     console.error("Daily report email error",e);
     return res.status(500).json({ok:false,error:e?.message||"Daily report email failed."});
