@@ -656,7 +656,7 @@ function openPersonnelForm(id=null){
   const p=(personnel||[]).find(x=>Number(x.id)===Number(id));
   $("pfId").value=p?.id||"";$("pfFirst").value=p?.first_name||"";$("pfLast").value=p?.last_name||"";$("pfEmail").value=p?.email||"";$("pfPassword").value="";
   $("pfRole").value=p?.role||"firefighter";$("pfInspector").checked=!!p?.is_inspector;$("pfShift").value=p?.shift||"A";
-  $("personnelFormTitle").textContent=p?"Edit Personnel":"Add Personnel";const deleteBtn=$("pfDeleteButton");if(deleteBtn)deleteBtn.classList.toggle("hidden",!p);m.classList.remove("hiddenx");
+  $("personnelFormTitle").textContent=p?"Edit Personnel":"Add Personnel";syncInspectorField();const deleteBtn=$("pfDeleteButton");if(deleteBtn)deleteBtn.classList.toggle("hidden",!p);m.classList.remove("hiddenx");
 }
 function closePersonnelForm(){$("personnelFormModal")?.classList.add("hiddenx")}
 function syncInspectorField(){const clerk=$("pfRole")?.value==="clerk",label=$("pfInspector")?.closest("label");label?.classList.toggle("hiddenx",clerk);if(clerk&&$("pfInspector"))$("pfInspector").checked=false;}
