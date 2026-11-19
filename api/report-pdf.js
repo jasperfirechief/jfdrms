@@ -47,7 +47,41 @@ async function requireAdmin(req){
 }
 async function requirePdfAccess(req,body){
   const auth=req.headers.authorization||"";
-  if(body?.action==="email_all"&&body?.incident?.incident_id){
+  const action=String(body?.action||"");
+  const clerkActions=["download_incident","email_incident","download_all","email_all"];
+  if(clerkActions.includes(action)){
+    if(!auth.startsWith("Bearer "))throw new Error("Authentication required.");
+    const userCtl=new AbortController(),userTimer=setTimeout(()=>userCtl.abort(),10000);
+    let ur;
+    try{ur=await fetch(SUPABASE_URL+"/auth/v1/user",{headers:{apikey:SUPABASE_KEY,Authorization:auth},signal:userCtl.signal})}
+    finally{clearTimeout(userTimer)}
+    if(!ur.ok)throw new Error("Invalid or expired session.");
+    const user=await ur.json();
+    const roleCtl=new AbortController(),roleTimer=setTimeout(()=>roleCtl.abort(),10000);
+    let pr;
+    try{pr=await fetch(SUPABASE_URL+"/rest/v1/users?select=app_role,active&user_id=eq."+encodeURIComponent(user.id),{headers:{apikey:SUPABASE_KEY,Authorization:auth},signal:roleCtl.signal})}
+    finally{clearTimeout(roleTimer)}
+    if(!pr.ok)throw new Error("Unable to verify RMS permissions.");
+    const profile=(await pr.json())?.[0];
+    if(profile?.active!==true)throw new Error("This RMS account is inactive.");
+    if(profile.app_role==="admin")return {user};
+    if(profile.app_role!=="clerk")throw new Error("Administrator or Clerk access required.");
+    if(body.archiveType)throw new Error("Clerk access is limited to incident report PDFs.");
+    const cad=String(body?.incident?.cad||"").trim();
+    if(!cad)throw new Error("Incident CAD number is required.");
+    const safeCtl=new AbortController(),safeTimer=setTimeout(()=>safeCtl.abort(),15000);
+    let safeResponse;
+    try{safeResponse=await fetch(SUPABASE_URL+"/rest/v1/rpc/clerk_search_incident_reports",{method:"POST",headers:{apikey:SUPABASE_KEY,Authorization:auth,"Content-Type":"application/json"},body:"{}",signal:safeCtl.signal})}
+    finally{clearTimeout(safeTimer)}
+    if(!safeResponse.ok)throw new Error("Unable to verify the incident report.");
+    const rows=await safeResponse.json(),incident=(rows||[]).find(x=>String(x.cad)===cad);
+    if(!incident)throw new Error("Incident report not found or access denied.");
+    const requested=new Set((Array.isArray(body.reports)?body.reports:[]).map(x=>String(x?.report_id||"")).filter(Boolean));
+    const trusted=(incident.reports||[]).filter(x=>requested.size===0||requested.has(String(x?.report_id||"")));
+    if(!trusted.length)throw new Error("No authorized incident reports were selected.");
+    return {user,incident,reports:trusted};
+  }
+  if(action==="email_all"&&body?.incident?.incident_id){
     if(!auth.startsWith("Bearer "))throw new Error("Authentication required.");
     const userCtl=new AbortController(),userTimer=setTimeout(()=>userCtl.abort(),8000);
     let ur;
@@ -65,9 +99,9 @@ async function requirePdfAccess(req,body){
     if(String(d?.status||"")!=="awaiting_neris"||String(d?.report_by||"")!==String(user.id)){
       throw new Error("This completed incident package is not authorized for the current user.");
     }
-    return user;
+    return {user};
   }
-  return await requireAdmin(req);
+  return {user:await requireAdmin(req)};
 }
 
 const t=v=>String(v??"").replace(/\s+/g," ").trim();
@@ -843,7 +877,8 @@ export default async function handler(req,res){
  if(req.method!=="POST")return res.status(405).json({ok:false,error:"Method not allowed"});
  try{
   const body=typeof req.body==="string"?JSON.parse(req.body):req.body||{};
-  await requirePdfAccess(req,body);
+  const pdfAccess=await requirePdfAccess(req,body);
+  if(pdfAccess?.incident){body.incident=pdfAccess.incident;body.reports=pdfAccess.reports;}
   if(body.archiveType){
     const pdf=await makeArchivePdf(body.archiveType,body.archiveData||{});
     if(body.action==="email"){
