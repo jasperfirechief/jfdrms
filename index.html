@@ -2422,10 +2422,9 @@ function buildNerisPayload(data){
       // records. Older records stored care as "Yes"/"No" and the complaint as
       // "complaint", rather than the current evaluation/chief fields.
       const legacyCare=String(p.careProvided??p.care??"").trim().toLowerCase();
-      const legacyRefusal=!!(p.refusedCare||p.refusedTransport||p.minorRefusal) ||
-        /refus/i.test(String(p.transportDisposition||p.disposition||""));
+      const refused=legacyCare==="no"||/refus/i.test(String(p.transportDisposition||p.disposition||""));
       const evaluation=p.evaluation||p.patientCareEvaluation||
-        (legacyRefusal?"Evaluated and refused care":
+        (refused?"Evaluated and refused care":
           legacyCare==="yes"?"Evaluated and cared for":
           legacyCare==="no"?"Evaluated, no care required":"");
       const medical={
@@ -2811,7 +2810,7 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       card("Patient Disposition",select(id+"_transportDisposition","Disposition",["Transport by EMS Unit","Transport by Other Agency","Patient Refused Transport","Treated / No Transport","Other"],disposition,"md:col-span-2",true)+
         '<div id="'+id+'_transportSection" class="'+(showTransport?"":"hiddenx")+' md:col-span-2 border-t pt-3"><div class="font-black mb-2">Transport / Vehicle</div><div class="grid md:grid-cols-2 gap-3"><label class="text-sm font-semibold">Transport Vehicle / Unit<select id="'+id+'_transportVehicle" class="w-full border rounded p-2 mt-1"><option value="">Select vehicle / unit...</option>'+transportOptions+'<option value="OTHER_AGENCY" '+(p.transportVehicle==="OTHER_AGENCY"?"selected":"")+'>Other agency / ambulance</option></select></label>'+field(id+"_transportAgency","Transporting Agency",p.transportAgency||"")+field(id+"_destination","Destination",p.destination||"")+field(id+"_vehicleMake","Vehicle Make",p.vehicleMake||"")+field(id+"_vehicleModel","Vehicle Model",p.vehicleModel||"")+field(id+"_vehicleYear","Vehicle Year",p.vehicleYear||"","number")+field(id+"_vehicleVin","License / VIN",p.vehicleVin||"")+field(id+"_insurance","Insurance Company",p.insurance||"")+field(id+"_policy","Policy Number",p.policy||"")+field(id+"_expiration","Insurance Expiration",p.expiration||"","date")+'</div></div>'+
         '<label class="block text-sm font-semibold md:col-span-2">Narrative<textarea id="'+id+'_narrative" rows="4" class="w-full border rounded p-2 mt-1">'+esc(p.narrative||p.dispositionNote||"")+'</textarea></label>'+
-        patientRefusalHtml(id,{...p,refusedCare:p.refusedCare||careProvided==="no",refusedTransport:p.refusedTransport||disposition==="Patient Refused Transport"}))+
+        (showRefusal?'<div id="'+id+'_refusalSlot">'+patientRefusalHtml(id,{...p,refusalRequired:true})+'</div>':'<div id="'+id+'_refusalSlot"></div>'))+
       '<div class="mt-4 flex flex-wrap justify-end gap-2 border-t pt-3"><button type="button" class="rounded-lg border px-4 py-2 font-bold" onclick="jfdCancelPatient('+index+')">Cancel</button><button type="button" class="rounded-lg border border-slate-300 px-4 py-2 font-bold" onclick="jfdSavePatient('+index+')">Save Patient</button><button type="button" class="rounded-lg bg-red-600 px-4 py-2 font-bold text-white" onclick="jfdAddPatientAndSave('+index+')">+ Add Patient</button></div>'+
       '</article>';
   }
@@ -2848,29 +2847,10 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
     const slot=cardEl?.querySelector("#"+id+"_refusalSlot");
     if(slot){
       if(shouldRefusal){
-        slot.outerHTML=patientRefusalHtml(id,{refusedCare:care==="no",refusedTransport:disposition==="Patient Refused Transport",minorRefusal:false});
+        slot.outerHTML='<div id="'+id+'_refusalSlot">'+patientRefusalHtml(id,{refusalRequired:true})+'</div>';
         setTimeout(jfdBindSignaturePads,0);
       }
     }
-  };
-  window.jfdSyncRefusal=function(id){
-    const care=$(id+"_refusedCare")?.checked,transport=$(id+"_refusedTransport")?.checked;
-    const box=$(id+"_refusalDetails");
-    if(box)box.classList.toggle("hiddenx",!(care||transport));
-  };
-  window.jfdAddMinor=function(id){
-    const list=$(id+"_minorList");if(!list)return;
-    const n=list.querySelectorAll("[data-minor-row]").length;
-    list.insertAdjacentHTML("beforeend",'<div class="grid grid-cols-[1fr_160px_auto] gap-2 items-end border rounded-lg p-2 bg-white" data-minor-row="'+n+'"><label class="text-sm font-semibold">Minor Patient Name<input id="'+id+'_minor_'+n+'_name" class="w-full border rounded p-2 mt-1"></label><label class="text-sm font-semibold">DOB<input id="'+id+'_minor_'+n+'_dob" type="date" class="w-full border rounded p-2 mt-1"></label><button type="button" onclick="jfdRemoveMinor(\''+id+'\','+n+')" class="border border-red-300 text-red-600 px-3 py-2 rounded font-bold text-sm">Remove</button></div>');
-  };
-  window.jfdRemoveMinor=function(id,index){
-    const list=$(id+"_minorList");if(!list)return;
-    const row=list.querySelector('[data-minor-row="'+index+'"]');if(row)row.remove();
-    [...list.querySelectorAll("[data-minor-row]")].forEach((r,j)=>{
-      r.dataset.minorRow=j;
-      r.querySelectorAll("input").forEach((x,k)=>x.id=id+"_minor_"+j+"_"+(k===0?"name":"dob"));
-      const b=r.querySelector("button");if(b)b.setAttribute("onclick","jfdRemoveMinor('"+id+"',"+j+")");
-    });
   };
   window.jfdPatientState=[];
   window.jfdRenderPatients=function(state){window.jfdPatientState=state||[];const box=$("jfdPatients");if(!box)return;box.innerHTML=(window.jfdPatientState.length?window.jfdPatientState.map(patientCard).join(""):'<div class="rounded-xl border border-dashed p-5 text-sm text-slate-500">No patient started yet.</div>');setTimeout(()=>{jfdBindSignaturePads();jfdSearchableSelects();},0);};
@@ -2954,7 +2934,6 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
       const canvas=cardEl.querySelector("#p"+i+"_signaturePad");
       const witnessCanvas=cardEl.querySelector("#p"+i+"_witnessSignaturePad");
       const vitals=[...cardEl.querySelectorAll("[data-vital]")].map(v=>{const x=[...v.querySelectorAll("input")];return {time:x[0]?.value||"",o2:x[1]?.value||"",pulse:x[2]?.value||"",resp:x[3]?.value||"",bp:x[4]?.value||"",pupils:x[5]?.value||""}}).filter(v=>Object.values(v).some(Boolean));
-      const minorPatients=[...cardEl.querySelectorAll("[data-minor-row]")].map(row=>({name:row.querySelector('input[id$="_name"]')?.value||"",dob:row.querySelector('input[id$="_dob"]')?.value||""}));
       const careMethods=[...cardEl.querySelectorAll("[data-care-method]:checked")].map(x=>x.value);
       const evaluation=careProvided==="yes"?"Evaluated and cared for":(disposition==="Patient Refused Transport"?"Evaluated and refused care":"Evaluated, no care required");
       const transport=disposition==="Transport by EMS Unit"?"EMS Unit":disposition==="Transport by Other Agency"?"Other Agency":"No Transport";
@@ -3281,7 +3260,6 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
         if(!p.chief)errors.push("Patient "+(i+1)+": chief complaint is required.");
         if(!p.evaluation)errors.push("Patient "+(i+1)+": patient care evaluation is required.");
         if(String(p.careProvided??p.care??"").trim().toLowerCase()==="no"||/refus/i.test(String(p.transportDisposition||p.disposition||""))){
-          if(!p.refusalSigner)errors.push("Patient "+(i+1)+": Patient / Guardian Name is required for refusal.");
           if(!p.signature)errors.push("Patient "+(i+1)+": refusal signature is required.");
         }
       });
