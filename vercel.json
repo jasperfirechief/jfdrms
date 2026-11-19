@@ -7,14 +7,6 @@
     {
       "path": "/api/daily-report-email",
       "schedule": "0 14 * * *"
-    },
-    {
-      "path": "/api/reinspection-reminders",
-      "schedule": "0 14 * * *"
-    },
-    {
-      "path": "/api/reinspection-reminders",
-      "schedule": "0 15 * * *"
     }
   ]
 }
