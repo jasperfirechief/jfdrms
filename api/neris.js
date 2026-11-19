@@ -2,6 +2,22 @@ const BASE_URL = String(process.env.NERIS_BASE_URL || "https://api-test.neris.fs
 const CLIENT_ID = String(process.env.NERIS_CLIENT_ID || "");
 const CLIENT_SECRET = String(process.env.NERIS_CLIENT_SECRET || "");
 const DEPARTMENT_ID = String(process.env.NERIS_DEPARTMENT_ID || "");
+const SUPABASE_URL = "https://audgtwcctdoiptuekqvn.supabase.co";
+const SUPABASE_KEY = "sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz";
+
+async function requireNerisRole(req, allowed = ["admin","clerk"]) {
+  const auth = req.headers.authorization || "";
+  if (!auth.startsWith("Bearer ")) throw new Error("Authentication required.");
+  const headers = { apikey: SUPABASE_KEY, Authorization: auth };
+  const userResponse = await fetch(SUPABASE_URL + "/auth/v1/user", { headers });
+  if (!userResponse.ok) throw new Error("Invalid or expired session.");
+  const user = await userResponse.json();
+  const profileResponse = await fetch(SUPABASE_URL + "/rest/v1/users?select=app_role,active&user_id=eq." + encodeURIComponent(user.id), { headers });
+  if (!profileResponse.ok) throw new Error("Unable to verify RMS permissions.");
+  const profile = (await profileResponse.json())?.[0];
+  if (profile?.active !== true || !allowed.includes(profile.app_role)) throw new Error("Administrator or Clerk access required.");
+  return { user, role: profile.app_role, headers };
+}
 
 async function getToken() {
   if (!CLIENT_ID || !CLIENT_SECRET) throw new Error("NERIS integration credentials are not configured in Vercel.");
@@ -34,6 +50,7 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     if (new URL(req.url, "http://localhost").searchParams.get("action") === "test-auth") {
       try {
+        await requireNerisRole(req, ["admin"]);
         const auth = await getToken();
         return res.status(200).json({
           ok: true,
@@ -67,6 +84,7 @@ export default async function handler(req, res) {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
 
     if (body?.action === "test-auth") {
+      await requireNerisRole(req, ["admin"]);
       const auth = await getToken();
       return res.status(200).json({
         ok: true,
@@ -79,6 +97,26 @@ export default async function handler(req, res) {
 
     if (!body || !["validate","submit"].includes(body.action) || !body.payload) {
       return res.status(400).json({ ok:false, error:"A NERIS validation or submission payload is required." });
+    }
+    const access = await requireNerisRole(req, ["admin","clerk"]);
+    if (body.action === "submit") {
+      if (!body.cad || !body.report_id || !body.incident_id) throw new Error("Incident and report identifiers are required for NERIS submission.");
+      let incidentRow = null;
+      if (access.role === "clerk") {
+        const verify = await fetch(SUPABASE_URL + "/rest/v1/rpc/clerk_search_incident_reports", { method:"POST", headers:{...access.headers,"Content-Type":"application/json"}, body:"{}" });
+        if (!verify.ok) throw new Error("Unable to verify the incident report.");
+        incidentRow = (await verify.json() || []).find(x => String(x.cad) === String(body.cad));
+      } else {
+        const verify = await fetch(SUPABASE_URL + "/rest/v1/incidents?select=cad,reports&cad=eq." + encodeURIComponent(body.cad), { headers:access.headers });
+        if (!verify.ok) throw new Error("Unable to verify the incident report.");
+        incidentRow = (await verify.json() || [])[0];
+      }
+      const report = (incidentRow?.reports || []).find(x => String(x?.report_id || "") === String(body.report_id));
+      if (!report || report.status !== "ready_for_neris" || String(report.report_type || "").startsWith("pcr_")) throw new Error("Only an incident report awaiting NERIS review can be submitted by this account.");
+      const detailsResponse = await fetch(SUPABASE_URL + "/rest/v1/incident_details?select=incident_id&cad=eq." + encodeURIComponent(body.cad), { headers:access.headers });
+      if (!detailsResponse.ok) throw new Error("Unable to verify the incident detail record.");
+      const detail = (await detailsResponse.json() || [])[0];
+      if (!detail || String(detail.incident_id) !== String(body.incident_id)) throw new Error("Incident identifiers do not match.");
     }
 
     const payload = withDepartmentId(body.payload);
