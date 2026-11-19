@@ -37,7 +37,7 @@ function validEmail(value) {
 async function sendReminder(email, inspection) {
   const subject = "Jasper Fire Department: Reinspection Tomorrow";
   const date = new Intl.DateTimeFormat("en-US", {timeZone:"America/Chicago",month:"long",day:"numeric",year:"numeric"}).format(new Date(inspection.reinspection_date + "T12:00:00-06:00"));
-  const time = inspection.reinspection_time ? new Intl.DateTimeFormat("en-US", {timeZone:"America/Chicago",hour:"numeric",minute:"2-digit"}).format(new Date("1970-01-01T" + String(inspection.reinspection_time).slice(0,8) + "Z")) : "Time not recorded";
+  const time = inspection.reinspection_time ? (() => { const parts=String(inspection.reinspection_time).slice(0,5).split(":").map(Number); const hour=parts[0]%12||12; return hour+":"+String(parts[1]).padStart(2,"0")+" "+(parts[0]>=12?"PM":"AM"); })() : "Time not recorded";
   const textContent = [
     "This is a reminder of your scheduled fire reinspection tomorrow.",
     "",
