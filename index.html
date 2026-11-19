@@ -1097,12 +1097,23 @@ function jfdCurrentCentralTimeInput(){
   const parts=Object.fromEntries(JFD_CENTRAL_PARTS.formatToParts(new Date()).map(x=>[x.type,x.value]));
   return String(parts.hour||"00").padStart(2,"0")+":"+String(parts.minute||"00").padStart(2,"0");
 }
+function setInspectionCurrentTime(){
+  const field=$("inTime");if(!field)return;
+  const value=jfdCurrentCentralTimeInput();
+  field.value=value;
+  // The global time-input enhancer hides the native time field and inserts a visible text
+  // editor immediately after it. Keep both controls synchronized when opening a new form.
+  const visible=field.nextElementSibling;
+  if(visible?.tagName==="INPUT"&&visible.type==="text"&&visible.inputMode==="numeric"){
+    visible.value=value;visible.setCustomValidity("");
+  }
+}
 async function newInspection(){
   if(!canInspect())return alert("Only administrators and on-duty inspectors can perform inspections.");
   $("inspectionEditor").classList.remove("hiddenx");$("inspectionForm").reset();
-  $("inDate").value=today();$("inTime").value=jfdCurrentCentralTimeInput();$("inSignatureDate").value=today();
+  $("inDate").value=today();setInspectionCurrentTime();$("inSignatureDate").value=today();
   populateInspectionInspector();renderAcceptancePanels();await renderInspectionChecklist();
-  $("inTime").value=jfdCurrentCentralTimeInput();
+  setInspectionCurrentTime();
   ensureInspectionSignaturePad();bindInspectionDimensions();window.scrollTo({top:0,behavior:"smooth"});
 }
 function closeInspectionEditor(){$("inspectionEditor")?.classList.add("hiddenx");$("inspectionForm")?.reset();clearInspectionSignature()}
