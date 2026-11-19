@@ -271,7 +271,7 @@ async function sendReinspectionReminders(now = new Date()) {
   for(const item of items||[]){
     const email=emails.get(String(item.inspector_user_id))||"";
     if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)){skipped++;continue;}
-    const dateLabel=fmtDate(item.reinspection_date);
+    const dateLabel=fmtDate(item.reinspection_date+"T12:00:00Z");
     const clock=String(item.reinspection_time||"").slice(0,5);
     let timeLabel="Time not recorded";
     if(/^\\d{2}:\\d{2}$/.test(clock)){const [h,m]=clock.split(":").map(Number);timeLabel=(h%12||12)+":"+String(m).padStart(2,"0")+" "+(h>=12?"PM":"AM");}
