@@ -3285,8 +3285,6 @@ $("incidentForm")?.addEventListener("submit",saveIncidentEditor);
           if(!p.refusalSigner)errors.push("Patient "+(i+1)+": Patient / Guardian Name is required for refusal.");
           if(!p.signature)errors.push("Patient "+(i+1)+": refusal signature is required.");
         }
-        if(p.minorRefusal&&!(p.minorPatients||[]).length)errors.push("Patient "+(i+1)+": add at least one minor patient with name and DOB.");
-        (p.minorPatients||[]).forEach((m,j)=>{if(!m.name)errors.push("Patient "+(i+1)+": Minor Patient "+(j+1)+" name is required.");if(!m.dob)errors.push("Patient "+(i+1)+": Minor Patient "+(j+1)+" DOB is required.");})
       });
     }
     if(errors.length)return {ok:false,errors};
