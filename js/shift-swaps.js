@@ -90,7 +90,7 @@
     }else q=await db.from("shift_swap_requests").insert(payload).select("swap_id").maybeSingle();
     if(q.error)return alert("Could not save shift swap request: "+q.error.message);
     if(!q.data?.swap_id)return alert("The request was not saved.");
-    resetForm();await loadRequests();await refreshPending();
+    resetForm();await loadRequests();await refreshPending();if(wasEditing)await refreshCalendarForSwap(payload);
     alert(wasEditing?"Request updated and returned for approval.":"Shift swap request submitted for Administrator approval.");
   }
   function beginEdit(x){
@@ -134,6 +134,11 @@
     $("jfdSwapList").querySelectorAll("[data-swap-deny]").forEach(b=>b.onclick=()=>denyRequest(b.dataset.swapDeny));
     $("jfdSwapList").querySelectorAll("[data-swap-cancel]").forEach(b=>b.onclick=()=>cancelRequest(b.dataset.swapCancel));
   }
+  async function refreshCalendarForSwap(x){
+    if(typeof renderStaffCalendar==="function")await renderStaffCalendar();
+    const selected=document.getElementById("staffDate")?.value||"";
+    if(selected&&[x.member_one_regular_date,x.member_two_regular_date].includes(selected)&&typeof renderStaffingCalendarDetails==="function")await renderStaffingCalendarDetails(selected,staffShiftForDate(selected));
+  }
   async function addCalendarEvent(staffDate,shift,personId,replacementId,full,start,end,notes){
     const base=await getOrCreateStaffing(staffDate,shift);if(base.error)throw base.error;
     const ins=await db.from("daily_staffing_events").insert({staffing_id:base.data.staffing_id,event_type:"swap",effective_date:staffDate,leave_start_date:null,leave_end_date:null,personnel_id:personId,replacement_personnel_id:replacementId,station_id:null,apparatus_id:null,leave_type:"swap",is_full_shift:full,start_time:full?null:start,end_time:full?null:end,notes,created_by:me.id}).select("event_id").maybeSingle();
@@ -149,7 +154,7 @@
       b=await addCalendarEvent(x.member_two_regular_date,x.member_two_regular_shift,x.member_two_id,x.member_one_id,x.member_one_full_shift,x.member_one_start_time,x.member_one_end_time,"Approved shift swap · "+id);
       const u=await db.from("shift_swap_requests").update({status:"approved",reviewed_by:me.id,reviewed_at:new Date().toISOString(),approved_at:new Date().toISOString(),member_one_calendar_event_id:a,member_two_calendar_event_id:b}).eq("swap_id",id).eq("status","pending").select("swap_id").maybeSingle();
       if(u.error||!u.data?.swap_id)throw u.error||new Error("Request status was not updated.");
-      await loadRequests();await refreshPending();if(typeof renderStaffCalendar==="function")await renderStaffCalendar();alert("Swap approved and added to the staffing calendar.");
+      await loadRequests();await refreshPending();await refreshCalendarForSwap(x);alert("Swap approved and added to the staffing calendar.");
     }catch(e){
       for(const eventId of [a,b].filter(Boolean))await db.from("daily_staffing_events").delete().eq("event_id",eventId);
       alert("Approval was not completed. No partial calendar change was kept. "+(e.message||e));
@@ -169,7 +174,7 @@
     for(const eventId of [x.member_one_calendar_event_id,x.member_two_calendar_event_id].filter(Boolean)){const d=await db.from("daily_staffing_events").delete().eq("event_id",eventId);if(d.error)return alert("Could not reverse the calendar entry: "+d.error.message);}
     const u=await db.from("shift_swap_requests").update({status:"cancelled",cancelled_by:me.id,cancelled_at:new Date().toISOString()}).eq("swap_id",id);
     if(u.error)return alert("Calendar entries were removed, but request status could not be updated: "+u.error.message);
-    await loadRequests();await refreshPending();if(typeof renderStaffCalendar==="function")await renderStaffCalendar();
+    await loadRequests();await refreshPending();await refreshCalendarForSwap(x);
   }
   async function refreshPending(){
     const box=$("jfdAdminPending");if(!box)return;
