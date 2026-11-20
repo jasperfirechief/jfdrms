@@ -80,7 +80,7 @@
     const payload=formPayload();let q;const wasEditing=!!editing;
     if(editing){
       const old=requestCache.find(x=>x.swap_id===editing);if(old)payload.submitted_by=old.submitted_by;
-      if(old?.status==="approved"&&!isAdmin())return alert("Only an Administrator can edit an approved swap.");
+      if(old?.status==="approved"&&!isAdmin()&&old?.submitted_by!==me.id)return alert("Only the submitting Officer or an Administrator can edit an approved swap.");
       if(old?.status==="approved"){
         for(const id of [old.member_one_calendar_event_id,old.member_two_calendar_event_id].filter(Boolean)){const del=await db.from("daily_staffing_events").delete().eq("event_id",id);if(del.error)return alert("Could not reverse the previous calendar entries: "+del.error.message);}
       }
@@ -120,9 +120,9 @@
     if(!requestCache.length){$("jfdSwapList").innerHTML='<p class="text-slate-500">No shift swap requests have been submitted.</p>';return;}
     const items=[];
     for(const x of requestCache){
-      const canEdit=(x.status==="pending"&&(isAdmin()||x.submitted_by===me.id))||(x.status==="approved"&&isAdmin());
+      const canEdit=(["pending","approved"].includes(x.status)&&(isAdmin()||x.submitted_by===me.id));
       const canApprove=isAdmin()&&x.status==="pending";
-      const canCancel=isAdmin()&&x.status==="approved"||x.status==="pending"&&(isAdmin()||x.submitted_by===me.id);
+      const canCancel=["pending","approved"].includes(x.status)&&(isAdmin()||x.submitted_by===me.id);
       const history=await loadHistory(x.swap_id);
       items.push('<article class="border rounded-xl p-3"><div class="flex flex-wrap justify-between gap-2"><div><b>'+escHtml(personName(x.member_one_id))+' ↔ '+escHtml(personName(x.member_two_id))+'</b><div class="text-xs text-slate-500 mt-1">'+dateFmt(x.member_one_regular_date)+' ('+escHtml(x.member_one_regular_shift)+') ↔ '+dateFmt(x.member_two_regular_date)+' ('+escHtml(x.member_two_regular_shift)+')</div><div class="text-xs text-slate-500">Both members exchange the other member’s date · '+(Number(x.member_one_minutes)/60)+' hours each</div></div><span class="rounded-full px-3 py-1 text-xs font-bold '+(x.status==="approved"?"bg-emerald-100 text-emerald-800":x.status==="pending"?"bg-amber-100 text-amber-800":"bg-slate-100 text-slate-700")+'">'+escHtml(x.status.toUpperCase())+'</span></div><p class="text-sm mt-2">'+escHtml(x.reason)+'</p>'+(x.review_notes?'<p class="text-xs mt-1 text-slate-600">Admin note: '+escHtml(x.review_notes)+'</p>':'')+'<div class="flex flex-wrap gap-2 mt-3">'+(canEdit?'<button data-swap-edit="'+x.swap_id+'" class="border rounded px-3 py-1 text-xs font-semibold">Edit</button>':'')+(canApprove?'<button data-swap-approve="'+x.swap_id+'" class="bg-emerald-700 text-white rounded px-3 py-1 text-xs font-bold">Approve & add to calendar</button><button data-swap-deny="'+x.swap_id+'" class="border border-red-300 text-red-700 rounded px-3 py-1 text-xs font-semibold">Deny</button>':'')+(canCancel?'<button data-swap-cancel="'+x.swap_id+'" class="border border-red-300 text-red-700 rounded px-3 py-1 text-xs font-semibold">Cancel</button>':'')+'</div>'+history+'</article>');
     }
@@ -161,7 +161,7 @@
   }
   async function cancelRequest(id){
     const x=requestCache.find(r=>r.swap_id===id);if(!x)return;
-    if(x.status==="approved"&&!isAdmin())return alert("Only an Administrator can cancel an approved swap.");
+    if(x.status==="approved"&&!isAdmin()&&x.submitted_by!==me.id)return alert("Only the submitting Officer or an Administrator can cancel an approved swap.");
     if(x.status==="pending"&&!isAdmin()&&x.submitted_by!==me.id)return alert("You can only cancel your own request.");
     if(!confirm(x.status==="approved"?"Cancel this approved swap and remove its calendar entries?":"Cancel this pending request?"))return;
     for(const eventId of [x.member_one_calendar_event_id,x.member_two_calendar_event_id].filter(Boolean)){const d=await db.from("daily_staffing_events").delete().eq("event_id",eventId);if(d.error)return alert("Could not reverse the calendar entry: "+d.error.message);}
