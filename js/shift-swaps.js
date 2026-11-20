@@ -94,7 +94,7 @@
     alert(wasEditing?"Request updated and returned for approval.":"Shift swap request submitted for Administrator approval.");
   }
   function beginEdit(x){
-    if(x.status==="approved"&&!isAdmin())return alert("Only an Administrator can edit an approved swap.");
+    if(x.status==="approved"&&!isAdmin()&&x.submitted_by!==me.id)return alert("Only the submitting Officer or an Administrator can edit an approved swap.");
     if(!isAdmin()&&x.submitted_by!==me.id)return alert("You can only edit your own request.");
     editing=x.swap_id;
     $("jfdSwapMember1").value=String(x.member_one_id);$("jfdSwapMember2").value=String(x.member_two_id);
