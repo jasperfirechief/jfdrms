@@ -287,11 +287,11 @@ async function handleTestEmail(req,res) {
     const profile=profiles?.[0];
     if(!profile?.active||profile.app_role!=="admin")return res.status(403).json({error:"Active administrator access required."});
     await sendDepartmentMail({
-      to:"firechief@jaspercity.com",
+      to:"deputyfirechief@jaspercity.com",
       subject:"JFDRMS Test Email",
-      text:"This is a test email from the Jasper Fire Department RMS. The department email service is working. No other recipients were included.\\n\\nJasper Fire Department"
+      text:"This is a test email from the Jasper Fire Department RMS. The department email service is working. This temporary test is addressed only to the Deputy Fire Chief.\\n\\nJasper Fire Department"
     });
-    return res.status(200).json({ok:true,recipient:"firechief@jaspercity.com"});
+    return res.status(200).json({ok:true,recipient:"deputyfirechief@jaspercity.com"});
   }catch(e){return res.status(500).json({error:e.message||"Test email failed."})}
 }
 
