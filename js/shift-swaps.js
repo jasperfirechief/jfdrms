@@ -53,6 +53,7 @@
     editing=null;$("jfdSwapFormTitle").textContent="Submit a shift swap";$("jfdSwapSubmit").textContent="Submit request";$("jfdSwapCancelEdit").classList.add("hidden");
     ["jfdSwapRegular1","jfdSwapRegular2","jfdSwapStart1","jfdSwapEnd1","jfdSwapStart2","jfdSwapEnd2","jfdSwapReason"].forEach(id=>$(id).value="");
     ["jfdSwapFull1","jfdSwapFull2"].forEach(id=>$(id).checked=true);
+    ["1","2"].forEach(n=>$("jfdSwapTimes"+n)?.classList.add("hidden"));
     fillPeople();updateFormSummary();
   }
   function validateForm(){
