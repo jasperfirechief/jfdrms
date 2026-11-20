@@ -83,6 +83,7 @@
       const old=requestCache.find(x=>x.swap_id===editing);if(old)payload.submitted_by=old.submitted_by;
       if(old?.status==="approved"&&!isAdmin()&&old?.submitted_by!==me.id)return alert("Only the submitting Officer or an Administrator can edit an approved swap.");
       if(old?.status==="approved"){
+        if(!confirm("This approved swap will be removed from the staffing calendar and returned to Pending until an Administrator approves it again. Continue?"))return;
         for(const id of [old.member_one_calendar_event_id,old.member_two_calendar_event_id].filter(Boolean)){const del=await db.from("daily_staffing_events").delete().eq("event_id",id);if(del.error)return alert("Could not reverse the previous calendar entries: "+del.error.message);}
       }
       q=await db.from("shift_swap_requests").update({...payload,member_one_calendar_event_id:null,member_two_calendar_event_id:null}).eq("swap_id",editing).select("swap_id").maybeSingle();
