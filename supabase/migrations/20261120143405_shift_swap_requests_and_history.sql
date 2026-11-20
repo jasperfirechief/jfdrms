@@ -43,6 +43,7 @@ alter table public.shift_swap_requests
 alter table public.shift_swap_requests drop constraint if exists shift_swap_same_28_day_cycle;
 alter table public.shift_swap_requests add constraint shift_swap_same_28_day_cycle check (
   member_one_regular_date is not null and member_two_regular_date is not null
+  and member_one_regular_date <> member_two_regular_date
   and member_one_swap_date = member_two_regular_date
   and member_two_swap_date = member_one_regular_date
   and floor((member_one_regular_date - date '2026-11-28') / 28.0) = floor((member_one_swap_date - date '2026-11-28') / 28.0)
