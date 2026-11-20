@@ -59,6 +59,7 @@
     const m1=Number($("jfdSwapMember1").value),m2=Number($("jfdSwapMember2").value),d1=$("jfdSwapRegular1").value,d2=$("jfdSwapRegular2").value;
     if(!m1||!m2||m1===m2)return "Select two different department members.";
     if(!d1||!d2)return "Enter both members’ regular shift dates.";
+    if(d1===d2)return "Choose two different regular shift dates.";
     const p1=personnel.find(p=>Number(p.id)===m1),p2=personnel.find(p=>Number(p.id)===m2),s1=staffShiftForDate(d1),s2=staffShiftForDate(d2);
     if(String(p1?.shift||"").toUpperCase()!==s1||String(p2?.shift||"").toUpperCase()!==s2)return "Each regular date must match that member’s assigned A/B/C shift.";
     if(dateCycle(d1)!==dateCycle(d2))return "Both regular dates must be within the same 28-day work cycle.";
