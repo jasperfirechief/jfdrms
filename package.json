@@ -6,6 +6,7 @@
   "dependencies": {
     "ai": "latest",
     "pdf-lib": "1.17.1",
-    "sharp": "^0.34.4"
+    "sharp": "^0.34.4",
+    "nodemailer": "^7.0.10"
   }
 }
