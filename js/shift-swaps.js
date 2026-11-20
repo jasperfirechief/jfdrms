@@ -175,16 +175,16 @@
     box.classList.remove("hidden");const out=$("jfdPendingItems");out.textContent="Checking pending actions…";
     const [sw,inc]=await Promise.all([
       db.from("shift_swap_requests").select("swap_id",{count:"exact",head:true}).eq("status","pending"),
-      db.from("incident_details").select("incident_id,cad").eq("status","awaiting_neris")
+      db.from("incidents").select("cad,reports").order("updated_at",{ascending:false}).limit(100)
     ]);
     const rows=[];
     if(sw.error)rows.push('<div class="text-sm text-red-700">Shift swaps: '+escHtml(sw.error.message)+'</div>');
     else if(sw.count)rows.push('<button type="button" id="jfdPendingSwaps" class="w-full text-left border rounded-lg p-3 hover:bg-slate-50"><b>'+sw.count+' shift swap request'+(sw.count===1?"":"s")+' awaiting approval</b><div class="text-xs text-slate-500">Open Staffing → Temporary Shift Swap Requests</div></button>');
     if(inc.error)rows.push('<div class="text-sm text-red-700">NERIS queue: '+escHtml(inc.error.message)+'</div>');
-    else if((inc.data||[]).length)rows.push('<button type="button" id="jfdPendingNeris" class="w-full text-left border rounded-lg p-3 hover:bg-slate-50"><b>'+(inc.data||[]).length+' incident report'+(inc.data.length===1?"":"s")+' awaiting NERIS submission</b><div class="text-xs text-slate-500">'+(inc.data||[]).slice(0,5).map(x=>escHtml(x.cad||("Incident "+x.incident_id))).join(" · ")+'</div></button>');
+    else {const ready=(inc.data||[]).flatMap(i=>(Array.isArray(i.reports)?i.reports:[]).filter(rep=>rep.status==="ready_for_neris").map(rep=>i.cad||"Incident"));if(ready.length)rows.push('<button type="button" id="jfdPendingNeris" class="w-full text-left border rounded-lg p-3 hover:bg-slate-50"><b>'+ready.length+' incident report'+(ready.length===1?"":"s")+' awaiting NERIS submission</b><div class="text-xs text-slate-500">'+ready.slice(0,5).map(escHtml).join(" · ")+'</div></button>');}
     out.innerHTML=rows.length?rows.join(""):'<p class="text-sm text-emerald-700">No pending administrator actions.</p>';
     $("jfdPendingSwaps")?.addEventListener("click",()=>{tab("staffing");setTimeout(()=> $("jfdSwapPanel")?.scrollIntoView({behavior:"smooth"}),100)});
-    $("jfdPendingNeris")?.addEventListener("click",()=>tab("incidents"));
+    $("jfdPendingNeris")?.addEventListener("click",()=>{tab("admin");setTimeout(()=>{window.renderNerisReviewQueue?.();$("adminNerisQueue")?.scrollIntoView({behavior:"smooth",block:"start"});},150)});
   }
   window.jfdSwapWorkflowInit=function(){ensureUi();if(isOfficer()){fillPeople();loadRequests();}refreshPending();};
   window.jfdSwapWorkflowRender=function(){ensureUi();if(isOfficer()){fillPeople();loadRequests();} };
