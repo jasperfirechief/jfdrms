@@ -5,7 +5,7 @@
   const isOfficer=()=>profile?.app_role==="officer"||isAdmin();
   const personName=id=>{const p=personnel.find(x=>Number(x.id)===Number(id));return p?[p.first_name,p.last_name].filter(Boolean).join(" "):"Unknown member"};
   const dateFmt=d=>d?new Date(d+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}):"—";
-  const dateCycle=d=>Math.floor((Date.parse(d+"T12:00:00Z")-Date.parse("2027-01-01T12:00:00Z"))/(28*86400000));
+  const dateCycle=d=>Math.floor((Date.parse(d+"T12:00:00Z")-Date.parse("2026-11-28T12:00:00Z"))/(28*86400000));
   const mins=(full,start,end)=>{if(full)return 1440;if(!start||!end||start===end)return 0;const a=Number(start.slice(0,2))*60+Number(start.slice(3,5)),b=Number(end.slice(0,2))*60+Number(end.slice(3,5));return (b-a+1440)%1440};
   const timeText=(full,s,e)=>full?"Full 24-hour shift":(s+"–"+e);
   let editing=null,requestCache=[];
