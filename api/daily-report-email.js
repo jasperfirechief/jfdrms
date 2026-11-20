@@ -229,7 +229,7 @@ async function sendEmail(attachments,shiftStart,shiftEnd,incidentCount,reportCou
 async function handleDepartmentEmail(req,res) {
   try {
     if(!SUPABASE_SERVICE_KEY||!process.env.BREVO_API_KEY||!process.env.BREVO_FROM_EMAIL)throw new Error("Email service is not configured.");
-    const token=String(req.headers.authorization||"").replace(/^Bearer\\s+/i,"");
+    const token=String(req.headers.authorization||"").replace(/^Bearer\s+/i,"");
     if(!token)return res.status(401).json({error:"Sign in required."});
     const auth=await fetch(SUPABASE_URL+"/auth/v1/user",{headers:{apikey:"sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz",Authorization:"Bearer "+token}});
     if(!auth.ok)return res.status(401).json({error:"Invalid session."});
@@ -261,7 +261,7 @@ async function handleDepartmentEmail(req,res) {
 async function handleTestEmail(req,res) {
   try {
     if(!SUPABASE_SERVICE_KEY||!process.env.BREVO_API_KEY||!process.env.BREVO_FROM_EMAIL)throw new Error("Email service is not configured.");
-    const token=String(req.headers.authorization||"").replace(/^Bearer\\s+/i,"");
+    const token=String(req.headers.authorization||"").replace(/^Bearer\s+/i,"");
     if(!token)return res.status(401).json({error:"Sign in required."});
     const auth=await fetch(SUPABASE_URL+"/auth/v1/user",{headers:{apikey:"sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz",Authorization:"Bearer "+token}});
     if(!auth.ok)return res.status(401).json({error:"Invalid session."});
