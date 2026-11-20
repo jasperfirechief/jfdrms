@@ -159,6 +159,9 @@
       const occupied=[[row.member_one_id,row.member_one_regular_date],[row.member_one_id,row.member_one_swap_date],[row.member_two_id,row.member_two_regular_date],[row.member_two_id,row.member_two_swap_date]];
       if(proposed.some(a=>occupied.some(b=>Number(a[0])===Number(b[0])&&a[1]===b[1])))return row;
     }
+    const ev=await db.from("daily_staffing_events").select("personnel_id,replacement_personnel_id,effective_date").eq("event_type","swap").in("effective_date",[x.member_one_regular_date,x.member_two_regular_date]);
+    if(ev.error)throw ev.error;
+    for(const row of ev.data||[]){const occupied=[[row.personnel_id,row.effective_date],[row.replacement_personnel_id,row.effective_date]];if(proposed.some(a=>occupied.some(b=>Number(a[0])===Number(b[0])&&a[1]===b[1])))return row;}
     return null;
   }
   async function approveRequest(id){
