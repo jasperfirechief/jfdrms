@@ -1,44 +1,29 @@
 import { makePdf } from "./report-pdf.js";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import nodemailer from "nodemailer";
 
 const SUPABASE_URL = "https://audgtwcctdoiptuekqvn.supabase.co";
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-let smtpTransporter;
-function getSmtpTransporter() {
-  const host=process.env.BREVO_SMTP_HOST;
-  const port=Number(process.env.BREVO_SMTP_PORT||587);
-  const login=process.env.BREVO_SMTP_LOGIN;
-  const key=process.env.BREVO_SMTP_KEY;
-  if(!host||!Number.isInteger(port)||port<1||port>65535||!login||!key) {
-    throw new Error("Brevo SMTP is not configured. Check BREVO_SMTP_HOST, BREVO_SMTP_PORT, BREVO_SMTP_LOGIN, and BREVO_SMTP_KEY in Vercel.");
-  }
-  if(!smtpTransporter) {
-    smtpTransporter=nodemailer.createTransport({
-      host,port,secure:port===465,requireTLS:port===587,
-      auth:{user:login,pass:key},
-      connectionTimeout:10000,greetingTimeout:10000,socketTimeout:20000
-    });
-  }
-  return smtpTransporter;
-}
-
 async function sendDepartmentMail({to,bcc,subject,text,attachments=[]}) {
+  const key=process.env.BREVO_API_KEY;
   const from=process.env.BREVO_FROM_EMAIL;
-  if(!from) throw new Error("BREVO_FROM_EMAIL is not configured in Vercel.");
-  const mail={from:{name:"Jasper Fire Department",address:from},to,subject,text};
-  if(bcc?.length) mail.bcc=bcc;
-  if(attachments.length) {
-    mail.attachments=attachments.map(a=>({
-      filename:a.filename,
-      content:Buffer.from(a.content,"base64"),
-      contentType:"application/pdf"
-    }));
-  }
-  return await getSmtpTransporter().sendMail(mail);
+  if(!key||!from) throw new Error("Brevo email is not configured. Add BREVO_API_KEY and BREVO_FROM_EMAIL in Vercel.");
+  const payload={
+    sender:{email:from,name:"Jasper Fire Department"},
+    to:(Array.isArray(to)?to:[to]).map(email=>({email})),
+    subject,
+    textContent:text
+  };
+  if(bcc?.length) payload.bcc=bcc.map(email=>({email}));
+  if(attachments.length) payload.attachment=attachments.map(a=>({content:a.content,name:a.filename}));
+  const response=await fetch("https://api.brevo.com/v3/smtp/email",{
+    method:"POST",
+    headers:{"api-key":key,"Content-Type":"application/json","accept":"application/json"},
+    body:JSON.stringify(payload)
+  });
+  if(!response.ok) throw new Error("Brevo delivery failed: "+(await response.text()).slice(0,500));
+  return response.json().catch(()=>null);
 }
-
 
 async function supa(path, opts = {}) {
   const r = await fetch(SUPABASE_URL + "/rest/v1/" + path, {
