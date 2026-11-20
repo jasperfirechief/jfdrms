@@ -151,12 +151,23 @@
     const ins=await db.from("daily_staffing_events").insert({staffing_id:base.data.staffing_id,event_type:"swap",effective_date:staffDate,leave_start_date:null,leave_end_date:null,personnel_id:personId,replacement_personnel_id:replacementId,station_id:null,apparatus_id:null,leave_type:"swap",is_full_shift:full,start_time:full?null:start,end_time:full?null:end,notes,created_by:me.id}).select("event_id").maybeSingle();
     if(ins.error)throw ins.error;if(!ins.data?.event_id)throw new Error("Calendar entry was not returned after save.");return ins.data.event_id;
   }
+  async function findSwapConflict(x){
+    const q=await db.from("shift_swap_requests").select("swap_id,member_one_id,member_two_id,member_one_regular_date,member_two_regular_date,member_one_swap_date,member_two_swap_date").in("status",["pending","approved"]).neq("swap_id",x.swap_id);
+    if(q.error)throw q.error;
+    const proposed=[[x.member_one_id,x.member_one_regular_date],[x.member_one_id,x.member_one_swap_date],[x.member_two_id,x.member_two_regular_date],[x.member_two_id,x.member_two_swap_date]];
+    for(const row of q.data||[]){
+      const occupied=[[row.member_one_id,row.member_one_regular_date],[row.member_one_id,row.member_one_swap_date],[row.member_two_id,row.member_two_regular_date],[row.member_two_id,row.member_two_swap_date]];
+      if(proposed.some(a=>occupied.some(b=>Number(a[0])===Number(b[0])&&a[1]===b[1])))return row;
+    }
+    return null;
+  }
   async function approveRequest(id){
     if(!isAdmin())return alert("Administrator approval is required.");
     const x=requestCache.find(r=>r.swap_id===id);if(!x||x.status!=="pending")return;
     if(!confirm("Approve this swap and add both personnel changes to the staffing calendar?"))return;
     let a=null,b=null;
     try{
+      const conflict=await findSwapConflict(x);if(conflict)throw new Error("This member or one of these dates is already involved in another pending or approved shift swap. Resolve the other request first.");
       a=await addCalendarEvent(x.member_one_regular_date,x.member_one_regular_shift,x.member_one_id,x.member_two_id,x.member_two_full_shift,x.member_two_start_time,x.member_two_end_time,"Approved shift swap · "+id);
       b=await addCalendarEvent(x.member_two_regular_date,x.member_two_regular_shift,x.member_two_id,x.member_one_id,x.member_one_full_shift,x.member_one_start_time,x.member_one_end_time,"Approved shift swap · "+id);
       const u=await db.from("shift_swap_requests").update({status:"approved",reviewed_by:me.id,reviewed_at:new Date().toISOString(),approved_at:new Date().toISOString(),member_one_calendar_event_id:a,member_two_calendar_event_id:b}).eq("swap_id",id).eq("status","pending").select("swap_id").maybeSingle();
