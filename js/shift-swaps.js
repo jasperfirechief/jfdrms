@@ -13,7 +13,7 @@
     const staff=document.getElementById("t-staffing");
     if(staff&&!$("jfdSwapPanel")){
       const anchor=staff.querySelector(".card.p-4.mb-5")||staff.firstElementChild;
-      const panel=document.createElement("div");panel.id="jfdSwapPanel";panel.className="card p-4 mb-5";
+      const panel=document.createElement("div");panel.id="jfdSwapPanel";panel.className="card p-4 mb-5";panel.classList.toggle("hidden",!isOfficer());
       panel.innerHTML='<div class="flex flex-wrap items-start justify-between gap-3 mb-3"><div><h2 class="font-black text-lg">Temporary Shift Swap Requests</h2><p class="text-sm text-slate-500">Officer-submitted requests · Admin approval required before the staffing calendar changes.</p></div><button type="button" id="jfdSwapRefresh" class="border rounded-lg px-3 py-2 text-sm font-semibold">Refresh</button></div><div id="jfdSwapFormWrap" class="border rounded-xl p-3 mb-4"><h3 class="font-bold mb-2" id="jfdSwapFormTitle">Submit a shift swap</h3><div class="grid md:grid-cols-2 gap-3"><div class="rounded-lg bg-slate-50 p-3"><b>Member initiating the swap</b><label class="block text-sm mt-2">Member<select id="jfdSwapMember1" class="block w-full border rounded p-2 mt-1"></select></label><label class="block text-sm mt-2">Regular shift date<input id="jfdSwapRegular1" type="date" class="block w-full border rounded p-2 mt-1"></label><div class="text-xs text-slate-500 mt-1" id="jfdSwapShift1">Shift: —</div><label class="flex items-center gap-2 text-sm mt-3"><input id="jfdSwapFull1" type="checkbox" checked> Full 24-hour shift</label><div id="jfdSwapTimes1" class="grid grid-cols-2 gap-2 mt-2 hidden"><label class="text-xs">Start<input id="jfdSwapStart1" type="time" class="block w-full border rounded p-2 mt-1"></label><label class="text-xs">End<input id="jfdSwapEnd1" type="time" class="block w-full border rounded p-2 mt-1"></label></div><div class="text-sm mt-3">Will work the other member’s regular date: <b id="jfdSwapTarget1">—</b></div></div><div class="rounded-lg bg-slate-50 p-3"><b>Member agreeing to the swap</b><label class="block text-sm mt-2">Member<select id="jfdSwapMember2" class="block w-full border rounded p-2 mt-1"></select></label><label class="block text-sm mt-2">Regular shift date<input id="jfdSwapRegular2" type="date" class="block w-full border rounded p-2 mt-1"></label><div class="text-xs text-slate-500 mt-1" id="jfdSwapShift2">Shift: —</div><label class="flex items-center gap-2 text-sm mt-3"><input id="jfdSwapFull2" type="checkbox" checked> Full 24-hour shift</label><div id="jfdSwapTimes2" class="grid grid-cols-2 gap-2 mt-2 hidden"><label class="text-xs">Start<input id="jfdSwapStart2" type="time" class="block w-full border rounded p-2 mt-1"></label><label class="text-xs">End<input id="jfdSwapEnd2" type="time" class="block w-full border rounded p-2 mt-1"></label></div><div class="text-sm mt-3">Will work the other member’s regular date: <b id="jfdSwapTarget2">—</b></div></div></div><div class="mt-3"><div id="jfdSwapDuration" class="text-sm font-semibold text-slate-600">Equal work time is required.</div><label class="block text-sm font-semibold mt-3">Reason for requesting the swap<textarea id="jfdSwapReason" rows="3" class="block w-full border rounded p-2 mt-1" placeholder="Explain the reason for the requested swap."></textarea></label><p class="text-xs text-slate-500 mt-2">Both dates must fall within the same 28-day work cycle. Each member works the other member’s regular shift date. No leave or other off-time may be substituted for the agreed work.</p></div><div class="flex flex-wrap gap-2 mt-3"><button id="jfdSwapSubmit" type="button" class="bg-red-700 text-white rounded-lg px-4 py-2 font-bold">Submit request</button><button id="jfdSwapCancelEdit" type="button" class="border rounded-lg px-4 py-2 hidden">Cancel edit</button></div></div><div><h3 class="font-bold mb-2">Requests and approvals</h3><div id="jfdSwapList" class="space-y-2 text-sm">Loading requests…</div></div>';
       if(anchor?.parentNode)anchor.parentNode.insertBefore(panel,anchor.nextSibling);else staff.prepend(panel);
     }
@@ -76,9 +76,9 @@
     if(!isOfficer()||!db)return alert("Only Officers and Administrators can submit shift swap requests.");
     if(profile?.app_role==="officer"&&(!crew||!crew.length))return alert("Only an on-duty Shift Officer can submit a swap request.");
     const err=validateForm();if(err)return alert(err);
-    const payload=formPayload();let q;
+    const payload=formPayload();let q;const wasEditing=!!editing;
     if(editing){
-      const old=requestCache.find(x=>x.swap_id===editing);
+      const old=requestCache.find(x=>x.swap_id===editing);if(old)payload.submitted_by=old.submitted_by;
       if(old?.status==="approved"&&!isAdmin())return alert("Only an Administrator can edit an approved swap.");
       if(old?.status==="approved"){
         for(const id of [old.member_one_calendar_event_id,old.member_two_calendar_event_id].filter(Boolean)){const del=await db.from("daily_staffing_events").delete().eq("event_id",id);if(del.error)return alert("Could not reverse the previous calendar entries: "+del.error.message);}
@@ -88,7 +88,7 @@
     if(q.error)return alert("Could not save shift swap request: "+q.error.message);
     if(!q.data?.swap_id)return alert("The request was not saved.");
     resetForm();await loadRequests();await refreshPending();
-    alert(editing?"Request updated and returned for approval.":"Shift swap request submitted for Administrator approval.");
+    alert(wasEditing?"Request updated and returned for approval.":"Shift swap request submitted for Administrator approval.");
   }
   function beginEdit(x){
     if(x.status==="approved"&&!isAdmin())return alert("Only an Administrator can edit an approved swap.");
