@@ -1,8 +1,44 @@
 import { makePdf } from "./report-pdf.js";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import nodemailer from "nodemailer";
 
 const SUPABASE_URL = "https://audgtwcctdoiptuekqvn.supabase.co";
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+let smtpTransporter;
+function getSmtpTransporter() {
+  const host=process.env.BREVO_SMTP_HOST;
+  const port=Number(process.env.BREVO_SMTP_PORT||587);
+  const login=process.env.BREVO_SMTP_LOGIN;
+  const key=process.env.BREVO_SMTP_KEY;
+  if(!host||!Number.isInteger(port)||port<1||port>65535||!login||!key) {
+    throw new Error("Brevo SMTP is not configured. Check BREVO_SMTP_HOST, BREVO_SMTP_PORT, BREVO_SMTP_LOGIN, and BREVO_SMTP_KEY in Vercel.");
+  }
+  if(!smtpTransporter) {
+    smtpTransporter=nodemailer.createTransport({
+      host,port,secure:port===465,requireTLS:port===587,
+      auth:{user:login,pass:key},
+      connectionTimeout:10000,greetingTimeout:10000,socketTimeout:20000
+    });
+  }
+  return smtpTransporter;
+}
+
+async function sendDepartmentMail({to,bcc,subject,text,attachments=[]}) {
+  const from=process.env.BREVO_FROM_EMAIL;
+  if(!from) throw new Error("BREVO_FROM_EMAIL is not configured in Vercel.");
+  const mail={from:{name:"Jasper Fire Department",address:from},to,subject,text};
+  if(bcc?.length) mail.bcc=bcc;
+  if(attachments.length) {
+    mail.attachments=attachments.map(a=>({
+      filename:a.filename,
+      content:Buffer.from(a.content,"base64"),
+      contentType:"application/pdf"
+    }));
+  }
+  return await getSmtpTransporter().sendMail(mail);
+}
+
 
 async function supa(path, opts = {}) {
   const r = await fetch(SUPABASE_URL + "/rest/v1/" + path, {
@@ -212,24 +248,18 @@ async function makeStandaloneReportPdf(incident, report) {
 }
 
 async function sendEmail(attachments,shiftStart,shiftEnd,incidentCount,reportCount,activitySummary,trainingCount=0) {
-  const key=process.env.BREVO_API_KEY,from=process.env.BREVO_FROM_EMAIL;
-  if(!key||!from) throw new Error("Brevo email is not configured. Add BREVO_API_KEY and BREVO_FROM_EMAIL in Vercel.");
-  const payload={
-    sender:{email:from,name:"Jasper Fire Department"},
-    to:[{email:"firechief@jaspercity.com"}],
+  await sendDepartmentMail({
+    to:"firechief@jaspercity.com",
     subject:"Jasper Fire Department - Daily Shift Reports - "+shiftStart+" to "+shiftEnd,
-    textContent:"Daily shift package for "+shiftStart+" through "+shiftEnd+"\\n\\n"+activitySummary+"\\n\\nIncidents: "+incidentCount+"\\nSubmitted reports: "+reportCount+"\\nTraining reports: "+trainingCount+"\\nAttachments: "+attachments.length,
-    attachment:attachments.map(a=>({content:a.content,name:a.filename}))
-  };
-  const r=await fetch("https://api.brevo.com/v3/smtp/email",{method:"POST",headers:{"api-key":key,"Content-Type":"application/json","accept":"application/json"},body:JSON.stringify(payload)});
-  if(!r.ok) throw new Error("Brevo delivery failed: "+await r.text());
+    text:"Daily shift package for "+shiftStart+" through "+shiftEnd+"\\n\\n"+activitySummary+"\\n\\nIncidents: "+incidentCount+"\\nSubmitted reports: "+reportCount+"\\nTraining reports: "+trainingCount+"\\nAttachments: "+attachments.length,
+    attachments
+  });
 }
-
 
 async function handleDepartmentEmail(req,res) {
   try {
-    if(!SUPABASE_SERVICE_KEY||!process.env.BREVO_API_KEY||!process.env.BREVO_FROM_EMAIL)throw new Error("Email service is not configured.");
-    const token=String(req.headers.authorization||"").replace(/^Bearer\s+/i,"");
+    if(!SUPABASE_SERVICE_KEY||!process.env.BREVO_SMTP_HOST||!process.env.BREVO_SMTP_LOGIN||!process.env.BREVO_SMTP_KEY||!process.env.BREVO_FROM_EMAIL)throw new Error("Email service is not configured.");
+    const token=String(req.headers.authorization||"").replace(/^Bearer\\s+/i,"");
     if(!token)return res.status(401).json({error:"Sign in required."});
     const auth=await fetch(SUPABASE_URL+"/auth/v1/user",{headers:{apikey:"sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz",Authorization:"Bearer "+token}});
     if(!auth.ok)return res.status(401).json({error:"Invalid session."});
@@ -250,18 +280,19 @@ async function handleDepartmentEmail(req,res) {
     }
     const emails=[...new Set((recipients||[]).map(x=>String(x.email||"").trim().toLowerCase()).filter(x=>/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(x)))];
     if(!emails.length)return res.status(400).json({error:"No active recipients with valid email addresses were found."});
-    const payload={sender:{email:process.env.BREVO_FROM_EMAIL,name:"Jasper Fire Department"},to:[{email:emails[0]}],bcc:emails.slice(1).map(email=>({email})),subject:"Jasper Fire Department: "+String(subject).trim().slice(0,180),textContent:String(message).trim().slice(0,20000)};
-    const sent=await fetch("https://api.brevo.com/v3/smtp/email",{method:"POST",headers:{"api-key":process.env.BREVO_API_KEY,"Content-Type":"application/json","accept":"application/json"},body:JSON.stringify(payload)});
-    if(!sent.ok)throw new Error("Brevo delivery failed: "+(await sent.text()).slice(0,500));
+    await sendDepartmentMail({
+      to:emails[0],bcc:emails.slice(1),
+      subject:"Jasper Fire Department: "+String(subject).trim().slice(0,180),
+      text:String(message).trim().slice(0,20000)
+    });
     return res.status(200).json({ok:true,recipient_count:emails.length});
   }catch(e){return res.status(500).json({error:e.message||"Email failed."})}
 }
 
-
 async function handleTestEmail(req,res) {
   try {
-    if(!SUPABASE_SERVICE_KEY||!process.env.BREVO_API_KEY||!process.env.BREVO_FROM_EMAIL)throw new Error("Email service is not configured.");
-    const token=String(req.headers.authorization||"").replace(/^Bearer\s+/i,"");
+    if(!SUPABASE_SERVICE_KEY||!process.env.BREVO_SMTP_HOST||!process.env.BREVO_SMTP_LOGIN||!process.env.BREVO_SMTP_KEY||!process.env.BREVO_FROM_EMAIL)throw new Error("Email service is not configured.");
+    const token=String(req.headers.authorization||"").replace(/^Bearer\\s+/i,"");
     if(!token)return res.status(401).json({error:"Sign in required."});
     const auth=await fetch(SUPABASE_URL+"/auth/v1/user",{headers:{apikey:"sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz",Authorization:"Bearer "+token}});
     if(!auth.ok)return res.status(401).json({error:"Invalid session."});
@@ -270,18 +301,17 @@ async function handleTestEmail(req,res) {
     const profiles=await supa("users?select=app_role,active&user_id=eq."+encodeURIComponent(user.id));
     const profile=profiles?.[0];
     if(!profile?.active||profile.app_role!=="admin")return res.status(403).json({error:"Active administrator access required."});
-    const sent=await fetch("https://api.brevo.com/v3/smtp/email",{
-      method:"POST",
-      headers:{"api-key":process.env.BREVO_API_KEY,"Content-Type":"application/json","accept":"application/json"},
-      body:JSON.stringify({sender:{email:process.env.BREVO_FROM_EMAIL,name:"Jasper Fire Department"},to:[{email:"firechief@jaspercity.com"}],subject:"JFDRMS Test Email",textContent:"This is a test email from the Jasper Fire Department RMS. The department email service is working. No other recipients were included.\n\nJasper Fire Department"})
+    await sendDepartmentMail({
+      to:"firechief@jaspercity.com",
+      subject:"JFDRMS Test Email",
+      text:"This is a test email from the Jasper Fire Department RMS. The department email service is working. No other recipients were included.\\n\\nJasper Fire Department"
     });
-    if(!sent.ok)throw new Error("Brevo delivery failed: "+(await sent.text()).slice(0,500));
     return res.status(200).json({ok:true,recipient:"firechief@jaspercity.com"});
   }catch(e){return res.status(500).json({error:e.message||"Test email failed."})}
 }
 
 async function sendReinspectionReminders(now = new Date()) {
-  if (!SUPABASE_SERVICE_KEY || !process.env.BREVO_API_KEY || !process.env.BREVO_FROM_EMAIL) {
+  if (!SUPABASE_SERVICE_KEY || !process.env.BREVO_SMTP_HOST || !process.env.BREVO_SMTP_LOGIN || !process.env.BREVO_SMTP_KEY || !process.env.BREVO_FROM_EMAIL) {
     return {inspector_sent:0,property_representative_sent:0,skipped:0,reason:"Email service is not configured."};
   }
   const d=new Date(chicagoDate(now)+"T12:00:00Z");
@@ -295,12 +325,7 @@ async function sendReinspectionReminders(now = new Date()) {
   const validEmail=value=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value||"").trim());
   let inspectorSent=0,representativeSent=0,skipped=0,failed=0;
   const send=async(email,subject,textContent)=>{
-    const result=await fetch("https://api.brevo.com/v3/smtp/email",{
-      method:"POST",
-      headers:{"api-key":process.env.BREVO_API_KEY,"Content-Type":"application/json","accept":"application/json"},
-      body:JSON.stringify({sender:{email:process.env.BREVO_FROM_EMAIL,name:"Jasper Fire Department"},to:[{email}],subject,textContent})
-    });
-    if(!result.ok)throw new Error("Brevo delivery failed: "+(await result.text()).slice(0,300));
+    await sendDepartmentMail({to:email,subject,text:textContent});
   };
   for(const item of items||[]){
     const dateLabel=fmtDate(item.reinspection_date+"T12:00:00Z");
