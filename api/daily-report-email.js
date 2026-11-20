@@ -258,6 +258,28 @@ async function handleDepartmentEmail(req,res) {
 }
 
 
+async function handleTestEmail(req,res) {
+  try {
+    if(!SUPABASE_SERVICE_KEY||!process.env.BREVO_API_KEY||!process.env.BREVO_FROM_EMAIL)throw new Error("Email service is not configured.");
+    const token=String(req.headers.authorization||"").replace(/^Bearer\\s+/i,"");
+    if(!token)return res.status(401).json({error:"Sign in required."});
+    const auth=await fetch(SUPABASE_URL+"/auth/v1/user",{headers:{apikey:"sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz",Authorization:"Bearer "+token}});
+    if(!auth.ok)return res.status(401).json({error:"Invalid session."});
+    const user=await auth.json();
+    if(String(user.email||"").toLowerCase()!=="firechief@jaspercity.com")return res.status(403).json({error:"Only the Fire Chief may send this test email."});
+    const profiles=await supa("users?select=app_role,active&user_id=eq."+encodeURIComponent(user.id));
+    const profile=profiles?.[0];
+    if(!profile?.active||profile.app_role!=="admin")return res.status(403).json({error:"Active administrator access required."});
+    const sent=await fetch("https://api.brevo.com/v3/smtp/email",{
+      method:"POST",
+      headers:{"api-key":process.env.BREVO_API_KEY,"Content-Type":"application/json","accept":"application/json"},
+      body:JSON.stringify({sender:{email:process.env.BREVO_FROM_EMAIL,name:"Jasper Fire Department"},to:[{email:"firechief@jaspercity.com"}],subject:"JFDRMS Test Email",textContent:"This is a test email from the Jasper Fire Department RMS. The department email service is working. No other recipients were included.\n\nJasper Fire Department"})
+    });
+    if(!sent.ok)throw new Error("Brevo delivery failed: "+(await sent.text()).slice(0,500));
+    return res.status(200).json({ok:true,recipient:"firechief@jaspercity.com"});
+  }catch(e){return res.status(500).json({error:e.message||"Test email failed."})}
+}
+
 async function sendReinspectionReminders(now = new Date()) {
   if (!SUPABASE_SERVICE_KEY || !process.env.BREVO_API_KEY || !process.env.BREVO_FROM_EMAIL) {
     return {inspector_sent:0,property_representative_sent:0,skipped:0,reason:"Email service is not configured."};
@@ -324,6 +346,7 @@ async function sendReinspectionReminders(now = new Date()) {
 export default async function handler(req,res) {
   if(req.method!=="GET"&&req.method!=="POST") return res.status(405).json({error:"Method not allowed"});
   if(req.method==="POST"&&req.body?.action==="department_email")return handleDepartmentEmail(req,res);
+  if(req.method==="POST"&&req.body?.action==="test_email")return handleTestEmail(req,res);
   const testMva=req.query?.test==="mva-22608-jfd";
   if(process.env.CRON_SECRET && !testMva && (req.headers.authorization||"")!=="Bearer "+process.env.CRON_SECRET) return res.status(401).json({error:"Unauthorized"});
   if(testMva && (req.query?.cad||"")!=="2026-22608") return res.status(400).json({error:"Invalid test request"});
