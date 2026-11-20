@@ -34,7 +34,7 @@
     ["jfdSwapRegular1","jfdSwapRegular2"].forEach(id=>$(id)?.addEventListener("change",updateFormSummary));
   }
   function fillPeople(){
-    ["jfdSwapMember1","jfdSwapMember2"].forEach(id=>{const el=$(id);if(!el)return;const old=el.value;el.innerHTML='<option value="">Select member</option>'+personnel.filter(p=>p.active!==false).map(p=>'<option value="'+Number(p.id)+'">'+escHtml([p.first_name,p.last_name].filter(Boolean).join(" "))+' · '+escHtml(p.shift||"")+'</option>').join("");if(old)el.value=old});
+    ["jfdSwapMember1","jfdSwapMember2"].forEach(id=>{const el=$(id);if(!el)return;const old=el.value;el.innerHTML='<option value="">Select member</option>'+personnel.filter(p=>p.active!==false&&["A","B","C"].includes(String(p.shift||"").toUpperCase())).map(p=>'<option value="'+Number(p.id)+'">'+escHtml([p.first_name,p.last_name].filter(Boolean).join(" "))+' · '+escHtml(p.shift||"")+'</option>').join("");if(old)el.value=old});
     if(!editing){const cp=personnel.find(p=>p.auth_user_id===me?.id);if(cp&&$("jfdSwapMember1"))$("jfdSwapMember1").value=String(cp.id);}
   }
   function updateFormSummary(){
