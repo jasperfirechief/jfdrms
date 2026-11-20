@@ -81,7 +81,7 @@ function zoned7amUtc(isoDate) {
   const offsetMs = Date.UTC(v.year, v.month - 1, v.day, v.hour, v.minute, v.second) - naive.getTime();
   return new Date(Date.UTC(Number(isoDate.slice(0,4)), Number(isoDate.slice(5,7))-1, Number(isoDate.slice(8,10)), 7) - offsetMs);
 }
-function clean(v) { return String(v ?? "").replace(/\\s+/g, " ").trim(); }
+function clean(v) { return String(v ?? "").replace(/\s+/g, " ").trim(); }
 function fmtShiftDuration(event) {
   if (event.is_full_shift) return "Full shift";
   const start=String(event.start_time||"").slice(0,5),end=String(event.end_time||"").slice(0,5);
@@ -107,7 +107,7 @@ async function makeTablePdf(title, sections) {
   let page=pdf.addPage([W,H]),y=H-margin;
   const ensure = (h=16) => { if(y-h<margin){page=pdf.addPage([W,H]);y=H-margin;return true;} return false; };
   const wrap = (value,size=9,font=regular) => {
-    const words=clean(value).split(/\\s+/).filter(Boolean),lines=[];let line="";
+    const words=clean(value).split(/\s+/).filter(Boolean),lines=[];let line="";
     for(const w of words){const t=line?line+" "+w:w;if(font.widthOfTextAtSize(t,size)>contentW-125){if(line)lines.push(line);line=w;}else line=t;}
     if(line)lines.push(line);return lines;
   };
@@ -259,7 +259,7 @@ async function sendEmail(attachments,shiftStart,shiftEnd,incidentCount,reportCou
 async function handleDepartmentEmail(req,res) {
   try {
     if(!SUPABASE_SERVICE_KEY||!process.env.BREVO_SMTP_HOST||!process.env.BREVO_SMTP_LOGIN||!process.env.BREVO_SMTP_KEY||!process.env.BREVO_FROM_EMAIL)throw new Error("Email service is not configured.");
-    const token=String(req.headers.authorization||"").replace(/^Bearer\\s+/i,"");
+    const token=String(req.headers.authorization||"").replace(/^Bearer\s+/i,"");
     if(!token)return res.status(401).json({error:"Sign in required."});
     const auth=await fetch(SUPABASE_URL+"/auth/v1/user",{headers:{apikey:"sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz",Authorization:"Bearer "+token}});
     if(!auth.ok)return res.status(401).json({error:"Invalid session."});
@@ -278,7 +278,7 @@ async function handleDepartmentEmail(req,res) {
     }else{
       recipients=await supa("users?select=email&active=eq.true&app_role=eq.officer&email=not.is.null");
     }
-    const emails=[...new Set((recipients||[]).map(x=>String(x.email||"").trim().toLowerCase()).filter(x=>/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(x)))];
+    const emails=[...new Set((recipients||[]).map(x=>String(x.email||"").trim().toLowerCase()).filter(x=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x)))];
     if(!emails.length)return res.status(400).json({error:"No active recipients with valid email addresses were found."});
     await sendDepartmentMail({
       to:emails[0],bcc:emails.slice(1),
@@ -292,7 +292,7 @@ async function handleDepartmentEmail(req,res) {
 async function handleTestEmail(req,res) {
   try {
     if(!SUPABASE_SERVICE_KEY||!process.env.BREVO_SMTP_HOST||!process.env.BREVO_SMTP_LOGIN||!process.env.BREVO_SMTP_KEY||!process.env.BREVO_FROM_EMAIL)throw new Error("Email service is not configured.");
-    const token=String(req.headers.authorization||"").replace(/^Bearer\\s+/i,"");
+    const token=String(req.headers.authorization||"").replace(/^Bearer\s+/i,"");
     if(!token)return res.status(401).json({error:"Sign in required."});
     const auth=await fetch(SUPABASE_URL+"/auth/v1/user",{headers:{apikey:"sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz",Authorization:"Bearer "+token}});
     if(!auth.ok)return res.status(401).json({error:"Invalid session."});
