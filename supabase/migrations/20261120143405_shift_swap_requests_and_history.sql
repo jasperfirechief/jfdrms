@@ -51,6 +51,17 @@ alter table public.shift_swap_requests add constraint shift_swap_same_28_day_cyc
   and floor((member_one_regular_date - date '2026-11-28') / 28.0) = floor((member_two_swap_date - date '2026-11-28') / 28.0)
 );
 
+alter table public.shift_swap_requests drop constraint if exists shift_swap_duration_matches_intervals;
+alter table public.shift_swap_requests add constraint shift_swap_duration_matches_intervals check (
+  (member_one_full_shift and member_one_minutes=1440)
+  or (not member_one_full_shift and member_one_minutes>0 and member_one_minutes=mod(((extract(epoch from (member_one_end_time-member_one_start_time))/60)::integer+1440),1440))
+);
+alter table public.shift_swap_requests drop constraint if exists shift_swap_member_two_duration_matches_intervals;
+alter table public.shift_swap_requests add constraint shift_swap_member_two_duration_matches_intervals check (
+  (member_two_full_shift and member_two_minutes=1440)
+  or (not member_two_full_shift and member_two_minutes>0 and member_two_minutes=mod(((extract(epoch from (member_two_end_time-member_two_start_time))/60)::integer+1440),1440))
+);
+
 create index if not exists shift_swap_status_date_idx
   on public.shift_swap_requests(status, member_one_regular_date, member_two_regular_date);
 
