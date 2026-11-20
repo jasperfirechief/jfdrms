@@ -259,29 +259,66 @@ async function handleDepartmentEmail(req,res) {
 
 
 async function sendReinspectionReminders(now = new Date()) {
-  if (!SUPABASE_SERVICE_KEY || !process.env.BREVO_API_KEY || !process.env.BREVO_FROM_EMAIL) return {sent:0,skipped:0,reason:"Email service is not configured."};
-  const d=new Date(chicagoDate(now)+"T12:00:00Z"); d.setUTCDate(d.getUTCDate()+1);
+  if (!SUPABASE_SERVICE_KEY || !process.env.BREVO_API_KEY || !process.env.BREVO_FROM_EMAIL) {
+    return {inspector_sent:0,property_representative_sent:0,skipped:0,reason:"Email service is not configured."};
+  }
+  const d=new Date(chicagoDate(now)+"T12:00:00Z");
+  d.setUTCDate(d.getUTCDate()+1);
   const tomorrow=d.toISOString().slice(0,10);
   const [items,people]=await Promise.all([
-    supa("inspections?select=inspection_id,inspector_user_id,occupancy_name,address,reinspection_date,reinspection_time&reinspection_date=eq."+tomorrow+"&reinspection_reminder_sent_at=is.null&inspector_user_id=not.is.null"),
+    supa("inspections?select=inspection_id,inspector_user_id,occupancy_name,address,contact_name,email,reinspection_date,reinspection_time,reinspection_reminder_sent_at,property_representative_reminder_sent_at&reinspection_date=eq."+tomorrow),
     supa("personnel?select=auth_user_id,email,active&active=eq.true&auth_user_id=not.is.null")
   ]);
-  const emails=new Map((people||[]).map(p=>[String(p.auth_user_id),String(p.email||"").trim()]));
-  let sent=0,skipped=0;
+  const inspectorEmails=new Map((people||[]).map(p=>[String(p.auth_user_id),String(p.email||"").trim()]));
+  const validEmail=value=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value||"").trim());
+  let inspectorSent=0,representativeSent=0,skipped=0,failed=0;
+  const send=async(email,subject,textContent)=>{
+    const result=await fetch("https://api.brevo.com/v3/smtp/email",{
+      method:"POST",
+      headers:{"api-key":process.env.BREVO_API_KEY,"Content-Type":"application/json","accept":"application/json"},
+      body:JSON.stringify({sender:{email:process.env.BREVO_FROM_EMAIL,name:"Jasper Fire Department"},to:[{email}],subject,textContent})
+    });
+    if(!result.ok)throw new Error("Brevo delivery failed: "+(await result.text()).slice(0,300));
+  };
   for(const item of items||[]){
-    const email=emails.get(String(item.inspector_user_id))||"";
-    if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)){skipped++;continue;}
     const dateLabel=fmtDate(item.reinspection_date+"T12:00:00Z");
     const clock=String(item.reinspection_time||"").slice(0,5);
     let timeLabel="Time not recorded";
-    if(/^\\d{2}:\\d{2}$/.test(clock)){const [h,m]=clock.split(":").map(Number);timeLabel=(h%12||12)+":"+String(m).padStart(2,"0")+" "+(h>=12?"PM":"AM");}
-    const body="This is a reminder of your scheduled fire reinspection tomorrow.\\n\\nOccupancy: "+(item.occupancy_name||"Not recorded")+"\\nAddress: "+(item.address||"Not recorded")+"\\nReinspection: "+dateLabel+" at "+timeLabel+"\\n\\nPlease review the prior inspection report in JFDRMS before the appointment.\\n\\nJasper Fire Department";
-    const result=await fetch("https://api.brevo.com/v3/smtp/email",{method:"POST",headers:{"api-key":process.env.BREVO_API_KEY,"Content-Type":"application/json","accept":"application/json"},body:JSON.stringify({sender:{email:process.env.BREVO_FROM_EMAIL,name:"Jasper Fire Department"},to:[{email}],subject:"Jasper Fire Department: Reinspection Tomorrow",textContent:body})});
-    if(!result.ok)throw new Error("Reinspection reminder email failed: "+(await result.text()).slice(0,300));
-    await supa("inspections?inspection_id=eq."+encodeURIComponent(item.inspection_id),{method:"PATCH",body:JSON.stringify({reinspection_reminder_sent_at:new Date().toISOString()})});
-    sent++;
+    if(/^\d{2}:\d{2}$/.test(clock)){
+      const [h,m]=clock.split(":").map(Number);
+      timeLabel=(h%12||12)+":"+String(m).padStart(2,"0")+" "+(h>=12?"PM":"AM");
+    }
+    const appointment="Reinspection: "+dateLabel+" at "+timeLabel;
+    const property="Occupancy: "+(item.occupancy_name||"Not recorded")+"\nAddress: "+(item.address||"Not recorded");
+    if(!item.reinspection_reminder_sent_at){
+      const email=inspectorEmails.get(String(item.inspector_user_id))||"";
+      if(validEmail(email)){
+        try{
+          await send(email,"Jasper Fire Department: Reinspection Tomorrow",
+            "This is a reminder of your scheduled fire reinspection tomorrow.\n\n"+property+"\n"+appointment+"\n\nPlease review the prior inspection report in JFDRMS before the appointment.\n\nJasper Fire Department");
+          await supa("inspections?inspection_id=eq."+encodeURIComponent(item.inspection_id),{
+            method:"PATCH",body:JSON.stringify({reinspection_reminder_sent_at:new Date().toISOString()})
+          });
+          inspectorSent++;
+        }catch(error){failed++;console.error("Inspector reinspection reminder failed",item.inspection_id,error);}
+      }else skipped++;
+    }
+    if(!item.property_representative_reminder_sent_at){
+      const email=String(item.email||"").trim();
+      if(validEmail(email)){
+        try{
+          const greeting=item.contact_name?"Hello "+item.contact_name+",\n\n":"";
+          await send(email,"Jasper Fire Department: Reinspection Tomorrow",
+            greeting+"This is a courtesy reminder that a fire reinspection is scheduled for tomorrow.\n\n"+property+"\n"+appointment+"\n\nIf you have questions about the appointment, please contact the Jasper Fire Department.\n\nJasper Fire Department");
+          await supa("inspections?inspection_id=eq."+encodeURIComponent(item.inspection_id),{
+            method:"PATCH",body:JSON.stringify({property_representative_reminder_sent_at:new Date().toISOString()})
+          });
+          representativeSent++;
+        }catch(error){failed++;console.error("Property representative reinspection reminder failed",item.inspection_id,error);}
+      }else skipped++;
+    }
   }
-  return {sent,skipped,checked:(items||[]).length};
+  return {inspector_sent:inspectorSent,property_representative_sent:representativeSent,skipped,failed,checked:(items||[]).length};
 }
 
 export default async function handler(req,res) {
