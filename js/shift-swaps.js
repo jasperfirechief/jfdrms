@@ -85,7 +85,7 @@
       if(old?.status==="approved"&&!isAdmin()&&old?.submitted_by!==me.id)return alert("Only the submitting Officer or an Administrator can edit an approved swap.");
       if(old?.status==="approved"){
         if(!confirm("This approved swap will be removed from the staffing calendar and returned to Pending until an Administrator approves it again. Continue?"))return;
-        for(const id of [old.member_one_calendar_event_id,old.member_two_calendar_event_id].filter(Boolean)){const del=await db.from("daily_staffing_events").delete().eq("event_id",id);if(del.error)return alert("Could not reverse the previous calendar entries: "+del.error.message);}
+        const delError=await removeCalendarEvents([old.member_one_calendar_event_id,old.member_two_calendar_event_id]);if(delError)return alert("Could not reverse the previous calendar entries: "+delError.message);
       }
       q=await db.from("shift_swap_requests").update({...payload,member_one_calendar_event_id:null,member_two_calendar_event_id:null}).eq("swap_id",editing).select("swap_id").maybeSingle();
     }else q=await db.from("shift_swap_requests").insert(payload).select("swap_id").maybeSingle();
@@ -136,6 +136,11 @@
     $("jfdSwapList").querySelectorAll("[data-swap-deny]").forEach(b=>b.onclick=()=>denyRequest(b.dataset.swapDeny));
     $("jfdSwapList").querySelectorAll("[data-swap-cancel]").forEach(b=>b.onclick=()=>cancelRequest(b.dataset.swapCancel));
   }
+  async function removeCalendarEvents(ids){
+    const clean=(ids||[]).filter(Boolean);if(!clean.length)return null;
+    const d=await db.from("daily_staffing_events").delete().in("event_id",clean);
+    return d.error||null;
+  }
   async function refreshCalendarForSwap(x){
     if(typeof renderStaffCalendar==="function")await renderStaffCalendar();
     const selected=document.getElementById("staffDate")?.value||"";
@@ -158,8 +163,8 @@
       if(u.error||!u.data?.swap_id)throw u.error||new Error("Request status was not updated.");
       await loadRequests();await refreshPending();await refreshCalendarForSwap(x);alert("Swap approved and added to the staffing calendar.");
     }catch(e){
-      for(const eventId of [a,b].filter(Boolean))await db.from("daily_staffing_events").delete().eq("event_id",eventId);
-      alert("Approval was not completed. No partial calendar change was kept. "+(e.message||e));
+      const cleanupError=await removeCalendarEvents([a,b]);
+      alert("Approval was not completed. "+(cleanupError?"Calendar cleanup needs administrator attention: "+cleanupError.message+". ":"No partial calendar change was kept. ")+(e.message||e));
     }
   }
   async function denyRequest(id){
@@ -173,7 +178,7 @@
     if(x.status==="approved"&&!isAdmin()&&x.submitted_by!==me.id)return alert("Only the submitting Officer or an Administrator can cancel an approved swap.");
     if(x.status==="pending"&&!isAdmin()&&x.submitted_by!==me.id)return alert("You can only cancel your own request.");
     if(!confirm(x.status==="approved"?"Cancel this approved swap and remove its calendar entries?":"Cancel this pending request?"))return;
-    for(const eventId of [x.member_one_calendar_event_id,x.member_two_calendar_event_id].filter(Boolean)){const d=await db.from("daily_staffing_events").delete().eq("event_id",eventId);if(d.error)return alert("Could not reverse the calendar entry: "+d.error.message);}
+    const deleteError=await removeCalendarEvents([x.member_one_calendar_event_id,x.member_two_calendar_event_id]);if(deleteError)return alert("Could not reverse the calendar entries: "+deleteError.message);
     const u=await db.from("shift_swap_requests").update({status:"cancelled",cancelled_by:me.id,cancelled_at:new Date().toISOString()}).eq("swap_id",id);
     if(u.error)return alert("Calendar entries were removed, but request status could not be updated: "+u.error.message);
     await loadRequests();await refreshPending();await refreshCalendarForSwap(x);
