@@ -1430,6 +1430,23 @@ async function renderStaffCalendar(){
   grid.onclick=event=>{const day=event.target.closest("[data-staff-calendar-date]");if(day)selectStaffCalendarDate(day.dataset.staffCalendarDate)};
 }
 function staffShiftForDate(date){const d=new Date(date+"T12:00:00Z"),anchor=new Date("2027-01-01T12:00:00Z"),delta=Math.round((d-anchor)/86400000),cycle=((delta%3)+3)%3;return ["C","A","B"][cycle]}
+function staffEmailDateAllowed(date){
+  const base=today();if(!base)return false;
+  for(let offset=-3;offset<=1;offset++){const d=new Date(base+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+offset);if(d.toISOString().slice(0,10)===date)return true;}
+  return false;
+}
+async function sendStaffingCalendarEmail(date,shift){
+  if(!canStaff())return alert("Officer or administrator access required.");
+  if(!staffEmailDateAllowed(date))return alert("Email is limited to today, the previous three shifts, and the next shift.");
+  const subject=$("staffEmailSubject_"+date)?.value?.trim()||("Jasper Fire Department Staffing — "+date+" "+shift+" Shift");
+  const message=$("staffEmailMessage_"+date)?.value?.trim();
+  if(!message)return alert("Enter a message before sending.");
+  const session=(await db.auth.getSession()).data?.session;if(!session)return alert("Please sign in again.");
+  const r=await fetch("/api/daily-report-email",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},body:JSON.stringify({action:"staffing_email",date,subject,message})});
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok)return alert(data.error||"Staffing email could not be sent.");
+  alert("Staffing email sent to "+data.recipient_count+" recipients, including you. It was not saved in the RMS.");
+}
 async function selectStaffCalendarDate(date){
   const shift=staffShiftForDate(date);window.jfdStaffingDateSelected=true;$("staffingManagement")?.classList.toggle("hiddenx",!canStaff());$("staffDate").value=date;$("staffShift").value=shift;window.jfdSelectedStaffShift=shift;
   const p=staffDateParts(date);
@@ -1472,7 +1489,8 @@ async function renderStaffingCalendarDetails(date,shift){
       const dateInfo=x.event_type==="swap"?("Effective "+(x.effective_date||"Not set")):("Leave "+(x.leave_start_date||"Not set")+(x.leave_end_date?" through "+x.leave_end_date:" (ongoing)"));
       return '<div class="rounded-lg border p-3 mb-2"><div class="font-semibold">'+esc(type)+'</div><div class="text-sm mt-1">'+esc((person?.first_name||"")+' '+(person?.last_name||""))+(replacement?' → '+esc(replacement.first_name+' '+replacement.last_name):'')+'</div><div class="text-xs text-slate-500 mt-1">'+esc([dateInfo,st?.station_name,ap?.unit_number,duration].filter(Boolean).join(' · '))+'</div>'+(x.notes?'<p class="text-sm mt-2">'+esc(x.notes)+'</p>':'')+'</div>';
     }).join("");
-    out.innerHTML='<h3 class="font-bold mb-3">'+esc(date)+' · '+esc(shift)+' Shift Staffing</h3>'+(sections||'<p class="text-sm text-slate-500">No apparatus assignments have been saved.</p>')+'<h4 class="font-bold mt-5 mb-2">Personnel Changes & Leave</h4>'+(eventHtml||'<p class="text-sm text-slate-500">No personnel changes or leave entries recorded.</p>');
+    const emailPanel=canStaff()&&staffEmailDateAllowed(date)?'<div class="card p-4 mt-5 border-blue-200 bg-blue-50"><h4 class="font-bold">Email Shift Personnel</h4><p class="text-xs text-slate-600 mb-3">Emails everyone on the shift assignments, including swaps and replacements. Your email is included automatically. Nothing is stored in the RMS.</p><label class="block text-sm font-semibold">Subject<input id="staffEmailSubject_'+date+'" class="block w-full border rounded p-2 mt-1" value="Jasper Fire Department Staffing — '+date+' '+shift+' Shift"></label><label class="block text-sm font-semibold mt-3">Message<textarea id="staffEmailMessage_'+date+'" rows="4" class="block w-full border rounded p-2 mt-1" placeholder="Enter your message to the shift personnel"></textarea></label><button type="button" onclick="sendStaffingCalendarEmail(\''+date+'\',\''+shift+'\')" class="bg-blue-700 text-white rounded px-4 py-2 font-bold mt-3">Email Shift Personnel</button></div>':'';
+    out.innerHTML='<h3 class="font-bold mb-3">'+esc(date)+' · '+esc(shift)+' Shift Staffing</h3>'+(sections||'<p class="text-sm text-slate-500">No apparatus assignments have been saved.</p>')+'<h4 class="font-bold mt-5 mb-2">Personnel Changes & Leave</h4>'+(eventHtml||'<p class="text-sm text-slate-500">No personnel changes or leave entries recorded.</p>')+emailPanel;
   }catch(err){out.innerHTML='<p class="text-sm text-red-700">Unable to load staffing: '+esc(err.message||String(err))+'</p>'}
 }
 window.selectStaffCalendarDate=selectStaffCalendarDate;
