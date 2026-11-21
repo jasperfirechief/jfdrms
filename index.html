@@ -1553,7 +1553,7 @@ async function renderStaffingCalendarDetails(date,shift){
   try{
     const s=await db.from("daily_staffing").select("staffing_id").eq("staffing_date",date).eq("shift",shift).maybeSingle();
     if(s.error)throw s.error;
-    if(!s.data){out.innerHTML='<p class="text-sm text-slate-500">No regular shift staffing has been saved for this date and shift.</p>'+specialHtml;return}
+    if(!s.data){out.innerHTML='<p class="text-sm text-slate-500">No regular shift staffing has been saved for this date and shift.</p>'+specialHtml+shiftEventHtml;return}
     const a=await db.from("daily_app_assignments").select("station_id,apparatus_id,daily_personnel_assignments(assignment_role,personnel(first_name,last_name))").eq("staffing_id",s.data.staffing_id);
     if(a.error)throw a.error;
     const rows=a.data||[];
