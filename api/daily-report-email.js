@@ -298,6 +298,41 @@ async function handleDepartmentEmail(req,res) {
     return res.status(200).json({ok:true,recipient_count:emails.length,sender_copy_included:true});
   }catch(e){return res.status(500).json({error:e.message||"Email failed."})}
 }
+async function handleStaffingEmail(req,res){
+  try{
+    if(!SUPABASE_SERVICE_KEY||!process.env.BREVO_API_KEY||!process.env.BREVO_FROM_EMAIL)throw new Error("Email service is not configured.");
+    const token=String(req.headers.authorization||"").replace(/^Bearer\\s+/i,"");
+    if(!token)return res.status(401).json({error:"Sign in required."});
+    const auth=await fetch(SUPABASE_URL+"/auth/v1/user",{headers:{apikey:"sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz",Authorization:"Bearer "+token}});
+    if(!auth.ok)return res.status(401).json({error:"Invalid session."});
+    const user=await auth.json();
+    const profiles=await supa("users?select=app_role,active&user_id=eq."+encodeURIComponent(user.id));
+    const profile=profiles?.[0];
+    if(!profile?.active||!["admin","officer"].includes(profile.app_role))return res.status(403).json({error:"Administrator or officer access required."});
+    const {date,subject,message}=req.body||{};
+    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(date||""))||!String(subject||"").trim()||!String(message||"").trim())return res.status(400).json({error:"Select a valid date and enter a subject and message."});
+    const today=chicagoDate();
+    const allowed=new Set();
+    for(let offset=-3;offset<=1;offset++){const d=new Date(today+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+offset);allowed.add(d.toISOString().slice(0,10));}
+    if(!allowed.has(date))return res.status(403).json({error:"Email is limited to today, the previous three shift dates, or the next shift date."});
+    const d=new Date(date+"T12:00:00Z"),anchor=new Date("2027-01-01T12:00:00Z"),delta=Math.round((d-anchor)/86400000),cycle=((delta%3)+3)%3,shift=["C","A","B"][cycle];
+    const staffing=await supa("daily_staffing?select=staffing_id&staffing_date=eq."+encodeURIComponent(date)+"&shift=eq."+shift);
+    if(!staffing?.length)return res.status(404).json({error:"No staffing roster is saved for this date."});
+    const staffingId=staffing[0].staffing_id;
+    const assignments=await supa("daily_app_assignments?select=daily_personnel_assignments(personnel_id)&staffing_id=eq."+encodeURIComponent(staffingId));
+    const events=await supa("daily_staffing_events?select=personnel_id,replacement_personnel_id&staffing_id=eq."+encodeURIComponent(staffingId));
+    const ids=new Set();
+    for(const row of assignments||[])for(const p of row.daily_personnel_assignments||[])if(p.personnel_id)ids.add(String(p.personnel_id));
+    for(const e of events||[]){if(e.personnel_id)ids.add(String(e.personnel_id));if(e.replacement_personnel_id)ids.add(String(e.replacement_personnel_id));}
+    if(!ids.size)return res.status(400).json({error:"No personnel are recorded for this shift."});
+    const people=await supa("personnel?select=email&id=in.("+[...ids].map(encodeURIComponent).join(",")+")");
+    const senderEmail=String(user.email||"").trim().toLowerCase();
+    const emails=[...new Set([...(people||[]).map(p=>String(p.email||"").trim().toLowerCase()),senderEmail].filter(e=>/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(e)))];
+    if(!emails.length)return res.status(400).json({error:"No valid email addresses found for this shift."});
+    await sendDepartmentMail({to:emails[0],bcc:emails.slice(1),subject:"Jasper Fire Department: "+String(subject).trim().slice(0,180),text:String(message).trim().slice(0,20000)});
+    return res.status(200).json({ok:true,recipient_count:emails.length,sender_copy_included:true,staffing_date:date,shift});
+  }catch(e){return res.status(500).json({error:e.message||"Staffing email failed."})}
+}
 async function handleTestEmail(req,res) {
   try {
     if(!SUPABASE_SERVICE_KEY||!process.env.BREVO_API_KEY||!process.env.BREVO_FROM_EMAIL)throw new Error("Email service is not configured.");
@@ -379,7 +414,7 @@ async function sendReinspectionReminders(now = new Date()) {
 
 export default async function handler(req,res) {
   if(req.method!=="GET"&&req.method!=="POST") return res.status(405).json({error:"Method not allowed"});
-  if(req.method==="POST"&&req.body?.action==="department_email")return handleDepartmentEmail(req,res);
+  if(req.method==="POST"&&req.body?.action==="department_email")return handleDepartmentEmail(req,res);\n  if(req.method==="POST"&&req.body?.action==="staffing_email")return handleStaffingEmail(req,res);
   if(req.method==="POST"&&req.body?.action==="test_email")return handleTestEmail(req,res);
   const testMva=req.query?.test==="mva-22608-jfd";
   if(process.env.CRON_SECRET && !testMva && (req.headers.authorization||"")!=="Bearer "+process.env.CRON_SECRET) return res.status(401).json({error:"Unauthorized"});
