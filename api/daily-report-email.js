@@ -133,7 +133,7 @@ async function makeIncidentPdf(incident) {
   return makePdf(incident,reports);
 }
 
-async function makeStaffingPdf(date, rows, assignments, events, people, stations, apparatus) {
+async function makeStaffingPdf(date, rows, assignments, events, people, stations, apparatus, specialEvents=[]) {
   const sections=[];
   const personName=id=>{const p=(people||[]).find(x=>Number(x.id)===Number(id));return p?[p.first_name,p.last_name].filter(Boolean).join(" "):"Unknown employee"};
   const stationName=id=>(stations||[]).find(x=>Number(x.station_id)===Number(id))?.station_name||("Station "+id);
@@ -201,6 +201,19 @@ async function makeStaffingPdf(date, rows, assignments, events, people, stations
     ["Kelly Day entries",String(leaveCounts.kelly_day)],
     ["Other leave entries",String(leaveCounts.other)]
   ];
+  if((specialEvents||[]).length){
+    const specialRows=[];
+    for(const event of specialEvents){
+      const signups=event.staffing_special_event_signups||[];
+      specialRows.push(["EVENT",event.event_name]);
+      specialRows.push(["Date / Location",event.event_date+" · "+event.location]);
+      specialRows.push(["Time",String(event.start_time||"").slice(0,5)+"–"+String(event.end_time||"").slice(0,5)]);
+      specialRows.push(["Personnel",signups.length+" assigned / "+event.personnel_needed+" needed"]);
+      specialRows.push(["Event Personnel",signups.map(x=>[x.personnel?.first_name,x.personnel?.last_name].filter(Boolean).join(" ")+(x.signup_type==="admin_added"?" (admin assigned)":"")).join(", ")||"None assigned"]);
+      if(event.details)specialRows.push(["Details",event.details]);
+    }
+    sections.push({title:"SPECIAL EVENTS PERSONNEL • NOT INCLUDED IN SHIFT STAFFING TOTALS",rows:specialRows});
+  }
   sections.unshift({title:"SHIFT STAFFING SUMMARY • "+date,rows:summaryRows});
   if(!rows?.length)sections.unshift({title:"SHIFT STAFFING • "+date,rows:[["Result","No daily staffing record was recorded for this shift."]]});
   return makeTablePdf("DAILY STAFFING REPORT",sections);
@@ -354,6 +367,23 @@ async function handleTestEmail(req,res) {
   }catch(e){return res.status(500).json({error:e.message||"Test email failed."})}
 }
 
+async function sendSpecialEventReminders(now=new Date()){
+ if(!SUPABASE_SERVICE_KEY||!process.env.BREVO_API_KEY||!process.env.BREVO_FROM_EMAIL)return {sent:0,skipped:0};
+ const d=new Date(chicagoDate(now)+"T12:00:00Z");d.setUTCDate(d.getUTCDate()+1);const tomorrow=d.toISOString().slice(0,10);
+ const events=await supa("staffing_special_events?select=event_id,event_name,event_date,location,personnel_needed,created_by_email,day_before_notified_at,staffing_special_event_signups(signup_id)&event_date=eq."+tomorrow+"&cancelled_at=is.null&day_before_notified_at=is.null");
+ let sent=0,skipped=0;
+ for(const e of events||[]){
+  const count=(e.staffing_special_event_signups||[]).length;
+  if(count>=Number(e.personnel_needed)){skipped++;continue}
+  try{
+   await sendDepartmentMail({to:e.created_by_email,subject:"Jasper Fire Department: Special Event Staffing Update — Tomorrow",
+    text:"Your special staffing event is scheduled for tomorrow and is not yet fully staffed.\n\nEvent: "+e.event_name+"\nDate: "+e.event_date+"\nLocation: "+e.location+"\nPersonnel assigned: "+count+" of "+e.personnel_needed+"\nStill needed: "+(Number(e.personnel_needed)-count)+"\n\nPlease review the event in the JFDRMS Staffing Calendar."});
+   await supa("staffing_special_events?event_id=eq."+encodeURIComponent(e.event_id),{method:"PATCH",body:JSON.stringify({day_before_notified_at:new Date().toISOString()})});sent++;
+  }catch(error){console.error("Special event reminder failed",e.event_id,error)}
+ }
+ return {sent,skipped,checked:(events||[]).length};
+}
+
 async function sendReinspectionReminders(now = new Date()) {
   if (!SUPABASE_SERVICE_KEY || !process.env.BREVO_API_KEY || !process.env.BREVO_FROM_EMAIL) {
     return {inspector_sent:0,property_representative_sent:0,skipped:0,reason:"Email service is not configured."};
@@ -423,7 +453,8 @@ export default async function handler(req,res) {
     const now=new Date();
     if(!testMva && chicagoHour(now)!==9) return res.status(200).json({ok:true,skipped:true,reason:"Outside 9 AM America/Chicago delivery window."});
     const reinspectionReminders=testMva?{sent:0,skipped:0}:await sendReinspectionReminders(now);
-    if(!testMva && process.env.RMS_EMAILS_ENABLED!=="true") return res.status(200).json({ok:true,shift_packet_skipped:true,reason:"Automatic RMS shift-package emails are disabled until the department authorizes go-live.",reinspection_reminders:reinspectionReminders});
+    const specialEventReminders=testMva?{sent:0,skipped:0}:await sendSpecialEventReminders(now);
+    if(!testMva && process.env.RMS_EMAILS_ENABLED!=="true") return res.status(200).json({ok:true,shift_packet_skipped:true,reason:"Automatic RMS shift-package emails are disabled until the department authorizes go-live.",reinspection_reminders:reinspectionReminders,special_event_reminders:specialEventReminders});
     if(!SUPABASE_SERVICE_KEY) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured in Vercel.");
     const shiftEnd=chicagoDate(now),shiftStart=previousDate(shiftEnd);
     const startUtc=zoned7amUtc(shiftStart).toISOString(),endUtc=zoned7amUtc(shiftEnd).toISOString();
@@ -437,6 +468,7 @@ export default async function handler(req,res) {
       supa("stations?select=station_id,station_name"),
       supa("apparatus?select=apparatus_id,unit_number")
     ]):[[],[],[],[],[]];
+    const specialEventRows=await supa("staffing_special_events?select=event_id,event_date,event_name,location,start_time,end_time,details,personnel_needed,staffing_special_event_signups(personnel_id,signup_type,personnel(first_name,last_name))&event_date=eq."+shiftStart+"&cancelled_at=is.null&order=start_time");
     const checks=await supa("apparatus_checks?select=*&check_date=eq."+shiftStart+"&order=apparatus_id,check_time");
     const training=await supa("training_records?select=*,training_attendees(hours,personnel_name,shift_at_training,personnel(first_name,last_name))&training_date=eq."+shiftStart+"&conducted=eq.true&order=shift");
     const incidents=await supa("incidents?select=*&dispatch_time=gte."+encodeURIComponent(startUtc)+"&dispatch_time=lt."+encodeURIComponent(endUtc)+"&order=dispatch_time");
@@ -466,7 +498,7 @@ export default async function handler(req,res) {
     ];
     const activitySummary=activityLines.join("\\n");
     const attachments=[];
-    const staffingPdf=await makeStaffingPdf(shiftStart,staffing||[],staffAssignments||[],staffEvents||[],staffPeople||[],staffStations||[],staffApparatus||[]);
+    const staffingPdf=await makeStaffingPdf(shiftStart,staffing||[],staffAssignments||[],staffEvents||[],staffPeople||[],staffStations||[],staffApparatus||[],specialEventRows||[]);
     attachments.push({content:Buffer.from(staffingPdf).toString("base64"),filename:"01 - Daily Staffing Report.pdf"});
     const checksPdf=await makeChecksPdf(shiftStart,checks||[]);
     attachments.push({content:Buffer.from(checksPdf).toString("base64"),filename:"02 - Apparatus Checks.pdf"});
@@ -493,7 +525,7 @@ export default async function handler(req,res) {
       reportCount++;
     }
     await sendEmail(attachments,shiftStart,shiftEnd,(incidents||[]).length,reportCount,activitySummary,(training||[]).length);
-    return res.status(200).json({ok:true,shift_start:shiftStart,shift_end:shiftEnd,incidents:(incidents||[]).length,reports:reportCount,training_reports:(training||[]).length,attachments:attachments.length,reinspection_reminders:reinspectionReminders});
+    return res.status(200).json({ok:true,shift_start:shiftStart,shift_end:shiftEnd,incidents:(incidents||[]).length,reports:reportCount,training_reports:(training||[]).length,attachments:attachments.length,reinspection_reminders:reinspectionReminders,special_event_reminders:specialEventReminders});
   } catch(e) {
     console.error("Daily report email error",e);
     return res.status(500).json({ok:false,error:e?.message||"Daily report email failed."});
