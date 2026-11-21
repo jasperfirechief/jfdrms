@@ -3367,10 +3367,10 @@ async function refreshShiftDashboard(){
     const weekday=[1,2,3,4,5].includes(new Date(date+"T12:00:00").getDay());
     let trainingOk=true,trainingDetail="Not required on weekends";
     if(weekday){
-      const tr=await db.from("training_records").select("id").eq("training_date",date).eq("shift",shift).limit(1);
+      const tr=await db.from("training_records").select("id").eq("training_date",date).eq("shift",shift).not("signed_at","is",null).limit(1);
       if(tr.error)throw tr.error;
       trainingOk=(tr.data||[]).length>0;
-      trainingDetail=trainingOk?"Training report recorded":"No training report recorded";
+      trainingDetail=trainingOk?"Training report submitted and signed":"Training report not yet submitted and signed";
     }
     jfdSetTabStatus("training",trainingOk,trainingDetail);
     const startTime=new Date(date+"T07:00:00-06:00"),endTime=new Date(startTime.getTime()+86400000);
