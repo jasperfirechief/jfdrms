@@ -166,7 +166,12 @@ async function makeStaffingPdf(date, rows, assignments, events, people, stations
     if(!apps.length)section.rows.push(["Station / apparatus assignments","No station/apparatus assignments saved."]);
     const shiftEvents=(events||[]).filter(e=>Number(e.staffing_id)===Number(r.staffing_id));
     const shiftRoster=(people||[]).filter(p=>String(p.shift||"").toUpperCase()===String(r.shift||"").toUpperCase());
-    const ptRoster=(people||[]).filter(p=>String(p.shift||"").toLowerCase().includes("part")&&(onDutyIds.has(Number(p.id))||shiftEvents.some(e=>Number(e.personnel_id)===Number(p.id)||Number(e.replacement_personnel_id)===Number(p.id)))));
+    const ptRoster=(people||[]).filter(p=>{
+      const isPartTime=String(p.shift||"").toLowerCase().includes("part");
+      const assigned=onDutyIds.has(Number(p.id));
+      const changed=shiftEvents.some(e=>Number(e.personnel_id)===Number(p.id)||Number(e.replacement_personnel_id)===Number(p.id));
+      return isPartTime&&(assigned||changed);
+    });
     const roster=[...shiftRoster,...ptRoster.filter(p=>!shiftRoster.some(q=>Number(q.id)===Number(p.id)))];
     const absent=roster.filter(p=>!onDutyIds.has(Number(p.id)));
     section.rows.push(["SHIFT MEMBERS NOT ON DUTY • REASON / COVERAGE",""]);
