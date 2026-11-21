@@ -1,5 +1,6 @@
 import { makePdf } from "./report-pdf.js";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { handleSpecialEvents } from "../lib/special-events.js";
 
 const SUPABASE_URL = "https://audgtwcctdoiptuekqvn.supabase.co";
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -444,6 +445,8 @@ async function sendReinspectionReminders(now = new Date()) {
 
 export default async function handler(req,res) {
   if(req.method!=="GET"&&req.method!=="POST") return res.status(405).json({error:"Method not allowed"});
+  if(req.method==="GET"&&req.query?.action==="special_events")return handleSpecialEvents(req,res);
+  if(req.method==="POST"&&req.body?.action==="special_events")return handleSpecialEvents(req,res);
   if(req.method==="POST"&&req.body?.action==="department_email")return handleDepartmentEmail(req,res);
   if(req.method==="POST"&&req.body?.action==="staffing_email")return handleStaffingEmail(req,res);
   if(req.method==="POST"&&req.body?.action==="test_email")return handleTestEmail(req,res);
