@@ -47,7 +47,7 @@ window.adminDeleteNerisIncident=async function(cad,reportId){
     if(!cad||!reportId)throw new Error("Report CAD number and report ID are required.");
     if(typeof ensureSupabaseClient==="function")await ensureSupabaseClient();
     if(!db)throw new Error("RMS database is not ready. Please wait a moment and try again.");
-    const saved=await db.from("incidents").select("incident_id,reports").eq("cad",cad).maybeSingle();
+    const saved=await db.from("incidents").select("reports").eq("cad",cad).maybeSingle();
     if(saved.error||!saved.data)throw new Error(saved.error?.message||"Incident not found.");
     const matches=(Array.isArray(saved.data.reports)?saved.data.reports:[]).filter(x=>String(x?.report_id||"")===String(reportId));
     if(matches.length!==1)throw new Error("Saved report not found or report ID is ambiguous.");
