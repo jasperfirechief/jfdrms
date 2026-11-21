@@ -96,6 +96,100 @@ export default async function handler(req, res) {
       });
     }
 
+    if (body?.action === "delete") {
+      const access = await requireNerisRole(req, ["admin"]);
+      const cad = String(body.cad || "").trim();
+      const reportId = String(body.report_id || "").trim();
+      const nerisIncidentId = String(body.neris_incident_id || "").trim();
+      const reason = String(body.reason || "").trim();
+      if (!cad || !reportId || !nerisIncidentId || !reason) {
+        return res.status(400).json({ ok:false, error:"CAD, report ID, NERIS incident ID, and deletion reason are required." });
+      }
+      if (reason.length > 1000) {
+        return res.status(400).json({ ok:false, error:"Deletion reason must be 1,000 characters or fewer." });
+      }
+
+      const incidentResponse = await fetch(
+        SUPABASE_URL + "/rest/v1/incidents?select=incident_id,reports&cad=eq." + encodeURIComponent(cad),
+        { headers: access.headers }
+      );
+      if (!incidentResponse.ok) throw new Error("Unable to verify the saved incident report.");
+      const incidentRows = await incidentResponse.json();
+      const incidentRow = Array.isArray(incidentRows) ? incidentRows[0] : null;
+      if (!incidentRow) throw new Error("Incident not found.");
+      const matchingReports = (Array.isArray(incidentRow.reports) ? incidentRow.reports : [])
+        .filter(report => String(report?.report_id || "") === reportId);
+      if (matchingReports.length !== 1) throw new Error("Saved report not found or report identifier is ambiguous.");
+      const savedReport = matchingReports[0];
+      if (savedReport.status !== "submitted_to_neris") {
+        throw new Error("Only a report currently submitted to NERIS can be deleted from NERIS.");
+      }
+      const savedNerisId = String(savedReport?.neris?.neris_incident_id || "").trim();
+      if (!savedNerisId || savedNerisId !== nerisIncidentId) {
+        throw new Error("NERIS incident identifier does not match the saved submission.");
+      }
+
+      const auth = await getToken();
+      const deleted = await fetch(
+        BASE_URL + "/incident/" + encodeURIComponent(DEPARTMENT_ID) + "/" + encodeURIComponent(nerisIncidentId),
+        {
+          method: "DELETE",
+          headers: {
+            "Authorization": "Bearer " + auth.token,
+            "User-Agent": "JasperFireDepartmentRMS/1.0"
+          }
+        }
+      );
+      const deletedText = await deleted.text();
+      let deletedData;
+      try { deletedData = deletedText ? JSON.parse(deletedText) : {}; }
+      catch { deletedData = { message: deletedText }; }
+      if (!deleted.ok) {
+        return res.status(502).json({
+          ok:false,
+          deleted:false,
+          error:"NERIS did not delete the incident.",
+          status:deleted.status,
+          details:deletedData
+        });
+      }
+
+      const auditResponse = await fetch(SUPABASE_URL + "/rest/v1/rpc/record_neris_deletion", {
+        method: "POST",
+        headers: { ...access.headers, "Content-Type":"application/json" },
+        body: JSON.stringify({
+          p_incident_id: Number(incidentRow.incident_id),
+          p_cad: cad,
+          p_report_id: reportId,
+          p_neris_incident_id: nerisIncidentId,
+          p_reason: reason,
+          p_response: deletedData
+        })
+      });
+      const auditText = await auditResponse.text();
+      let auditData;
+      try { auditData = auditText ? JSON.parse(auditText) : {}; }
+      catch { auditData = { message:auditText }; }
+      if (!auditResponse.ok) {
+        return res.status(502).json({
+          ok:false,
+          deleted:true,
+          audit_recorded:false,
+          error:"NERIS deleted the incident, but JFDRMS could not save the deletion audit record. Contact an RMS administrator before retrying.",
+          audit_details:auditData
+        });
+      }
+
+      return res.status(200).json({
+        ok:true,
+        deleted:true,
+        audit_recorded:true,
+        neris_incident_id:nerisIncidentId,
+        result:deletedData,
+        audit:auditData
+      });
+    }
+
     if (!body || !["validate","submit"].includes(body.action) || !body.payload) {
       return res.status(400).json({ ok:false, error:"A NERIS validation or submission payload is required." });
     }
