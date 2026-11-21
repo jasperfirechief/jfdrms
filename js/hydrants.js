@@ -287,7 +287,8 @@
   window.jfdHydrantCalcFlow=calcFlow;
   window.jfdHydrantCloseHistory=()=> $("hydrantHistoryModal")?.classList.add("hiddenx");
   window.jfdHydrantCloseForm=()=> $("hydrantRecordForm")?.classList.add("hiddenx");
-  window.jfdHydrantTabEntered=async function(){if(!allowed())return alert("Hydrants are available to administrators and officers.");if(!window.jfdHydrantShiftInitialized&&typeof personnel!=="undefined"&&typeof me!=="undefined"){const own=personnel.find(p=>p.auth_user_id===me.id);if(["A","B","C"].includes(String(own?.shift||"").toUpperCase()))$("hydrantShift").value=String(own.shift).toUpperCase();window.jfdHydrantShiftInitialized=true;}if(!initialized||!map||!map.getContainer().isConnected)await refresh();else{await loadRecords();ensureMap();renderScheduleSummary();renderSelected();renderHydrantRecordList();}};
+  function currentCalendarShift(){const date=new Date(),todayDate=new Date(date.getFullYear(),date.getMonth(),date.getDate()),anchor=new Date(2027,0,1),days=Math.round((todayDate-anchor)/86400000),mod=((days%3)+3)%3;return ["C","A","B"][mod];}
+  window.jfdHydrantTabEntered=async function(){if(!allowed())return alert("Hydrants are available to administrators and officers.");if(!window.jfdHydrantShiftInitialized){$("hydrantShift").value=currentCalendarShift();$("hydrantMonth").value=String(new Date().getMonth()+1);$("hydrantYear").value=String(new Date().getFullYear());window.jfdHydrantShiftInitialized=true;}if(!initialized||!map||!map.getContainer().isConnected)await refresh();else{await loadRecords();ensureMap();renderScheduleSummary();renderSelected();renderHydrantRecordList();}};
   window.jfdHydrantFiltersChanged=async function(){if(!allowed())return;await loadRecords();ensureMap();renderScheduleSummary();renderSelected();renderHydrantRecordList();};
   document.addEventListener("DOMContentLoaded",()=>{
     const form=$("hydrantRecordInnerForm");form?.addEventListener("submit",saveRecord);
