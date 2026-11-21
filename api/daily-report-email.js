@@ -444,7 +444,8 @@ async function sendReinspectionReminders(now = new Date()) {
 
 export default async function handler(req,res) {
   if(req.method!=="GET"&&req.method!=="POST") return res.status(405).json({error:"Method not allowed"});
-  if(req.method==="POST"&&req.body?.action==="department_email")return handleDepartmentEmail(req,res);\n  if(req.method==="POST"&&req.body?.action==="staffing_email")return handleStaffingEmail(req,res);
+  if(req.method==="POST"&&req.body?.action==="department_email")return handleDepartmentEmail(req,res);
+  if(req.method==="POST"&&req.body?.action==="staffing_email")return handleStaffingEmail(req,res);
   if(req.method==="POST"&&req.body?.action==="test_email")return handleTestEmail(req,res);
   const testMva=req.query?.test==="mva-22608-jfd";
   if(process.env.CRON_SECRET && !testMva && (req.headers.authorization||"")!=="Bearer "+process.env.CRON_SECRET) return res.status(401).json({error:"Unauthorized"});
