@@ -138,14 +138,15 @@ async function makeStaffingPdf(date, rows, assignments, events, people, stations
   const personName=id=>{const p=(people||[]).find(x=>Number(x.id)===Number(id));return p?[p.first_name,p.last_name].filter(Boolean).join(" "):"Unknown employee"};
   const stationName=id=>(stations||[]).find(x=>Number(x.station_id)===Number(id))?.station_name||("Station "+id);
   const apparatusName=id=>(apparatus||[]).find(x=>Number(x.apparatus_id)===Number(id))?.unit_number||("Apparatus "+id);
-  const personnelSeen=new Set();
   let swapCount=0;
   const leaveCounts={sick:0,vacation:0,kelly_day:0,other:0};
   for(const r of rows||[]){
     const section={title:(r.shift||"SHIFT")+" SHIFT • "+date,rows:[]};
     section.rows.push(["Shift",r.shift],["Record",r.staffing_id],["Created",fmtDateTime(r.created_at)]);
     const apps=(assignments||[]).filter(a=>Number(a.staffing_id)===Number(r.staffing_id));
+    const onDutyIds=new Set();
     const stationIds=[...new Set(apps.map(a=>Number(a.station_id)))].sort((a,b)=>a-b);
+    section.rows.push(["ON-DUTY PERSONNEL • STATION / APPARATUS / ROLE",""]);
     for(const stationId of stationIds){
       const stationApps=apps.filter(a=>Number(a.station_id)===stationId);
       section.rows.push(["",stationName(stationId)]);
@@ -154,16 +155,31 @@ async function makeStaffingPdf(date, rows, assignments, events, people, stations
         const roleOrder={driver:0,officer:1,firefighter:2};
         crew.sort((x,y)=>(roleOrder[x.assignment_role]??9)-(roleOrder[y.assignment_role]??9));
         const crewText=crew.map(p=>{
-          personnelSeen.add(Number(p.personnel_id));
+          if(p.personnel_id)onDutyIds.add(Number(p.personnel_id));
           const role=String(p.assignment_role||"crew").replace(/^./,s=>s.toUpperCase());
           return role+": "+(p.personnel?.first_name||"")+" "+(p.personnel?.last_name||"");
         }).join(" | ");
         section.rows.push([apparatusName(a.apparatus_id),crewText||"No personnel assigned"]);
       }
     }
-    if(!apps.length)section.rows.push(["Apparatus assignments","No station/apparatus assignments saved."]);
+    if(!apps.length)section.rows.push(["Station / apparatus assignments","No station/apparatus assignments saved."]);
     const shiftEvents=(events||[]).filter(e=>Number(e.staffing_id)===Number(r.staffing_id));
-    section.rows.push(["PERSONNEL CHANGES & LEAVE",""]);
+    const shiftRoster=(people||[]).filter(p=>String(p.shift||"").toUpperCase()===String(r.shift||"").toUpperCase());
+    const ptRoster=(people||[]).filter(p=>String(p.shift||"").toLowerCase().includes("part")&&(onDutyIds.has(Number(p.id))||shiftEvents.some(e=>Number(e.personnel_id)===Number(p.id)||Number(e.replacement_personnel_id)===Number(p.id)))));
+    const roster=[...shiftRoster,...ptRoster.filter(p=>!shiftRoster.some(q=>Number(q.id)===Number(p.id)))];
+    const absent=roster.filter(p=>!onDutyIds.has(Number(p.id)));
+    section.rows.push(["SHIFT MEMBERS NOT ON DUTY • REASON / COVERAGE",""]);
+    for(const p of absent){
+      const pEvents=shiftEvents.filter(e=>Number(e.personnel_id)===Number(p.id));
+      const descriptions=pEvents.map(e=>{
+        const type=e.event_type==="swap"?"Swap":String(e.leave_type||"Leave").replace(/_/g," ").toUpperCase();
+        const replacement=e.replacement_personnel_id?personName(e.replacement_personnel_id):"No replacement recorded";
+        return type+" · "+fmtShiftDuration(e)+" · "+replacement+(e.notes?" · "+e.notes:"");
+      });
+      section.rows.push([personName(p.id),descriptions.join("; ")||"No leave, swap, or absence reason recorded"]);
+    }
+    if(!absent.length)section.rows.push(["Result","All listed shift members were assigned on duty."]);
+    section.rows.push(["PERSONNEL CHANGES & LEAVE • ALL ENTRIES",""]);
     for(const e of shiftEvents){
       if(e.event_type==="swap")swapCount++;else leaveCounts[e.leave_type]=(leaveCounts[e.leave_type]||0)+1;
       const person=personName(e.personnel_id);
@@ -171,19 +187,19 @@ async function makeStaffingPdf(date, rows, assignments, events, people, stations
       const kind=e.event_type==="swap"?"PERSONNEL SWAP":String(e.leave_type||"leave").replace(/_/g," ").toUpperCase();
       const duration=fmtShiftDuration(e);
       const location=[e.station_id?stationName(e.station_id):"",e.apparatus_id?apparatusName(e.apparatus_id):""].filter(Boolean).join(" / ");
-      const details=[person,replacement?("Replacement: "+replacement):"",location,duration,e.notes||""].filter(Boolean).join(" | ");
+      const details=[person,replacement?("Swapped / covered by: "+replacement):"",location,duration,e.notes||""].filter(Boolean).join(" | ");
       section.rows.push([kind,details]);
     }
     if(!shiftEvents.length)section.rows.push(["Personnel changes","No swaps or leave entries recorded."]);
     sections.push(section);
   }
   const summaryRows=[
-    ["Assigned personnel (unique)",String(personnelSeen.size)],
+    ["Assigned personnel (unique)",String(new Set((assignments||[]).flatMap(a=>(a.daily_personnel_assignments||[]).map(p=>Number(p.personnel_id)).filter(Boolean))).size)],
     ["Personnel swaps",String(swapCount)],
-    ["Sick leave",String(leaveCounts.sick)],
-    ["Vacation leave",String(leaveCounts.vacation)],
-    ["Kelly Days",String(leaveCounts.kelly_day)],
-    ["Other leave",String(leaveCounts.other)]
+    ["Sick leave entries",String(leaveCounts.sick)],
+    ["Vacation leave entries",String(leaveCounts.vacation)],
+    ["Kelly Day entries",String(leaveCounts.kelly_day)],
+    ["Other leave entries",String(leaveCounts.other)]
   ];
   sections.unshift({title:"SHIFT STAFFING SUMMARY • "+date,rows:summaryRows});
   if(!rows?.length)sections.unshift({title:"SHIFT STAFFING • "+date,rows:[["Result","No daily staffing record was recorded for this shift."]]});
@@ -374,7 +390,7 @@ export default async function handler(req,res) {
     const [staffAssignments,staffEvents,staffPeople,staffStations,staffApparatus]=staffingIds.length?await Promise.all([
       supa("daily_app_assignments?select=staffing_id,station_id,apparatus_id,daily_personnel_assignments(assignment_role,personnel_id,personnel(first_name,last_name))"+staffingFilter),
       supa("daily_staffing_events?select=*"+staffingFilter+"&order=created_at"),
-      supa("personnel?select=id,first_name,last_name"),
+      supa("personnel?select=id,first_name,last_name,shift"),
       supa("stations?select=station_id,station_name"),
       supa("apparatus?select=apparatus_id,unit_number")
     ]):[[],[],[],[],[]];
