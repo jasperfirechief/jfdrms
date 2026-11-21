@@ -110,13 +110,23 @@ export default async function handler(req, res) {
       }
 
       const incidentResponse = await fetch(
-        SUPABASE_URL + "/rest/v1/incidents?select=incident_id,reports&cad=eq." + encodeURIComponent(cad),
+        SUPABASE_URL + "/rest/v1/incidents?select=reports&cad=eq." + encodeURIComponent(cad),
         { headers: access.headers }
       );
       if (!incidentResponse.ok) throw new Error("Unable to verify the saved incident report.");
       const incidentRows = await incidentResponse.json();
       const incidentRow = Array.isArray(incidentRows) ? incidentRows[0] : null;
       if (!incidentRow) throw new Error("Incident not found.");
+      const detailsResponse = await fetch(
+        SUPABASE_URL + "/rest/v1/incident_details?select=incident_id&cad=eq." + encodeURIComponent(cad),
+        { headers: access.headers }
+      );
+      if (!detailsResponse.ok) throw new Error("Unable to verify the incident detail record.");
+      const detailRows = await detailsResponse.json();
+      if (!Array.isArray(detailRows) || detailRows.length !== 1 || !detailRows[0]?.incident_id) {
+        throw new Error("Incident detail record is missing or ambiguous.");
+      }
+      const incidentId = Number(detailRows[0].incident_id);
       const matchingReports = (Array.isArray(incidentRow.reports) ? incidentRow.reports : [])
         .filter(report => String(report?.report_id || "") === reportId);
       if (matchingReports.length !== 1) throw new Error("Saved report not found or report identifier is ambiguous.");
@@ -158,7 +168,7 @@ export default async function handler(req, res) {
         method: "POST",
         headers: { ...access.headers, "Content-Type":"application/json" },
         body: JSON.stringify({
-          p_incident_id: Number(incidentRow.incident_id),
+          p_incident_id: incidentId,
           p_cad: cad,
           p_report_id: reportId,
           p_neris_incident_id: nerisIncidentId,
