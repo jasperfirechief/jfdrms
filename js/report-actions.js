@@ -32,12 +32,63 @@ window.jfdHandleReportAction=async function(button){
       if(idx<0)throw new Error("Report not found.");
       return await window.adminSubmitReport(cad,idx);
     }
+    if(action==="delete_neris"){if(profile?.app_role!=="admin")throw new Error("Administrator access required.");return await window.adminDeleteNerisIncident(cad,reportId);}
     if(action==="delete")return await window.adminDeleteReportFromButton({dataset:{cad,reportId}});
     throw new Error("Unknown report action: "+action);
   }catch(e){
     console.error("JFD report action failed",e);
     alert(e?.message||String(e));
     return false;
+  }
+};
+window.adminDeleteNerisIncident=async function(cad,reportId){
+  try{
+    if(profile?.app_role!=="admin")throw new Error("Only RMS administrators can delete incidents from NERIS.");
+    if(!cad||!reportId)throw new Error("Report CAD number and report ID are required.");
+    if(typeof ensureSupabaseClient==="function")await ensureSupabaseClient();
+    if(!db)throw new Error("RMS database is not ready. Please wait a moment and try again.");
+    const saved=await db.from("incidents").select("incident_id,reports").eq("cad",cad).maybeSingle();
+    if(saved.error||!saved.data)throw new Error(saved.error?.message||"Incident not found.");
+    const matches=(Array.isArray(saved.data.reports)?saved.data.reports:[]).filter(x=>String(x?.report_id||"")===String(reportId));
+    if(matches.length!==1)throw new Error("Saved report not found or report ID is ambiguous.");
+    const report=matches[0];
+    if(report.status!=="submitted_to_neris")throw new Error("Only a report currently submitted to NERIS can be deleted.");
+    const nerisIncidentId=String(report?.neris?.neris_incident_id||"").trim();
+    if(!nerisIncidentId)throw new Error("The saved submission does not contain a NERIS incident ID. Do not attempt deletion until the ID is verified.");
+    const reason=window.prompt("Enter the reason for deleting this incident from NERIS. This reason will be recorded in the JFDRMS audit trail.","");
+    if(reason===null)return {ok:false,cancelled:true};
+    if(!String(reason).trim())throw new Error("A deletion reason is required.");
+    const confirmed=window.confirm(
+      "PERMANENT NERIS DELETION\n\nCAD: "+cad+
+      "\nNERIS incident ID: "+nerisIncidentId+
+      "\n\nThis deletes the entire incident from NERIS, not just one report. The original JFDRMS report and incident will remain saved.\n\nReason: "+String(reason).trim()+
+      "\n\nAre you sure you want to continue?"
+    );
+    if(!confirmed)return {ok:false,cancelled:true};
+    const session=(await db.auth.getSession()).data?.session;
+    if(!session)throw new Error("Authentication required.");
+    const response=await fetch("/api/neris",{
+      method:"POST",
+      headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.access_token},
+      body:JSON.stringify({action:"delete",cad:String(cad),report_id:String(reportId),neris_incident_id:nerisIncidentId,reason:String(reason).trim()})
+    });
+    let result={};try{result=await response.json()}catch{}
+    if(!response.ok||result.ok!==true){
+      if(result.deleted===true&&result.audit_recorded===false){
+        alert("NERIS reports that the incident was deleted, but JFDRMS could not record the audit entry. Do not retry the deletion. Contact the RMS administrator and preserve this message:\n"+(result.error||"Audit recording failed."));
+        return result;
+      }
+      throw new Error(result.error||"NERIS deletion failed.");
+    }
+    if(typeof renderReports==="function")await renderReports();
+    if(typeof renderNerisReviewQueue==="function")await renderNerisReviewQueue();
+    if(typeof window.openSavedReport==="function")await window.openSavedReport(cad,reportId);
+    alert("The incident was deleted from NERIS. The original JFDRMS incident and report remain saved. The administrator, timestamp, reason, and NERIS response were recorded.");
+    return result;
+  }catch(e){
+    console.error("JFDRMS NERIS deletion failed:",e);
+    alert(e?.message||String(e));
+    return {ok:false,error:e?.message||String(e)};
   }
 };
 window.generateIncidentPdf=async function(cad,reportId){
