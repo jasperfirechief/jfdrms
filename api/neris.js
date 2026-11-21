@@ -1,4 +1,4 @@
-const BASE_URL = String(process.env.NERIS_BASE_URL || "https://api-test.neris.fsri.org/v1").replace(/\/$/,"");
+const BASE_URL = String(process.env.NERIS_BASE_URL || "").replace(/\/$/,"");
 const CLIENT_ID = String(process.env.NERIS_CLIENT_ID || "");
 const CLIENT_SECRET = String(process.env.NERIS_CLIENT_SECRET || "");
 const DEPARTMENT_ID = String(process.env.NERIS_DEPARTMENT_ID || "");
@@ -20,6 +20,7 @@ async function requireNerisRole(req, allowed = ["admin","clerk"]) {
 }
 
 async function getToken() {
+  if (!BASE_URL) throw new Error("NERIS API URL is not configured in Vercel.");
   if (!CLIENT_ID || !CLIENT_SECRET) throw new Error("NERIS integration credentials are not configured in Vercel.");
   const basic = Buffer.from(CLIENT_ID + ":" + CLIENT_SECRET).toString("base64");
   const r = await fetch(BASE_URL + "/token", {
@@ -71,7 +72,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       service: "jfdrms-neris",
-      configured: Boolean(CLIENT_ID && CLIENT_SECRET && DEPARTMENT_ID),
+      configured: Boolean(BASE_URL && CLIENT_ID && CLIENT_SECRET && DEPARTMENT_ID),
       base_url: BASE_URL
     });
   }
