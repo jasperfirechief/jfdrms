@@ -260,7 +260,7 @@ async function sendEmail(attachments,shiftStart,shiftEnd,incidentCount,reportCou
 async function handleDepartmentEmail(req,res) {
   try {
     if(!SUPABASE_SERVICE_KEY||!process.env.BREVO_API_KEY||!process.env.BREVO_FROM_EMAIL)throw new Error("Email service is not configured.");
-    const token=String(req.headers.authorization||"").replace(/^Bearer\s+/i,"");
+    const token=String(req.headers.authorization||"").replace(/^Bearer\\s+/i,"");
     if(!token)return res.status(401).json({error:"Sign in required."});
     const auth=await fetch(SUPABASE_URL+"/auth/v1/user",{headers:{apikey:"sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz",Authorization:"Bearer "+token}});
     if(!auth.ok)return res.status(401).json({error:"Invalid session."});
@@ -269,27 +269,35 @@ async function handleDepartmentEmail(req,res) {
     const profile=profiles?.[0];
     if(!profile?.active||!["admin","officer"].includes(profile.app_role))return res.status(403).json({error:"Administrator or officer access required."});
     const {audience,shift,subject,message}=req.body||{};
-    if(!["shift","officers","everyone"].includes(audience)||!String(subject||"").trim()||!String(message||"").trim())return res.status(400).json({error:"Choose recipients and enter a subject and message."});
+    if(!["shift","part_time","admins","officers","everyone"].includes(audience)||!String(subject||"").trim()||!String(message||"").trim())return res.status(400).json({error:"Choose recipients and enter a subject and message."});
     let recipients=[];
     if(audience==="shift"){
       if(!["A","B","C"].includes(shift))return res.status(400).json({error:"Select a valid shift."});
       recipients=await supa("personnel?select=email&active=eq.true&shift=eq."+shift+"&email=not.is.null");
-    }else if(audience==="everyone"){
-      recipients=await supa("personnel?select=email&active=eq.true&email=not.is.null");
+    }else if(audience==="part_time"){
+      recipients=await supa("personnel?select=email&active=eq.true&shift=ilike.Part%20Time&email=not.is.null");
+    }else if(audience==="admins"){
+      recipients=await supa("users?select=email&active=eq.true&app_role=eq.admin&email=not.is.null");
+    }else if(audience==="officers"){
+      recipients=await supa("users?select=email&active=eq.true&app_role=in.(officer,admin)&email=not.is.null");
     }else{
-      recipients=await supa("users?select=email&active=eq.true&app_role=eq.officer&email=not.is.null");
+      const [personnelRecipients,userRecipients]=await Promise.all([
+        supa("personnel?select=email&active=eq.true&email=not.is.null"),
+        supa("users?select=email&active=eq.true&email=not.is.null")
+      ]);
+      recipients=[...(personnelRecipients||[]),...(userRecipients||[])];
     }
-    const emails=[...new Set((recipients||[]).map(x=>String(x.email||"").trim().toLowerCase()).filter(x=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x)))];
+    const senderEmail=String(user.email||"").trim().toLowerCase();
+    const emails=[...new Set([...(recipients||[]).map(x=>String(x.email||"").trim().toLowerCase()),senderEmail].filter(x=>/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(x)))];
     if(!emails.length)return res.status(400).json({error:"No active recipients with valid email addresses were found."});
     await sendDepartmentMail({
       to:emails[0],bcc:emails.slice(1),
       subject:"Jasper Fire Department: "+String(subject).trim().slice(0,180),
       text:String(message).trim().slice(0,20000)
     });
-    return res.status(200).json({ok:true,recipient_count:emails.length});
+    return res.status(200).json({ok:true,recipient_count:emails.length,sender_copy_included:true});
   }catch(e){return res.status(500).json({error:e.message||"Email failed."})}
 }
-
 async function handleTestEmail(req,res) {
   try {
     if(!SUPABASE_SERVICE_KEY||!process.env.BREVO_API_KEY||!process.env.BREVO_FROM_EMAIL)throw new Error("Email service is not configured.");
