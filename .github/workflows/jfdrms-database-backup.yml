@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 30
     env:
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-      AGE_RECIPIENT: ${{ vars.AGE_RECIPIENT }}
+      BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
       DRIVE_BRIDGE_URL_PRIMARY: ${{ secrets.DRIVE_BRIDGE_URL_PRIMARY }}
       DRIVE_BRIDGE_HMAC_SECRET_PRIMARY: ${{ secrets.DRIVE_BRIDGE_HMAC_SECRET_PRIMARY }}
       DRIVE_BRIDGE_URL_SECONDARY: ${{ secrets.DRIVE_BRIDGE_URL_SECONDARY }}
@@ -36,7 +36,7 @@ jobs:
           set -euo pipefail
           required=(
             SUPABASE_DB_URL
-            AGE_RECIPIENT
+            BACKUP_ENCRYPTION_PASSPHRASE
             DRIVE_BRIDGE_URL_PRIMARY
             DRIVE_BRIDGE_HMAC_SECRET_PRIMARY
             DRIVE_BRIDGE_URL_SECONDARY
@@ -44,21 +44,17 @@ jobs:
           )
           for name in "${required[@]}"; do
             if [[ -z "${!name:-}" ]]; then
-              echo "::error::Missing required GitHub secret or variable: ${name}"
+              echo "::error::Missing required GitHub secret: ${name}"
               exit 1
             fi
           done
-          if [[ ! "$AGE_RECIPIENT" =~ ^age1[0-9a-z]+$ ]]; then
-            echo "::error::AGE_RECIPIENT must be a valid age public recipient (age1...)."
+          if (( ${#BACKUP_ENCRYPTION_PASSPHRASE} < 32 )); then
+            echo "::error::BACKUP_ENCRYPTION_PASSPHRASE must be at least 32 characters."
             exit 1
           fi
 
-      - name: Install age encryption utility
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --yes age
+      - name: Verify GPG is available
+        run: gpg --version
 
       - name: Export the complete PostgreSQL database
         shell: bash
@@ -79,13 +75,17 @@ jobs:
 
       - name: Encrypt backup before it leaves the runner
         shell: bash
+        env:
+          BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
         run: |
           set -euo pipefail
-          age --recipient "$AGE_RECIPIENT" \
-            --output "$RUNNER_TEMP/jfdrms-backup/jfdrms.dump.age" \
+          printf '%s' "$BACKUP_ENCRYPTION_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback \
+            --passphrase-fd 0 --symmetric --cipher-algo AES256 \
+            --s2k-mode 3 --s2k-digest-algo SHA512 --s2k-count 65011712 \
+            --output "$RUNNER_TEMP/jfdrms-backup/jfdrms.dump.gpg" \
             "$RUNNER_TEMP/jfdrms-backup/jfdrms.dump"
-          test -s "$RUNNER_TEMP/jfdrms-backup/jfdrms.dump.age"
-          size=$(stat -c%s "$RUNNER_TEMP/jfdrms-backup/jfdrms.dump.age")
+          test -s "$RUNNER_TEMP/jfdrms-backup/jfdrms.dump.gpg"
+          size=$(stat -c%s "$RUNNER_TEMP/jfdrms-backup/jfdrms.dump.gpg")
           if (( size > 32 * 1024 * 1024 )); then
             echo "::error::Encrypted database backup exceeds the 32 MiB Drive bridge limit."
             exit 1
@@ -97,7 +97,7 @@ jobs:
           DRIVE_BRIDGE_HMAC_SECRET_PRIMARY: ${{ secrets.DRIVE_BRIDGE_HMAC_SECRET_PRIMARY }}
         run: |
           python3 scripts/backup/upload_to_drive.py \
-            --file "$RUNNER_TEMP/jfdrms-backup/jfdrms.dump.age" \
+            --file "$RUNNER_TEMP/jfdrms-backup/jfdrms.dump.gpg" \
             --url "$DRIVE_BRIDGE_URL_PRIMARY" \
             --secret-env DRIVE_BRIDGE_HMAC_SECRET_PRIMARY
 
@@ -106,7 +106,7 @@ jobs:
           DRIVE_BRIDGE_HMAC_SECRET_SECONDARY: ${{ secrets.DRIVE_BRIDGE_HMAC_SECRET_SECONDARY }}
         run: |
           python3 scripts/backup/upload_to_drive.py \
-            --file "$RUNNER_TEMP/jfdrms-backup/jfdrms.dump.age" \
+            --file "$RUNNER_TEMP/jfdrms-backup/jfdrms.dump.gpg" \
             --url "$DRIVE_BRIDGE_URL_SECONDARY" \
             --secret-env DRIVE_BRIDGE_HMAC_SECRET_SECONDARY
 
