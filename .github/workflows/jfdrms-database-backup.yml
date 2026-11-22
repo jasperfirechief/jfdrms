@@ -2,10 +2,6 @@ name: JFDRMS Encrypted Database Backup
 
 on:
   workflow_dispatch:
-  schedule:
-    # 2:00 AM Jasper local time, with automatic CST/CDT adjustment.
-    - cron: "0 2 * * *"
-      timezone: "America/Chicago"
 
 permissions:
   contents: read
