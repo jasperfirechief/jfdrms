@@ -1,0 +1,115 @@
+name: JFDRMS Isolated Restore Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      backup_filename:
+        description: Exact encrypted backup filename in the primary Drive folder
+        required: true
+        type: string
+        default: jfdrms-db-2026-11-22T032028Z.dump.gpg
+      confirm_isolated_target:
+        description: Confirm the target is the separate JFD RMS test project, not the live Jasper FD project
+        required: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jfdrms-isolated-restore-test
+  cancel-in-progress: false
+
+jobs:
+  restore-test:
+    name: Validate and restore into isolated JFD RMS project
+    if: \${{ inputs.confirm_isolated_target == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out backup scripts
+        uses: actions/checkout@v4
+
+      - name: Verify settings and enforce isolated target
+        shell: bash
+        env:
+          RESTORE_TEST_SUPABASE_DB_URL: \${{ secrets.RESTORE_TEST_SUPABASE_DB_URL }}
+          BACKUP_ENCRYPTION_PASSPHRASE: \${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
+          DRIVE_BRIDGE_URL_PRIMARY: \${{ secrets.DRIVE_BRIDGE_URL_PRIMARY }}
+          DRIVE_BRIDGE_HMAC_SECRET_PRIMARY: \${{ secrets.DRIVE_BRIDGE_HMAC_SECRET_PRIMARY }}
+          BACKUP_FILENAME: \${{ inputs.backup_filename }}
+        run: |
+          set -euo pipefail
+          for name in RESTORE_TEST_SUPABASE_DB_URL BACKUP_ENCRYPTION_PASSPHRASE DRIVE_BRIDGE_URL_PRIMARY DRIVE_BRIDGE_HMAC_SECRET_PRIMARY; do
+            if [[ -z "\${!name:-}" ]]; then
+              echo "::error::Missing required GitHub secret: \${name}"
+              exit 1
+            fi
+          done
+          python3 -c 'import os; from urllib.parse import urlparse; u=urlparse(os.environ["RESTORE_TEST_SUPABASE_DB_URL"]); assert u.scheme in ("postgres","postgresql") and u.hostname == "db.thzqamsxjktgrturrymo.supabase.co" and bool(u.password), "Refusing: restore URL is not the isolated JFD RMS test database"'
+          if (( \${#BACKUP_ENCRYPTION_PASSPHRASE} < 32 )); then
+            echo "::error::Backup encryption passphrase is missing or too short."
+            exit 1
+          fi
+          if [[ ! "$BACKUP_FILENAME" =~ ^jfdrms-db-[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{6}Z\.dump\.gpg$ ]]; then
+            echo "::error::Backup filename format is invalid."
+            exit 1
+          fi
+
+      - name: Download encrypted archive from primary Drive
+        env:
+          DRIVE_BRIDGE_URL_PRIMARY: \${{ secrets.DRIVE_BRIDGE_URL_PRIMARY }}
+          DRIVE_BRIDGE_HMAC_SECRET_PRIMARY: \${{ secrets.DRIVE_BRIDGE_HMAC_SECRET_PRIMARY }}
+          BACKUP_FILENAME: \${{ inputs.backup_filename }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/jfdrms-restore"
+          python3 scripts/backup/download_from_drive.py \
+            --filename "$BACKUP_FILENAME" \
+            --url "$DRIVE_BRIDGE_URL_PRIMARY" \
+            --secret-env DRIVE_BRIDGE_HMAC_SECRET_PRIMARY \
+            --output "$RUNNER_TEMP/jfdrms-restore/backup.dump.gpg"
+
+      - name: Decrypt archive and validate PostgreSQL format
+        shell: bash
+        env:
+          BACKUP_ENCRYPTION_PASSPHRASE: \${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$BACKUP_ENCRYPTION_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback \
+            --passphrase-fd 0 --decrypt \
+            --output "$RUNNER_TEMP/jfdrms-restore/backup.dump" \
+            "$RUNNER_TEMP/jfdrms-restore/backup.dump.gpg"
+          docker run --rm \
+            --volume "$RUNNER_TEMP/jfdrms-restore:/restore" \
+            postgres:17-alpine \
+            pg_restore --list /restore/backup.dump > "$RUNNER_TEMP/jfdrms-restore/archive-list.txt"
+          test -s "$RUNNER_TEMP/jfdrms-restore/archive-list.txt"
+          echo "Encrypted archive decrypted and PostgreSQL archive structure validated."
+
+      - name: Restore into isolated JFD RMS database
+        shell: bash
+        env:
+          RESTORE_TEST_SUPABASE_DB_URL: \${{ secrets.RESTORE_TEST_SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          echo "Restoring only to the separately verified JFD RMS test project."
+          docker run --rm \
+            --env RESTORE_TEST_SUPABASE_DB_URL \
+            --volume "$RUNNER_TEMP/jfdrms-restore:/restore:ro" \
+            postgres:17-alpine \
+            sh -euc 'pg_restore --verbose --no-owner --no-acl --clean --if-exists --exit-on-error --dbname="$RESTORE_TEST_SUPABASE_DB_URL" /restore/backup.dump'
+
+      - name: Verify restored database responds
+        shell: bash
+        env:
+          RESTORE_TEST_SUPABASE_DB_URL: \${{ secrets.RESTORE_TEST_SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          docker run --rm --env RESTORE_TEST_SUPABASE_DB_URL postgres:17-alpine \
+            sh -euc 'psql "$RESTORE_TEST_SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -Atc "select current_database(), current_setting('\''server_version'\'');"'
+
+      - name: Remove temporary restore files
+        if: always()
+        shell: bash
+        run: rm -rf "$RUNNER_TEMP/jfdrms-restore"
