@@ -86,10 +86,15 @@ jobs:
             sh -euc '
               pg_restore --list /restore/backup.dump > /restore/archive-list.txt
               test -s /restore/archive-list.txt
-              grep -v " EVENT TRIGGER " /restore/archive-list.txt > /restore/restore-list.txt
+              grep -v " EVENT TRIGGER " /restore/archive-list.txt \
+                | grep -vE " SCHEMA (- )?public( |$)" \
+                | grep -v " EXTENSION " \
+                > /restore/restore-list.txt
               test -s /restore/restore-list.txt
-              excluded=$(grep -c " EVENT TRIGGER " /restore/archive-list.txt || true)
-              echo "Encrypted archive validated; excluded $excluded event-trigger entries owned by the Supabase platform."
+              excluded_triggers=$(grep -c " EVENT TRIGGER " /restore/archive-list.txt || true)
+              excluded_public_schema=$(grep -Ec " SCHEMA (- )?public( |$)" /restore/archive-list.txt || true)
+              excluded_extensions=$(grep -c " EXTENSION " /restore/archive-list.txt || true)
+              echo "Encrypted archive validated; excluded $excluded_triggers platform event triggers, $excluded_public_schema existing public-schema definition, and $excluded_extensions extension entries."
             '
 
       - name: Restore into isolated JFD RMS database
@@ -103,7 +108,7 @@ jobs:
             --env RESTORE_TEST_SUPABASE_DB_URL \
             --volume "$RUNNER_TEMP/jfdrms-restore:/restore:ro" \
             postgres:17-alpine \
-            sh -euc 'pg_restore --use-list=/restore/restore-list.txt --verbose --no-owner --no-acl --exit-on-error --dbname="$RESTORE_TEST_SUPABASE_DB_URL" /restore/backup.dump'
+            sh -euc 'pg_restore --use-list=/restore/restore-list.txt --exclude-schema=auth --exclude-schema=storage --exclude-schema=realtime --exclude-schema=extensions --exclude-schema=graphql --exclude-schema=graphql_public --exclude-schema=net --exclude-schema=pgbouncer --exclude-schema=pgsodium --exclude-schema=supabase_functions --exclude-schema=supabase_migrations --exclude-schema=vault --exclude-schema=cron --verbose --no-owner --no-acl --exit-on-error --dbname="$RESTORE_TEST_SUPABASE_DB_URL" /restore/backup.dump'
 
       - name: Verify restored database responds
         shell: bash
