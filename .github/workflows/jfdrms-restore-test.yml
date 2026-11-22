@@ -89,7 +89,7 @@ src="/restore/archive-list.txt"; dst="/restore/restore-list.txt"
 import subprocess
 with open(src,"w") as f: subprocess.run(["pg_restore","--list","/restore/backup.dump"],stdout=f,check=True)
 kept=[]; counts={"managed_schema_objects":0,"schema_definitions":0,"extensions":0,"event_triggers":0}
-entry=re.compile(r"^\\s*;\\s*\\d+;\\s+\\d+\\s+\\d+\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)")
+entry=re.compile(r"^\\s*;\\s*\d+;\s+\d+\s+\d+\s+(\S+)\s+(\S+)\s+(\S+)")
 for line in open(src):
     if " EVENT TRIGGER " in line: counts["event_triggers"]+=1; continue
     if " EXTENSION " in line: counts["extensions"]+=1; continue
@@ -100,7 +100,7 @@ for line in open(src):
             if name=="public" or name in managed: counts["schema_definitions"]+=1; continue
         elif schema in managed:
             counts["managed_schema_objects"]+=1; continue
-    if re.search(r"\\bSCHEMA\\s+(?:"+"|".join(map(re.escape,managed)) + r")\\b",line):
+    if re.search(r"\bSCHEMA\s+(?:"+"|".join(map(re.escape,managed)) + r")\b",line):
         counts["managed_schema_objects"]+=1; continue
     kept.append(line)
 if not kept: raise SystemExit("No restorable entries remain in archive")
