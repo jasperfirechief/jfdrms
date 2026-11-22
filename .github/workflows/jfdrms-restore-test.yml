@@ -64,10 +64,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/jfdrms-restore"
-          python3 scripts/backup/download_from_drive.py \\
-            --filename "$BACKUP_FILENAME" \\
-            --url "$DRIVE_BRIDGE_URL_PRIMARY" \\
-            --secret-env DRIVE_BRIDGE_HMAC_SECRET_PRIMARY \\
+          python3 scripts/backup/download_from_drive.py \
+            --filename "$BACKUP_FILENAME" \
+            --url "$DRIVE_BRIDGE_URL_PRIMARY" \
+            --secret-env DRIVE_BRIDGE_HMAC_SECRET_PRIMARY \
             --output "$RUNNER_TEMP/jfdrms-restore/backup.dump.gpg"
 
       - name: Decrypt archive, validate it, and prepare a Supabase-safe restore list
@@ -76,13 +76,13 @@ jobs:
           BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
         run: |
           set -euo pipefail
-          printf '%s' "$BACKUP_ENCRYPTION_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback \\
-            --passphrase-fd 0 --decrypt \\
-            --output "$RUNNER_TEMP/jfdrms-restore/backup.dump" \\
+          printf '%s' "$BACKUP_ENCRYPTION_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback \
+            --passphrase-fd 0 --decrypt \
+            --output "$RUNNER_TEMP/jfdrms-restore/backup.dump" \
             "$RUNNER_TEMP/jfdrms-restore/backup.dump.gpg"
-          docker run --rm \\
-            --volume "$RUNNER_TEMP/jfdrms-restore:/restore" \\
-            postgres:17-alpine \\
+          docker run --rm \
+            --volume "$RUNNER_TEMP/jfdrms-restore:/restore" \
+            postgres:17-alpine \
             sh -euc '
               pg_restore --list /restore/backup.dump > /restore/archive-list.txt
               test -s /restore/archive-list.txt
@@ -99,10 +99,10 @@ jobs:
         run: |
           set -euo pipefail
           echo "Restoring only to the separately verified JFD RMS test project."
-          docker run --rm \\
-            --env RESTORE_TEST_SUPABASE_DB_URL \\
-            --volume "$RUNNER_TEMP/jfdrms-restore:/restore:ro" \\
-            postgres:17-alpine \\
+          docker run --rm \
+            --env RESTORE_TEST_SUPABASE_DB_URL \
+            --volume "$RUNNER_TEMP/jfdrms-restore:/restore:ro" \
+            postgres:17-alpine \
             sh -euc 'pg_restore --use-list=/restore/restore-list.txt --verbose --no-owner --no-acl --clean --if-exists --exit-on-error --dbname="$RESTORE_TEST_SUPABASE_DB_URL" /restore/backup.dump'
 
       - name: Verify restored database responds
@@ -111,7 +111,7 @@ jobs:
           RESTORE_TEST_SUPABASE_DB_URL: ${{ secrets.RESTORE_TEST_SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
-          docker run --rm --env RESTORE_TEST_SUPABASE_DB_URL postgres:17-alpine \\
+          docker run --rm --env RESTORE_TEST_SUPABASE_DB_URL postgres:17-alpine \
             sh -euc 'psql "$RESTORE_TEST_SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -Atc "select current_database(), current_setting('\''server_version'\'');"'
 
       - name: Remove temporary restore files
