@@ -23,7 +23,7 @@ concurrency:
 jobs:
   restore-test:
     name: Validate and restore into isolated JFD RMS project
-    if: \${{ inputs.confirm_isolated_target == true }}
+    if: ${{ inputs.confirm_isolated_target == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -33,21 +33,21 @@ jobs:
       - name: Verify settings and enforce isolated target
         shell: bash
         env:
-          RESTORE_TEST_SUPABASE_DB_URL: \${{ secrets.RESTORE_TEST_SUPABASE_DB_URL }}
-          BACKUP_ENCRYPTION_PASSPHRASE: \${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
-          DRIVE_BRIDGE_URL_PRIMARY: \${{ secrets.DRIVE_BRIDGE_URL_PRIMARY }}
-          DRIVE_BRIDGE_HMAC_SECRET_PRIMARY: \${{ secrets.DRIVE_BRIDGE_HMAC_SECRET_PRIMARY }}
-          BACKUP_FILENAME: \${{ inputs.backup_filename }}
+          RESTORE_TEST_SUPABASE_DB_URL: ${{ secrets.RESTORE_TEST_SUPABASE_DB_URL }}
+          BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
+          DRIVE_BRIDGE_URL_PRIMARY: ${{ secrets.DRIVE_BRIDGE_URL_PRIMARY }}
+          DRIVE_BRIDGE_HMAC_SECRET_PRIMARY: ${{ secrets.DRIVE_BRIDGE_HMAC_SECRET_PRIMARY }}
+          BACKUP_FILENAME: ${{ inputs.backup_filename }}
         run: |
           set -euo pipefail
           for name in RESTORE_TEST_SUPABASE_DB_URL BACKUP_ENCRYPTION_PASSPHRASE DRIVE_BRIDGE_URL_PRIMARY DRIVE_BRIDGE_HMAC_SECRET_PRIMARY; do
-            if [[ -z "\${!name:-}" ]]; then
-              echo "::error::Missing required GitHub secret: \${name}"
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Missing required GitHub secret: ${name}"
               exit 1
             fi
           done
           python3 -c 'import os; from urllib.parse import urlparse; u=urlparse(os.environ["RESTORE_TEST_SUPABASE_DB_URL"]); assert u.scheme in ("postgres","postgresql") and u.hostname == "db.thzqamsxjktgrturrymo.supabase.co" and bool(u.password), "Refusing: restore URL is not the isolated JFD RMS test database"'
-          if (( \${#BACKUP_ENCRYPTION_PASSPHRASE} < 32 )); then
+          if (( ${#BACKUP_ENCRYPTION_PASSPHRASE} < 32 )); then
             echo "::error::Backup encryption passphrase is missing or too short."
             exit 1
           fi
@@ -58,9 +58,9 @@ jobs:
 
       - name: Download encrypted archive from primary Drive
         env:
-          DRIVE_BRIDGE_URL_PRIMARY: \${{ secrets.DRIVE_BRIDGE_URL_PRIMARY }}
-          DRIVE_BRIDGE_HMAC_SECRET_PRIMARY: \${{ secrets.DRIVE_BRIDGE_HMAC_SECRET_PRIMARY }}
-          BACKUP_FILENAME: \${{ inputs.backup_filename }}
+          DRIVE_BRIDGE_URL_PRIMARY: ${{ secrets.DRIVE_BRIDGE_URL_PRIMARY }}
+          DRIVE_BRIDGE_HMAC_SECRET_PRIMARY: ${{ secrets.DRIVE_BRIDGE_HMAC_SECRET_PRIMARY }}
+          BACKUP_FILENAME: ${{ inputs.backup_filename }}
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/jfdrms-restore"
@@ -73,7 +73,7 @@ jobs:
       - name: Decrypt archive and validate PostgreSQL format
         shell: bash
         env:
-          BACKUP_ENCRYPTION_PASSPHRASE: \${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
+          BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
         run: |
           set -euo pipefail
           printf '%s' "$BACKUP_ENCRYPTION_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback \
@@ -90,7 +90,7 @@ jobs:
       - name: Restore into isolated JFD RMS database
         shell: bash
         env:
-          RESTORE_TEST_SUPABASE_DB_URL: \${{ secrets.RESTORE_TEST_SUPABASE_DB_URL }}
+          RESTORE_TEST_SUPABASE_DB_URL: ${{ secrets.RESTORE_TEST_SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
           echo "Restoring only to the separately verified JFD RMS test project."
@@ -103,7 +103,7 @@ jobs:
       - name: Verify restored database responds
         shell: bash
         env:
-          RESTORE_TEST_SUPABASE_DB_URL: \${{ secrets.RESTORE_TEST_SUPABASE_DB_URL }}
+          RESTORE_TEST_SUPABASE_DB_URL: ${{ secrets.RESTORE_TEST_SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
           docker run --rm --env RESTORE_TEST_SUPABASE_DB_URL postgres:17-alpine \
