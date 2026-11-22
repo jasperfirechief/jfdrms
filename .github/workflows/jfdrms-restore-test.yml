@@ -119,7 +119,7 @@ print("Archive validated; TOC entries retained:",len(kept),"; exclusions:",count
             --env RESTORE_TEST_SUPABASE_DB_URL \
             --volume "$RUNNER_TEMP/jfdrms-restore:/restore:ro" \
             postgres:17-alpine \
-            sh -euc 'pg_restore --use-list=/restore/restore-list.txt --exclude-schema=auth --exclude-schema=storage --exclude-schema=realtime --exclude-schema=extensions --exclude-schema=graphql --exclude-schema=graphql_public --exclude-schema=net --exclude-schema=pgbouncer --exclude-schema=pgsodium --exclude-schema=supabase_functions --exclude-schema=supabase_migrations --exclude-schema=vault --exclude-schema=cron --verbose --no-owner --no-acl --exit-on-error --dbname="$RESTORE_TEST_SUPABASE_DB_URL" /restore/backup.dump'
+            sh -euc 'pg_restore --use-list=/restore/restore-list.txt --verbose --no-owner --no-acl --exit-on-error --dbname="$RESTORE_TEST_SUPABASE_DB_URL" /restore/backup.dump'
 
       - name: Verify restored database responds
         shell: bash
