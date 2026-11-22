@@ -34,7 +34,7 @@ def main() -> int:
     if not payload_bytes or len(payload_bytes) > MAX_FILE_BYTES:
         raise SystemExit("Encrypted backup must be between 1 byte and 32 MiB.")
 
-    filename = "jfdrms-db-" + datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ") + ".dump.age"
+    filename = "jfdrms-db-" + datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ") + ".dump.gpg"
     timestamp = str(int(time.time()))
     digest = hashlib.sha256(payload_bytes).hexdigest()
     message = f"{timestamp}\n{filename}\n{digest}".encode("utf-8")
