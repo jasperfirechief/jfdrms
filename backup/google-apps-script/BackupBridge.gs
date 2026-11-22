@@ -24,16 +24,16 @@ function doPost(e) {
     const signature = String(request.signature || '').toLowerCase();
     const encoded = String(request.data || '');
 
-    if (!/^\d{10}$/.test(timestamp) ||
+    if (!/^\\d{10}$/.test(timestamp) ||
         Math.abs(Math.floor(Date.now() / 1000) - Number(timestamp)) > 300 ||
-        !/^jfdrms-db-\d{4}-\d{2}-\d{2}T\d{6}Z\.dump\.gpg$/.test(filename) ||
+        !/^jfdrms-db-\\d{4}-\\d{2}-\\d{2}T\\d{6}Z\\.dump\\.gpg$/.test(filename) ||
         !/^[a-f0-9]{64}$/.test(sha256) ||
         !/^[a-f0-9]{64}$/.test(signature) || !encoded) {
       throw new Error('REQUEST_INVALID');
     }
 
     stage = 'AUTH';
-    const message = timestamp + '\n' + filename + '\n' + sha256;
+    const message = timestamp + '\\n' + filename + '\\n' + sha256;
     const expected = toHex_(Utilities.computeHmacSha256Signature(message, secret));
     if (!constantTimeEqual_(expected, signature)) throw new Error('AUTH_FAILED');
 
@@ -70,9 +70,55 @@ function doPost(e) {
   }
 }
 
-function doGet() {
-  return json_({ok:true, service:'JFD RMS backup receiver', method:'POST required'});
+/**
+ * Authenticated download of one encrypted archive from the configured folder.
+ * HMAC message: timestamp + newline + filename + newline + DOWNLOAD.
+ * Returns base64 ciphertext only; plaintext is never served by this endpoint.
+ */
+function doGet(e) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const secret = props.getProperty('JFD_BACKUP_HMAC_SECRET');
+    const folderId = props.getProperty('JFD_BACKUP_FOLDER_ID');
+    if (!secret || secret.length < 32 || !folderId) throw new Error('CONFIG');
+
+    const params = e && e.parameter ? e.parameter : {};
+    const timestamp = String(params.timestamp || '');
+    const filename = String(params.filename || '');
+    const signature = String(params.signature || '').toLowerCase();
+
+    if (params.action !== 'download' ||
+        !/^\\d{10}$/.test(timestamp) ||
+        Math.abs(Math.floor(Date.now() / 1000) - Number(timestamp)) > 300 ||
+        !/^jfdrms-db-\\d{4}-\\d{2}-\\d{2}T\\d{6}Z\\.dump\\.gpg$/.test(filename) ||
+        !/^[a-f0-9]{64}$/.test(signature)) {
+      throw new Error('REQUEST_INVALID');
+    }
+
+    const message = timestamp + '\\n' + filename + '\\nDOWNLOAD';
+    const expected = toHex_(Utilities.computeHmacSha256Signature(message, secret));
+    if (!constantTimeEqual_(expected, signature)) throw new Error('AUTH_FAILED');
+
+    const folder = DriveApp.getFolderById(folderId);
+    const files = folder.getFilesByName(filename);
+    if (!files.hasNext()) throw new Error('NOT_FOUND');
+    const file = files.next();
+    if (files.hasNext()) throw new Error('AMBIGUOUS_FILE');
+    const blob = file.getBlob();
+    const bytes = blob.getBytes();
+    if (!bytes.length || bytes.length > 32 * 1024 * 1024) throw new Error('PAYLOAD_SIZE');
+    const digest = toHex_(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes));
+    return json_({ok:true, filename:filename, bytes:bytes.length, sha256:digest,
+      data:Utilities.base64Encode(bytes)});
+  } catch (err) {
+    const allowed = ['CONFIG','REQUEST_INVALID','AUTH_FAILED','NOT_FOUND',
+      'AMBIGUOUS_FILE','PAYLOAD_SIZE'];
+    const code = err && allowed.indexOf(err.message) >= 0 ? err.message : 'DOWNLOAD_ERROR';
+    console.error('JFD backup download rejection code: ' + code);
+    return json_({ok:false, code:code, error:'Encrypted backup download rejected.'});
+  }
 }
+
 function json_(value) {
   return ContentService.createTextOutput(JSON.stringify(value))
     .setMimeType(ContentService.MimeType.JSON);
