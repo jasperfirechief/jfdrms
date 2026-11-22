@@ -11,7 +11,6 @@ import time
 import urllib.request
 from datetime import datetime, timezone
 
-
 MAX_FILE_BYTES = 32 * 1024 * 1024
 
 
@@ -38,32 +37,28 @@ def main() -> int:
     digest = hashlib.sha256(payload_bytes).hexdigest()
     message = f"{timestamp}\n{filename}\n{digest}".encode("utf-8")
     signature = hmac.new(secret.encode("utf-8"), message, hashlib.sha256).hexdigest()
-
     request_body = json.dumps({
-        "timestamp": timestamp,
-        "filename": filename,
-        "sha256": digest,
+        "timestamp": timestamp, "filename": filename, "sha256": digest,
         "signature": signature,
         "data": base64.b64encode(payload_bytes).decode("ascii"),
     }, separators=(",", ":")).encode("utf-8")
 
-    request = urllib.request.Request(
-        args.url,
-        data=request_body,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
+    request = urllib.request.Request(args.url, data=request_body,
+        headers={"Content-Type": "application/json"}, method="POST")
     with urllib.request.urlopen(request, timeout=300) as response:
         result = json.loads(response.read().decode("utf-8"))
 
     if result.get("ok") is not True:
-        raise SystemExit("Google Drive bridge rejected the backup. Check Apps Script execution history.")
-    print(json.dumps({
-        "uploaded": True,
-        "filename": result.get("name", filename),
+        code = result.get("code", "UNSPECIFIED_REJECTION")
+        safe_codes = {"CONFIG","REQUEST_INVALID","JSON_INVALID","AUTH_FAILED",
+            "BASE64_INVALID","PAYLOAD_SIZE","CHECKSUM_MISMATCH","REQUEST_ERROR",
+            "AUTH_ERROR","PAYLOAD_ERROR","DRIVE_ERROR","SAVE_RECEIPT_ERROR"}
+        if code not in safe_codes:
+            code = "UNRECOGNIZED_REJECTION"
+        raise SystemExit(f"Google Drive bridge rejected the backup (code: {code}).")
+    print(json.dumps({"uploaded": True, "filename": result.get("name", filename),
         "bytes": result.get("size", len(payload_bytes)),
-        "duplicate": bool(result.get("duplicate", False)),
-    }))
+        "duplicate": bool(result.get("duplicate", False))}))
     return 0
 
 
@@ -71,6 +66,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except Exception as exc:
-        # Avoid printing request bodies, URLs, or credentials.
         print(f"Backup upload failed: {type(exc).__name__}", file=sys.stderr)
         raise SystemExit(1)
