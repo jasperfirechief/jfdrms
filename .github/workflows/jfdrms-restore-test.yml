@@ -51,7 +51,7 @@ jobs:
             echo "::error::Backup encryption passphrase is missing or too short."
             exit 1
           fi
-          if [[ ! "$BACKUP_FILENAME" =~ ^jfdrms-db-[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{6}Z\\.dump\\.gpg$ ]]; then
+          if [[ ! "$BACKUP_FILENAME" =~ ^jfdrms-db-[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{6}Z\.dump\.gpg$ ]]; then
             echo "::error::Backup filename format is invalid."
             exit 1
           fi
