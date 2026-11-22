@@ -35,7 +35,7 @@ def main() -> int:
     filename = "jfdrms-db-" + datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ") + ".dump.gpg"
     timestamp = str(int(time.time()))
     digest = hashlib.sha256(payload_bytes).hexdigest()
-    message = f"{timestamp}\\n{filename}\\n{digest}".encode("utf-8")
+    message = f"{timestamp}\n{filename}\n{digest}".encode("utf-8")
     signature = hmac.new(secret.encode("utf-8"), message, hashlib.sha256).hexdigest()
     request_body = json.dumps({
         "timestamp": timestamp, "filename": filename, "sha256": digest,
