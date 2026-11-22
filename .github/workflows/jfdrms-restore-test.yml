@@ -103,7 +103,7 @@ jobs:
             --env RESTORE_TEST_SUPABASE_DB_URL \
             --volume "$RUNNER_TEMP/jfdrms-restore:/restore:ro" \
             postgres:17-alpine \
-            sh -euc 'pg_restore --use-list=/restore/restore-list.txt --verbose --no-owner --no-acl --clean --if-exists --exit-on-error --dbname="$RESTORE_TEST_SUPABASE_DB_URL" /restore/backup.dump'
+            sh -euc 'pg_restore --use-list=/restore/restore-list.txt --verbose --no-owner --no-acl --exit-on-error --dbname="$RESTORE_TEST_SUPABASE_DB_URL" /restore/backup.dump'
 
       - name: Verify restored database responds
         shell: bash
