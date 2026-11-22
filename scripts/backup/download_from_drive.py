@@ -13,7 +13,7 @@ import urllib.parse
 import urllib.request
 
 MAX_FILE_BYTES = 32 * 1024 * 1024
-FILENAME_RE = re.compile(r"^jfdrms-db-\\d{4}-\\d{2}-\\d{2}T\\d{6}Z\\.dump\\.gpg$")
+FILENAME_RE = re.compile(r"^jfdrms-db-\d{4}-\d{2}-\d{2}T\d{6}Z\.dump\.gpg$")
 
 
 def main() -> int:
@@ -33,7 +33,7 @@ def main() -> int:
         raise SystemExit("Bridge URL must be a Google Apps Script /exec HTTPS URL.")
 
     timestamp = str(int(time.time()))
-    message = f"{timestamp}\\n{args.filename}\\nDOWNLOAD".encode("utf-8")
+    message = f"{timestamp}\n{args.filename}\nDOWNLOAD".encode("utf-8")
     signature = hmac.new(secret.encode("utf-8"), message, hashlib.sha256).hexdigest()
     query = urllib.parse.urlencode({
         "action": "download", "timestamp": timestamp,
