@@ -87,7 +87,7 @@ jobs:
 managed={"auth","storage","realtime","extensions","graphql","graphql_public","net","pgbouncer","pgsodium","supabase_functions","supabase_migrations","vault","cron"}
 src="/restore/archive-list.txt"; dst="/restore/restore-list.txt"
 import subprocess
-with open(src,"w") as f: subprocess.run(["pg_restore","--list","/restore/backup.dump"],stdout=f,check=True)
+with open(src,"w") as f: subprocess.run(["pg_restore","--schema=public","--list","/restore/backup.dump"],stdout=f,check=True)
 kept=[]; counts={"managed_schema_objects":0,"schema_definitions":0,"extensions":0,"event_triggers":0}
 entry=re.compile(r"^\s*;\s+\d+;\s+\d+\s+\d+\s+(\S+)\s+(\S+)\s+(\S+)")
 for line in open(src):
