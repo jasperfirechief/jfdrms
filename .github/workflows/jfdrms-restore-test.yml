@@ -51,7 +51,7 @@ jobs:
             echo "::error::Backup encryption passphrase is missing or too short."
             exit 1
           fi
-          if [[ ! "$BACKUP_FILENAME" =~ ^jfdrms-db-[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{6}Z\.dump\.gpg$ ]]; then
+          if [[ ! "$BACKUP_FILENAME" =~ ^jfdrms-db-[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{6}Z\\.dump\\.gpg$ ]]; then
             echo "::error::Backup filename format is invalid."
             exit 1
           fi
@@ -64,28 +64,33 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/jfdrms-restore"
-          python3 scripts/backup/download_from_drive.py \
-            --filename "$BACKUP_FILENAME" \
-            --url "$DRIVE_BRIDGE_URL_PRIMARY" \
-            --secret-env DRIVE_BRIDGE_HMAC_SECRET_PRIMARY \
+          python3 scripts/backup/download_from_drive.py \\
+            --filename "$BACKUP_FILENAME" \\
+            --url "$DRIVE_BRIDGE_URL_PRIMARY" \\
+            --secret-env DRIVE_BRIDGE_HMAC_SECRET_PRIMARY \\
             --output "$RUNNER_TEMP/jfdrms-restore/backup.dump.gpg"
 
-      - name: Decrypt archive and validate PostgreSQL format
+      - name: Decrypt archive, validate it, and prepare a Supabase-safe restore list
         shell: bash
         env:
           BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
         run: |
           set -euo pipefail
-          printf '%s' "$BACKUP_ENCRYPTION_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback \
-            --passphrase-fd 0 --decrypt \
-            --output "$RUNNER_TEMP/jfdrms-restore/backup.dump" \
+          printf '%s' "$BACKUP_ENCRYPTION_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback \\
+            --passphrase-fd 0 --decrypt \\
+            --output "$RUNNER_TEMP/jfdrms-restore/backup.dump" \\
             "$RUNNER_TEMP/jfdrms-restore/backup.dump.gpg"
-          docker run --rm \
-            --volume "$RUNNER_TEMP/jfdrms-restore:/restore" \
-            postgres:17-alpine \
-            pg_restore --list /restore/backup.dump > "$RUNNER_TEMP/jfdrms-restore/archive-list.txt"
-          test -s "$RUNNER_TEMP/jfdrms-restore/archive-list.txt"
-          echo "Encrypted archive decrypted and PostgreSQL archive structure validated."
+          docker run --rm \\
+            --volume "$RUNNER_TEMP/jfdrms-restore:/restore" \\
+            postgres:17-alpine \\
+            sh -euc '
+              pg_restore --list /restore/backup.dump > /restore/archive-list.txt
+              test -s /restore/archive-list.txt
+              grep -v " EVENT TRIGGER " /restore/archive-list.txt > /restore/restore-list.txt
+              test -s /restore/restore-list.txt
+              excluded=$(grep -c " EVENT TRIGGER " /restore/archive-list.txt || true)
+              echo "Encrypted archive validated; excluded $excluded event-trigger entries owned by the Supabase platform."
+            '
 
       - name: Restore into isolated JFD RMS database
         shell: bash
@@ -94,11 +99,11 @@ jobs:
         run: |
           set -euo pipefail
           echo "Restoring only to the separately verified JFD RMS test project."
-          docker run --rm \
-            --env RESTORE_TEST_SUPABASE_DB_URL \
-            --volume "$RUNNER_TEMP/jfdrms-restore:/restore:ro" \
-            postgres:17-alpine \
-            sh -euc 'pg_restore --verbose --no-owner --no-acl --clean --if-exists --exit-on-error --dbname="$RESTORE_TEST_SUPABASE_DB_URL" /restore/backup.dump'
+          docker run --rm \\
+            --env RESTORE_TEST_SUPABASE_DB_URL \\
+            --volume "$RUNNER_TEMP/jfdrms-restore:/restore:ro" \\
+            postgres:17-alpine \\
+            sh -euc 'pg_restore --use-list=/restore/restore-list.txt --verbose --no-owner --no-acl --clean --if-exists --exit-on-error --dbname="$RESTORE_TEST_SUPABASE_DB_URL" /restore/backup.dump'
 
       - name: Verify restored database responds
         shell: bash
@@ -106,7 +111,7 @@ jobs:
           RESTORE_TEST_SUPABASE_DB_URL: ${{ secrets.RESTORE_TEST_SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
-          docker run --rm --env RESTORE_TEST_SUPABASE_DB_URL postgres:17-alpine \
+          docker run --rm --env RESTORE_TEST_SUPABASE_DB_URL postgres:17-alpine \\
             sh -euc 'psql "$RESTORE_TEST_SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -Atc "select current_database(), current_setting('\''server_version'\'');"'
 
       - name: Remove temporary restore files
