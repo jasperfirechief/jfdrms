@@ -46,7 +46,7 @@ jobs:
               exit 1
             fi
           done
-          python3 -c 'import os; from urllib.parse import urlparse; u=urlparse(os.environ["RESTORE_TEST_SUPABASE_DB_URL"]); assert u.scheme in ("postgres","postgresql") and u.hostname == "db.thzqamsxjktgrturrymo.supabase.co" and bool(u.password), "Refusing: restore URL is not the isolated JFD RMS test database"'
+          python3 -c 'import os; from urllib.parse import urlparse; u=urlparse(os.environ["RESTORE_TEST_SUPABASE_DB_URL"]); assert u.scheme in ("postgres","postgresql") and u.hostname == "aws-0-us-east-2.pooler.supabase.com" and u.username == "postgres.thzqamsxjktgrturrymo" and u.port == 5432 and bool(u.password), "Refusing: restore URL is not the isolated JFD RMS session-pooler database"'
           if (( ${#BACKUP_ENCRYPTION_PASSPHRASE} < 32 )); then
             echo "::error::Backup encryption passphrase is missing or too short."
             exit 1
