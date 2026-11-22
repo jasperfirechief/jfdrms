@@ -19,20 +19,19 @@ jobs:
     name: Export, encrypt, and copy database backup
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-      BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
-      DRIVE_BRIDGE_URL_PRIMARY: ${{ secrets.DRIVE_BRIDGE_URL_PRIMARY }}
-      DRIVE_BRIDGE_HMAC_SECRET_PRIMARY: ${{ secrets.DRIVE_BRIDGE_HMAC_SECRET_PRIMARY }}
-      DRIVE_BRIDGE_URL_SECONDARY: ${{ secrets.DRIVE_BRIDGE_URL_SECONDARY }}
-      DRIVE_BRIDGE_HMAC_SECRET_SECONDARY: ${{ secrets.DRIVE_BRIDGE_HMAC_SECRET_SECONDARY }}
-
     steps:
       - name: Check out backup scripts
         uses: actions/checkout@v4
 
       - name: Verify required settings exist
         shell: bash
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
+          DRIVE_BRIDGE_URL_PRIMARY: ${{ secrets.DRIVE_BRIDGE_URL_PRIMARY }}
+          DRIVE_BRIDGE_HMAC_SECRET_PRIMARY: ${{ secrets.DRIVE_BRIDGE_HMAC_SECRET_PRIMARY }}
+          DRIVE_BRIDGE_URL_SECONDARY: ${{ secrets.DRIVE_BRIDGE_URL_SECONDARY }}
+          DRIVE_BRIDGE_HMAC_SECRET_SECONDARY: ${{ secrets.DRIVE_BRIDGE_HMAC_SECRET_SECONDARY }}
         run: |
           set -euo pipefail
           required=(
@@ -59,6 +58,8 @@ jobs:
 
       - name: Export the complete PostgreSQL database
         shell: bash
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/jfdrms-backup"
@@ -95,6 +96,7 @@ jobs:
 
       - name: Copy encrypted backup to primary Drive account
         env:
+          DRIVE_BRIDGE_URL_PRIMARY: ${{ secrets.DRIVE_BRIDGE_URL_PRIMARY }}
           DRIVE_BRIDGE_HMAC_SECRET_PRIMARY: ${{ secrets.DRIVE_BRIDGE_HMAC_SECRET_PRIMARY }}
         run: |
           python3 scripts/backup/upload_to_drive.py \
@@ -104,6 +106,7 @@ jobs:
 
       - name: Copy encrypted backup to secondary Drive account
         env:
+          DRIVE_BRIDGE_URL_SECONDARY: ${{ secrets.DRIVE_BRIDGE_URL_SECONDARY }}
           DRIVE_BRIDGE_HMAC_SECRET_SECONDARY: ${{ secrets.DRIVE_BRIDGE_HMAC_SECRET_SECONDARY }}
         run: |
           python3 scripts/backup/upload_to_drive.py \
