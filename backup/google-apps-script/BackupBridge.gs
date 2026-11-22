@@ -24,16 +24,16 @@ function doPost(e) {
     const signature = String(request.signature || '').toLowerCase();
     const encoded = String(request.data || '');
 
-    if (!/^\\d{10}$/.test(timestamp) ||
+    if (!/^\d{10}$/.test(timestamp) ||
         Math.abs(Math.floor(Date.now() / 1000) - Number(timestamp)) > 300 ||
-        !/^jfdrms-db-\\d{4}-\\d{2}-\\d{2}T\\d{6}Z\\.dump\\.gpg$/.test(filename) ||
+        !/^jfdrms-db-\d{4}-\d{2}-\d{2}T\d{6}Z\.dump\.gpg$/.test(filename) ||
         !/^[a-f0-9]{64}$/.test(sha256) ||
         !/^[a-f0-9]{64}$/.test(signature) || !encoded) {
       throw new Error('REQUEST_INVALID');
     }
 
     stage = 'AUTH';
-    const message = timestamp + '\\n' + filename + '\\n' + sha256;
+    const message = timestamp + '\n' + filename + '\n' + sha256;
     const expected = toHex_(Utilities.computeHmacSha256Signature(message, secret));
     if (!constantTimeEqual_(expected, signature)) throw new Error('AUTH_FAILED');
 
