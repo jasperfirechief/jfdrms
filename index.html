@@ -1434,6 +1434,7 @@ async function signupSpecialEvent(id){try{await specialEventRequest("signup",{ev
 async function adminAddSpecialEventPerson(id){const p=$("specialPerson_"+id)?.value;if(!p)return alert("Select personnel.");try{await specialEventRequest("admin_add",{event_id:id,personnel_id:Number(p)});await renderStaffCalendar();await renderStaffingCalendarDetails($("staffDate").value||today(),$("staffShift").value||"A")}catch(e){alert(e.message)}}
 async function removeSpecialEventPerson(id,pid){if(!confirm("Remove this person from the event?"))return;try{await specialEventRequest("remove",{event_id:id,personnel_id:pid});await renderStaffCalendar();await renderStaffingCalendarDetails($("staffDate").value||today(),$("staffShift").value||"A")}catch(e){alert(e.message)}}
 
+function staffingAssignmentsComplete(rows){return Array.isArray(rows)&&rows.length>0&&rows.every(x=>(x.daily_personnel_assignments||[]).some(p=>String(p.assignment_role||"").toLowerCase()==="driver"));}
 async function renderStaffCalendar(){
   const grid=$("staffCalendarGrid"),heading=$("staffCalendarMonth");if(!grid||!heading)return;
   const date=$("staffDate")?.value||today(),parts=staffDateParts(date);
@@ -1446,14 +1447,25 @@ async function renderStaffCalendar(){
   let eventMap={};try{const eb=await getSpecialEvents(from,to);for(const e of eb.events||[])(eventMap[e.event_date]??=[]).push(e)}catch(err){console.warn("Special event calendar fetch failed",err)}
   let shiftEventMap={};try{const se=await getShiftCalendarEvents(from,to);for(const e of se||[])(shiftEventMap[e.event_date]??=[]).push(e)}catch(err){console.warn("Scheduled shift event calendar fetch failed",err)}
   if(q.error){grid.innerHTML='<div class="col-span-7 text-sm text-amber-700 p-2">Could not load calendar records: '+esc(q.error.message)+'</div>';return}
-  staffCalendarRecords=new Set((q.data||[]).map(x=>String(x.staffing_date).slice(0,10)));
-  const staffingIds=(q.data||[]).map(x=>x.staffing_id).filter(Boolean);
-  const eventCounts=new Map();
+  const staffingRows=q.data||[];
+  const staffingIds=staffingRows.map(x=>x.staffing_id).filter(Boolean);
+  let assignedRows=[];
   if(staffingIds.length){
-    const ev=await db.from("daily_staffing_events").select("staffing_id,event_type").in("staffing_id",staffingIds);
+    const ar=await db.from("daily_app_assignments").select("staffing_id,assignment_id,daily_personnel_assignments(assignment_role)").in("staffing_id",staffingIds);
+    if(ar.error){grid.innerHTML='<div class="col-span-7 text-sm text-amber-700 p-2">Could not verify assigned personnel: '+esc(ar.error.message)+'</div>';return;}
+    assignedRows=ar.data||[];
+  }
+  const assignmentsByStaffing=new Map();
+  assignedRows.forEach(x=>{const id=Number(x.staffing_id);if(!assignmentsByStaffing.has(id))assignmentsByStaffing.set(id,[]);assignmentsByStaffing.get(id).push(x)});
+  const completeRows=staffingRows.filter(x=>staffingAssignmentsComplete(assignmentsByStaffing.get(Number(x.staffing_id))||[]));
+  staffCalendarRecords=new Set(completeRows.map(x=>String(x.staffing_date).slice(0,10)));
+  const completeIds=completeRows.map(x=>x.staffing_id).filter(Boolean);
+  const eventCounts=new Map();
+  if(completeIds.length){
+    const ev=await db.from("daily_staffing_events").select("staffing_id,event_type").in("staffing_id",completeIds);
     if(!ev.error)(ev.data||[]).forEach(x=>eventCounts.set(Number(x.staffing_id),(eventCounts.get(Number(x.staffing_id))||0)+1));
   }
-  const staffingIdByDate=new Map((q.data||[]).map(x=>[String(x.staffing_date).slice(0,10),Number(x.staffing_id)]));
+  const staffingIdByDate=new Map(completeRows.map(x=>[String(x.staffing_date).slice(0,10),Number(x.staffing_id)]));
   const cells=[];
   for(let i=0;i<start;i++)cells.push('<div class="min-h-16 rounded-lg bg-slate-50/70"></div>');
   for(let d=1;d<=days;d++){
@@ -1558,6 +1570,7 @@ async function renderStaffingCalendarDetails(date,shift){
     const a=await db.from("daily_app_assignments").select("station_id,apparatus_id,daily_personnel_assignments(assignment_role,personnel(first_name,last_name))").eq("staffing_id",s.data.staffing_id);
     if(a.error)throw a.error;
     const rows=a.data||[];
+    const staffingComplete=staffingAssignmentsComplete(rows);
     const ev=await db.from("daily_staffing_events").select("*,person:personnel!daily_staffing_events_personnel_id_fkey(first_name,last_name),replacement:personnel!daily_staffing_events_replacement_personnel_id_fkey(first_name,last_name)").eq("staffing_id",s.data.staffing_id).order("created_at");
     if(ev.error)throw ev.error;
     const sections=stations.map(st=>{
@@ -1580,7 +1593,8 @@ async function renderStaffingCalendarDetails(date,shift){
       return '<div class="rounded-lg border p-3 mb-2"><div class="font-semibold">'+esc(type)+'</div><div class="text-sm mt-1">'+esc((person?.first_name||"")+' '+(person?.last_name||""))+(replacement?' → '+esc(replacement.first_name+' '+replacement.last_name):'')+'</div><div class="text-xs text-slate-500 mt-1">'+esc([dateInfo,st?.station_name,ap?.unit_number,duration].filter(Boolean).join(' · '))+'</div>'+(x.notes?'<p class="text-sm mt-2">'+esc(x.notes)+'</p>':'')+'</div>';
     }).join("");
     const emailPanel=canStaff()&&staffEmailDateAllowed(date)?'<div class="card p-4 mt-5 border-blue-200 bg-blue-50"><h4 class="font-bold">Email Shift Personnel</h4><p class="text-xs text-slate-600 mb-3">Emails everyone on the shift assignments, including swaps and replacements. Your email is included automatically. Nothing is stored in the RMS.</p><label class="block text-sm font-semibold">Subject<input id="staffEmailSubject_'+date+'" class="block w-full border rounded p-2 mt-1" value="Jasper Fire Department Staffing — '+date+' '+shift+' Shift"></label><label class="block text-sm font-semibold mt-3">Message<textarea id="staffEmailMessage_'+date+'" rows="4" class="block w-full border rounded p-2 mt-1" placeholder="Enter your message to the shift personnel"></textarea></label><button type="button" onclick="sendStaffingCalendarEmail(\''+date+'\',\''+shift+'\')" class="bg-blue-700 text-white rounded px-4 py-2 font-bold mt-3">Email Shift Personnel</button></div>':'';
-    out.innerHTML='<h3 class="font-bold mb-3">'+esc(date)+' · '+esc(shift)+' Shift Staffing</h3>'+(sections||'<p class="text-sm text-slate-500">No apparatus assignments have been saved.</p>')+'<h4 class="font-bold mt-5 mb-2">Personnel Changes & Leave</h4>'+(eventHtml||'<p class="text-sm text-slate-500">No personnel changes or leave entries recorded.</p>')+emailPanel+specialHtml+shiftEventHtml;
+    const staffingStatus=staffingComplete?'<p class="text-sm font-bold text-green-700 mb-3">Staffing saved — every assigned apparatus has a driver.</p>':'<p class="text-sm font-semibold text-amber-700 mb-3">Staffing not saved. Assign a driver to every apparatus before this shift is considered staffed.</p>';
+    out.innerHTML='<h3 class="font-bold mb-3">'+esc(date)+' · '+esc(shift)+' Shift Staffing</h3>'+staffingStatus+(sections||'<p class="text-sm text-slate-500">No apparatus assignments have been saved.</p>')+'<h4 class="font-bold mt-5 mb-2">Personnel Changes & Leave</h4>'+(eventHtml||'<p class="text-sm text-slate-500">No personnel changes or leave entries recorded.</p>')+emailPanel+specialHtml+shiftEventHtml;
   }catch(err){out.innerHTML='<p class="text-sm text-red-700">Unable to load staffing: '+esc(err.message||String(err))+'</p>'}
 }
 window.selectStaffCalendarDate=selectStaffCalendarDate;
