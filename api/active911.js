@@ -15,8 +15,8 @@ async function handleJfdAssistant(req, res) {
     const token = authorization.match(/^Bearer\s+(.+)$/i)?.[1];
     if (!token) return res.status(401).json({ error: "Please sign in again." });
 
-    const authResponse = await fetch(SUPABASE_URL + "/auth/v1/user", {
-      headers: { apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + token }
+    const authResponse = await fetch(ASSISTANT_SUPABASE_URL + "/auth/v1/user", {
+      headers: { apikey: ASSISTANT_SUPABASE_ANON_KEY, Authorization: "Bearer " + token }
     });
     if (!authResponse.ok) return res.status(401).json({ error: "Your RMS session is not valid. Please sign in again." });
     const authUser = await authResponse.json();
@@ -30,7 +30,7 @@ async function handleJfdAssistant(req, res) {
     if (!openaiKey) return res.status(503).json({ error: "The assistant is installed but needs an OpenAI API key in the Vercel project settings." });
 
     const profileResponse = await fetch(
-      SUPABASE_URL + "/rest/v1/users?user_id=eq." + encodeURIComponent(authUser.id) + "&select=user_id,email,app_role,active&limit=1",
+      ASSISTANT_SUPABASE_URL + "/rest/v1/users?user_id=eq." + encodeURIComponent(authUser.id) + "&select=user_id,email,app_role,active&limit=1",
       { headers: { apikey: serviceKey, Authorization: "Bearer " + serviceKey } }
     );
     if (!profileResponse.ok) throw new Error("Unable to verify the RMS user profile.");
@@ -93,8 +93,8 @@ async function handleJfdAssistant(req, res) {
 }
 
 
-const SUPABASE_URL = "https://audgtwcctdoiptuekqvn.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz";
+const ASSISTANT_SUPABASE_URL = "https://audgtwcctdoiptuekqvn.supabase.co";
+const ASSISTANT_SUPABASE_ANON_KEY = "sb_publishable_oiWaymVcSB3UuhzNsO5kSg_ghVfnOwz";
 
 export default async function handler(req, res) {
   if (req.query?.assistant === "1") return handleJfdAssistant(req, res);
