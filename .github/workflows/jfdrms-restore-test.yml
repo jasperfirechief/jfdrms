@@ -83,19 +83,30 @@ jobs:
           docker run --rm \
             --volume "$RUNNER_TEMP/jfdrms-restore:/restore" \
             postgres:17-alpine \
-            sh -euc '
-              pg_restore --list /restore/backup.dump > /restore/archive-list.txt
-              test -s /restore/archive-list.txt
-              grep -v " EVENT TRIGGER " /restore/archive-list.txt \
-                | grep -vE " SCHEMA (- )?(public|auth|storage|realtime|extensions|graphql|graphql_public|net|pgbouncer|pgsodium|supabase_functions|supabase_migrations|vault|cron)( |$)" \
-                | grep -v " EXTENSION " \
-                > /restore/restore-list.txt
-              test -s /restore/restore-list.txt
-              excluded_triggers=$(grep -c " EVENT TRIGGER " /restore/archive-list.txt || true)
-              excluded_managed_schemas=$(grep -Ec " SCHEMA (- )?(public|auth|storage|realtime|extensions|graphql|graphql_public|net|pgbouncer|pgsodium|supabase_functions|supabase_migrations|vault|cron)( |$)" /restore/archive-list.txt || true)
-              excluded_extensions=$(grep -c " EXTENSION " /restore/archive-list.txt || true)
-              echo "Encrypted archive validated; excluded $excluded_triggers platform event triggers, $excluded_managed_schemas managed schema definitions, and $excluded_extensions extension entries."
-            '
+            python3 -c 'import re,sys
+managed={"auth","storage","realtime","extensions","graphql","graphql_public","net","pgbouncer","pgsodium","supabase_functions","supabase_migrations","vault","cron"}
+src="/restore/archive-list.txt"; dst="/restore/restore-list.txt"
+import subprocess
+with open(src,"w") as f: subprocess.run(["pg_restore","--schema=public","--list","/restore/backup.dump"],stdout=f,check=True)
+kept=[]; counts={"managed_schema_objects":0,"schema_definitions":0,"extensions":0,"event_triggers":0}
+entry=re.compile(r"^\s*;\s+\d+;\s+\d+(?:\s+\d+)?\s+(\S+)\s+(\S+)\s+(\S+)")
+for line in open(src):
+    if " EVENT TRIGGER " in line: counts["event_triggers"]+=1; continue
+    if " EXTENSION " in line: counts["extensions"]+=1; continue
+    m=entry.match(line)
+    if m:
+        kind, schema, name=m.groups()
+        if kind=="SCHEMA":
+            if name=="public" or name in managed: counts["schema_definitions"]+=1; continue
+        elif schema in managed:
+            counts["managed_schema_objects"]+=1; continue
+    if re.search(r"\bSCHEMA\s+(?:"+"|".join(map(re.escape,managed)) + r")\b",line):
+        counts["managed_schema_objects"]+=1; continue
+    kept.append(line)
+if not kept: raise SystemExit("No restorable entries remain in archive")
+with open(dst,"w") as f: f.writelines(kept)
+print("Archive validated; TOC entries retained:",len(kept),"; exclusions:",counts)
+'
 
       - name: Restore into isolated JFD RMS database
         shell: bash
@@ -108,7 +119,7 @@ jobs:
             --env RESTORE_TEST_SUPABASE_DB_URL \
             --volume "$RUNNER_TEMP/jfdrms-restore:/restore:ro" \
             postgres:17-alpine \
-            sh -euc 'pg_restore --use-list=/restore/restore-list.txt --exclude-schema=auth --exclude-schema=storage --exclude-schema=realtime --exclude-schema=extensions --exclude-schema=graphql --exclude-schema=graphql_public --exclude-schema=net --exclude-schema=pgbouncer --exclude-schema=pgsodium --exclude-schema=supabase_functions --exclude-schema=supabase_migrations --exclude-schema=vault --exclude-schema=cron --verbose --no-owner --no-acl --exit-on-error --dbname="$RESTORE_TEST_SUPABASE_DB_URL" /restore/backup.dump'
+            sh -euc 'pg_restore --use-list=/restore/restore-list.txt --verbose --no-owner --no-acl --exit-on-error --dbname="$RESTORE_TEST_SUPABASE_DB_URL" /restore/backup.dump'
 
       - name: Verify restored database responds
         shell: bash
