@@ -33,7 +33,7 @@ function doPost(e) {
 
     if (!/^\d{10}$/.test(timestamp) ||
         Math.abs(Math.floor(Date.now() / 1000) - Number(timestamp)) > 300 ||
-        !/^jfdrms-db-\d{4}-\d{2}-\d{2}T\d{6}Z\.dump\.age$/.test(filename) ||
+        !/^jfdrms-db-\d{4}-\d{2}-\d{2}T\d{6}Z\.dump\.gpg$/.test(filename) ||
         !/^[a-f0-9]{64}$/.test(sha256) ||
         !/^[a-f0-9]{64}$/.test(signature) ||
         !encoded) {
