@@ -1,4 +1,10 @@
 {
+  "rewrites": [
+    {
+      "source": "/api/jfd-assistant",
+      "destination": "/api/active911?assistant=1"
+    }
+  ],
   "crons": [
     {
       "path": "/api/daily-report-email",
