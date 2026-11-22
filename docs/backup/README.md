@@ -15,7 +15,7 @@ The current database is PostgreSQL 17.6; the workflow uses a PostgreSQL 17 clien
 
 - This database stage does **not** copy the actual bytes of files stored in Supabase Storage. A database dump can include Storage metadata, but it does not include the objects themselves. Preplan photos and inspection attachments need a separate file-backup stage to Account 3.
 - This does not yet create monthly archives, retention cleanup, or a restore test.
-- The workflow is not active on the live/default branch. It is staged on this branch and cannot run on its daily schedule until it is reviewed and merged to `main`.
+- The workflow is staged on this branch. Its automatic schedule is intentionally disabled until upload and restore tests pass. After it is reviewed and merged to `main`, it can be run manually with `workflow_dispatch`.
 - Do not rely on backups until a real upload to both Drive accounts and a restore into an isolated Supabase project have been verified.
 
 ## 1. Configure the Apps Script receiver in Drive Account 1
@@ -64,7 +64,7 @@ After the Apps Script deployments and all six GitHub secrets are configured:
 4. Confirm the run succeeds and that the same encrypted `.dump.gpg` file appears in both Drive accounts' `Database Backups` folders.
 5. Do not merge to `main` or enable the daily schedule until the test upload and a separate restore test have been reviewed.
 
-The workflow is configured for 2:00 AM daily in the `America/Chicago` timezone. GitHub Actions timezone-aware scheduling adjusts automatically between Central Standard Time and Central Daylight Time. Scheduled workflows run only from the default branch.
+The automatic schedule is intentionally disabled during initial testing. After successful upload to both Drive accounts and a verified isolated restore, add a Central-time schedule in a separate reviewed change. This avoids activating recurring production database exports before the end-to-end path is proven.
 
 ## Security notes
 
