@@ -30,14 +30,13 @@ async function handleJfdAssistant(req, res) {
     if (!openaiKey) return res.status(503).json({ error: "The assistant is installed but needs an OpenAI API key in the Vercel project settings." });
 
     const profileResponse = await fetch(
-      ASSISTANT_SUPABASE_URL + "/rest/v1/users?user_id=eq." + encodeURIComponent(authUser.id) + "&select=user_id,email,app_role,active&limit=1",
+      ASSISTANT_SUPABASE_URL + "/rest/v1/users?user_id=eq." + encodeURIComponent(authUser.id) + "&select=user_id,app_role,active&limit=1",
       { headers: { apikey: serviceKey, Authorization: "Bearer " + serviceKey } }
     );
     if (!profileResponse.ok) throw new Error("Unable to verify the RMS user profile.");
     const profiles = await profileResponse.json();
     const profile = profiles[0];
-    if (!profile || profile.active !== true || profile.app_role !== "admin" ||
-        String(profile.email || "").toLowerCase() !== CHIEF_EMAIL) {
+    if (!profile || profile.active !== true || profile.app_role !== "admin") {
       return res.status(403).json({ error: "Your account is not authorized to use JFD Assistant." });
     }
 
@@ -57,7 +56,7 @@ async function handleJfdAssistant(req, res) {
       method: "POST",
       headers: { Authorization: "Bearer " + openaiKey, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: process.env.JFD_ASSISTANT_MODEL || "gpt-6-luna",
+        model: process.env.JFD_ASSISTANT_MODEL || "gpt-6.2-sol",
         store: false,
         max_output_tokens: 900,
         instructions: [
