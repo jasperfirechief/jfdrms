@@ -78,8 +78,9 @@ function doPost(e) {
     return json_({ ok: true, fileId: file.getId(), name: file.getName(),
                    size: file.getSize() });
   } catch (err) {
-    // Do not return internal details or secrets to the caller.
-    return json_({ ok: false, error: 'Backup upload rejected. Check Apps Script execution log.' });
+    // Log only the error class; never log request data, identifiers, or secrets.
+    console.error('JFD backup bridge rejected a request: ' + (err && err.name ? err.name : 'Error'));
+    return json_({ ok: false, error: 'Backup upload rejected. Check Apps Script executions.' });
   }
 }
 
