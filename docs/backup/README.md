@@ -64,7 +64,7 @@ After the Apps Script deployments and all six GitHub secrets are configured:
 4. Confirm the run succeeds and that the same encrypted `.dump.gpg` file appears in both Drive accounts' `Database Backups` folders.
 5. Do not merge to `main` or enable the daily schedule until the test upload and a separate restore test have been reviewed.
 
-The workflow is configured for 13:15 UTC daily (07:15 Central Standard Time; 08:15 during daylight time) once it is on the default branch. GitHub scheduled workflows use UTC.
+The workflow is configured for 2:00 AM daily in the `America/Chicago` timezone. GitHub Actions timezone-aware scheduling adjusts automatically between Central Standard Time and Central Daylight Time. Scheduled workflows run only from the default branch.
 
 ## Security notes
 
