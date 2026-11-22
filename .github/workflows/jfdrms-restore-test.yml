@@ -87,14 +87,14 @@ jobs:
               pg_restore --list /restore/backup.dump > /restore/archive-list.txt
               test -s /restore/archive-list.txt
               grep -v " EVENT TRIGGER " /restore/archive-list.txt \
-                | grep -vE " SCHEMA (- )?public( |$)" \
+                | grep -vE " SCHEMA (- )?(public|auth|storage|realtime|extensions|graphql|graphql_public|net|pgbouncer|pgsodium|supabase_functions|supabase_migrations|vault|cron)( |$)" \
                 | grep -v " EXTENSION " \
                 > /restore/restore-list.txt
               test -s /restore/restore-list.txt
               excluded_triggers=$(grep -c " EVENT TRIGGER " /restore/archive-list.txt || true)
-              excluded_public_schema=$(grep -Ec " SCHEMA (- )?public( |$)" /restore/archive-list.txt || true)
+              excluded_managed_schemas=$(grep -Ec " SCHEMA (- )?(public|auth|storage|realtime|extensions|graphql|graphql_public|net|pgbouncer|pgsodium|supabase_functions|supabase_migrations|vault|cron)( |$)" /restore/archive-list.txt || true)
               excluded_extensions=$(grep -c " EXTENSION " /restore/archive-list.txt || true)
-              echo "Encrypted archive validated; excluded $excluded_triggers platform event triggers, $excluded_public_schema existing public-schema definition, and $excluded_extensions extension entries."
+              echo "Encrypted archive validated; excluded $excluded_triggers platform event triggers, $excluded_managed_schemas managed schema definitions, and $excluded_extensions extension entries."
             '
 
       - name: Restore into isolated JFD RMS database
