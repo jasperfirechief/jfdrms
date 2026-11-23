@@ -42,10 +42,15 @@ def find_object(root, date, bucket, path, digest):
     return found[0]["id"]
 
 def object_exists(base, bucket, path):
-    r = HTTP.head(f"{base}/storage/v1/object/{bucket}/{enc(path)}", headers=storage_headers(), timeout=120)
+    # Use Storage's metadata endpoint for an existence check. HEAD on the
+    # object-download endpoint can return a generic 400 for missing objects.
+    url = f"{base}/storage/v1/object/info/{bucket}/{enc(path)}"
+    r = HTTP.get(url, headers=storage_headers(), timeout=120)
     if r.status_code == 404:
         return False
-    r.raise_for_status()
+    if not r.ok:
+        detail = (r.text or "")[:1000]
+        raise RuntimeError(f"Supabase Storage existence check failed ({r.status_code}): {detail}")
     return True
 
 def restore_object(base, bucket, path, data, mime):
