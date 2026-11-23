@@ -172,15 +172,38 @@ jobs:
 
             -- Views can also block table removal. They are recreated from the backup.
             FOR obj IN
-              SELECT schemaname, viewname FROM pg_views WHERE schemaname = 'public'
+              SELECT v.schemaname, v.viewname
+              FROM pg_views v
+              JOIN pg_class c ON c.relname = v.viewname
+              JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = v.schemaname
+              WHERE v.schemaname = 'public'
+                AND NOT EXISTS (
+                  SELECT 1
+                  FROM pg_depend d
+                  WHERE d.classid = 'pg_class'::regclass
+                    AND d.objid = c.oid
+                    AND d.refclassid = 'pg_extension'::regclass
+                    AND d.deptype = 'e'
+                )
             LOOP
               EXECUTE format('DROP VIEW IF EXISTS %I.%I CASCADE',
                              obj.schemaname, obj.viewname);
             END LOOP;
 
             FOR obj IN
-              SELECT schemaname, matviewname
-              FROM pg_matviews WHERE schemaname = 'public'
+              SELECT m.schemaname, m.matviewname
+              FROM pg_matviews m
+              JOIN pg_class c ON c.relname = m.matviewname
+              JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = m.schemaname
+              WHERE m.schemaname = 'public'
+                AND NOT EXISTS (
+                  SELECT 1
+                  FROM pg_depend d
+                  WHERE d.classid = 'pg_class'::regclass
+                    AND d.objid = c.oid
+                    AND d.refclassid = 'pg_extension'::regclass
+                    AND d.deptype = 'e'
+                )
             LOOP
               EXECUTE format('DROP MATERIALIZED VIEW IF EXISTS %I.%I CASCADE',
                              obj.schemaname, obj.matviewname);
