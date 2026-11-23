@@ -134,7 +134,7 @@ function doGet(e) {
  * Expired files are moved to Drive Trash (recoverable), never hard-deleted.
  */
 function applyRetention_(folder) {
-  const pattern = /^jfdrms-db-(\\d{4}-\\d{2}-\\d{2})T(\\d{6})Z\\.dump\\.gpg$/;
+  const pattern = /^jfdrms-db-(\d{4}-\d{2}-\d{2})T(\d{6})Z\.dump\.gpg$/;
   const files = [];
   const iterator = folder.getFiles();
   while (iterator.hasNext()) {
