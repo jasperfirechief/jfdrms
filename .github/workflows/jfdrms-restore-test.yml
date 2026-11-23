@@ -122,6 +122,7 @@ jobs:
             | grep -v ' FK CONSTRAINT public neris_submissions neris_submissions_submitted_by_fkey ' \
             | grep -v ' FK CONSTRAINT public personnel personnel_auth_user_id_fkey ' \
             | grep -v ' FK CONSTRAINT public inspections inspections_inspector_user_id_fkey ' \
+            | grep -v ' FK CONSTRAINT public preincident_plans preincident_plans_created_by_fkey ' \
             > "$RUNNER_TEMP/jfdrms-restore/restore-list.txt"
           test -s "$RUNNER_TEMP/jfdrms-restore/restore-list.txt"
           echo "Encrypted backup decrypted and PostgreSQL archive validated; Supabase-managed event triggers and auth.users foreign keys excluded."
