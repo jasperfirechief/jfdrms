@@ -1,9 +1,6 @@
-name: JFDRMS Daily Supabase to Neon Mirror
+name: JFDRMS Neon Database Mirror (Manual Test Only)
 
 on:
-  schedule:
-    - cron: '0 3 * * *'
-      timezone: 'America/Chicago'
   workflow_dispatch:
 
 permissions:
@@ -15,7 +12,7 @@ concurrency:
 
 jobs:
   neon-restore:
-    name: Refresh dedicated JFD RMS Neon mirror from production
+    name: Manual database-only mirror test (not full disaster recovery)
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
