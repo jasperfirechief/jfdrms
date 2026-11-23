@@ -125,8 +125,11 @@ jobs:
           u = urlparse(sys.argv[1])
           user = unquote(u.username or "")
           host = (u.hostname or "").lower()
-          expected_host = "ep-still-cherry-bdt94wqc.c-8.us-east-2.aws.neon.tech"
-          if host != expected_host:
+          expected_hosts = {
+              "ep-still-cherry-bdt94wqc.c-8.us-east-2.aws.neon.tech",
+              "ep-still-cherry-bdt94wqc-pooler.c-8.us-east-2.aws.neon.tech",
+          }
+          if host not in expected_hosts:
               raise SystemExit("Restore blocked: destination is not the approved JFD RMS Neon mirror endpoint.")
           if "audgtwcctdoiptuekqvn" in sys.argv[1]:
               raise SystemExit("Restore blocked: live production project reference detected.")
