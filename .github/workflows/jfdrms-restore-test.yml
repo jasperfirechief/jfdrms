@@ -191,6 +191,19 @@ jobs:
                              obj.nspname, obj.relname, obj.conname);
             END LOOP;
 
+            -- RLS policies can depend on public.users (for example policies
+            -- that call auth.uid() and query users). Remove all application-schema
+            -- policies before pg_restore drops/recreates the tables; the backup
+            -- recreates them in the post-data section.
+            FOR obj IN
+              SELECT schemaname, tablename, policyname
+              FROM pg_policies
+              WHERE schemaname = 'public'
+            LOOP
+              EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I',
+                             obj.policyname, obj.schemaname, obj.tablename);
+            END LOOP;
+
             -- Views can also block table removal. They are recreated from the backup.
             FOR obj IN
               SELECT v.schemaname, v.viewname
