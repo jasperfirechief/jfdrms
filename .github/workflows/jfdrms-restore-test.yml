@@ -148,7 +148,46 @@ jobs:
           set -euo pipefail
           # Restore only the JFDRMS application schema. Supabase-managed schemas
           # such as auth, storage, and realtime must remain under platform ownership.
-          # Keep the staged order so post-data objects are applied after tables/data.
+          # Remove dependencies left by earlier/partial test restores before pg_restore
+          # drops and recreates the application's tables.
+          docker run --rm --env RESTORE_TEST_DB_URL postgres:17-alpine \
+            psql "$RESTORE_TEST_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE
+            obj record;
+          BEGIN
+            -- Foreign keys can prevent pg_restore from dropping referenced tables
+            -- during its pre-data cleanup pass.
+            FOR obj IN
+              SELECT n.nspname, t.relname, c.conname
+              FROM pg_constraint c
+              JOIN pg_class t ON t.oid = c.conrelid
+              JOIN pg_namespace n ON n.oid = t.relnamespace
+              WHERE n.nspname = 'public' AND c.contype = 'f'
+            LOOP
+              EXECUTE format('ALTER TABLE %I.%I DROP CONSTRAINT IF EXISTS %I',
+                             obj.nspname, obj.relname, obj.conname);
+            END LOOP;
+
+            -- Views can also block table removal. They are recreated from the backup.
+            FOR obj IN
+              SELECT schemaname, viewname FROM pg_views WHERE schemaname = 'public'
+            LOOP
+              EXECUTE format('DROP VIEW IF EXISTS %I.%I CASCADE',
+                             obj.schemaname, obj.viewname);
+            END LOOP;
+
+            FOR obj IN
+              SELECT schemaname, matviewname
+              FROM pg_matviews WHERE schemaname = 'public'
+            LOOP
+              EXECUTE format('DROP MATERIALIZED VIEW IF EXISTS %I.%I CASCADE',
+                             obj.schemaname, obj.matviewname);
+            END LOOP;
+          END
+          $$;
+          SQL
+          # Keep staged order: tables first, then data, then policies/indexes/constraints.
           docker run --rm \
             --env RESTORE_TEST_DB_URL \
             --volume "$RUNNER_TEMP/jfdrms-restore:/restore:ro" \
@@ -165,6 +204,7 @@ jobs:
               --dbname="$RESTORE_TEST_DB_URL" /restore/jfdrms.dump
           docker run --rm \
             --env RESTORE_TEST_DB_URL \
+            --volume "$RUNNER_TEMP/jfdrms-restore:/restore:ro" \
             --volume "$RUNNER_TEMP/jfdrms-restore:/restore:ro" \
             postgres:17-alpine \
             pg_restore --exit-on-error --verbose --clean --if-exists --no-owner --no-acl \
