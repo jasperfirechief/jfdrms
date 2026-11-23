@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Back up every object in the JFDRMS Supabase Storage buckets to Google Drive.
 
-The service-role key and Google service-account JSON are read only from environment
-secrets. No object bytes, credentials, or signed URLs are logged.
+The Supabase service-role key and Google Drive OAuth refresh credentials are read only
+from environment secrets. No object bytes, credentials, or signed URLs are logged.
 """
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from io import BytesIO
 from zoneinfo import ZoneInfo
 
 import requests
-from google.oauth2.service_account import Credentials
+from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 
 EXPECTED_PRODUCTION_PROJECT_REF = "audgtwcctdoiptuekqvn"
@@ -37,14 +37,24 @@ def required(name: str) -> str:
     return value
 
 
+DRIVE_CREDS = None
+
+
 def drive_headers() -> dict[str, str]:
-    raw = required("GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON")
-    info = json.loads(raw)
-    creds = Credentials.from_service_account_info(
-        info, scopes=["https://www.googleapis.com/auth/drive"]
-    )
-    creds.refresh(Request())
-    return {"Authorization": f"Bearer {creds.token}"}
+    """Refresh a user-authorized Google Drive OAuth token when needed."""
+    global DRIVE_CREDS
+    if DRIVE_CREDS is None:
+        DRIVE_CREDS = Credentials(
+            token=None,
+            refresh_token=required("GOOGLE_DRIVE_REFRESH_TOKEN"),
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=required("GOOGLE_DRIVE_CLIENT_ID"),
+            client_secret=required("GOOGLE_DRIVE_CLIENT_SECRET"),
+            scopes=["https://www.googleapis.com/auth/drive"],
+        )
+    if not DRIVE_CREDS.valid:
+        DRIVE_CREDS.refresh(Request())
+    return {"Authorization": f"Bearer {DRIVE_CREDS.token}"}
 
 
 def drive_request(method: str, url: str, **kwargs):
