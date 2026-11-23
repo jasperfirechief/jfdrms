@@ -73,3 +73,20 @@ The automatic schedule is intentionally disabled during initial testing. After s
 - The Apps Script receiver accepts only encrypted backup filenames, validates the HMAC and SHA-256 checksum, limits the decoded file to 32 MiB, and does not log the request body.
 - The workflow uses no GitHub artifact storage for database contents.
 - GitHub-hosted runners are temporary. The workflow deletes its local working backup files at the end of the job.
+
+
+## 5. Isolated restore test (manual only)
+
+The restore workflow is `.github/workflows/jfdrms-restore-test.yml`. It is intentionally manual and requires an exact encrypted backup filename plus a choice of Drive account.
+
+Before running it:
+
+1. Update the `BackupBridge.gs` source in both existing Apps Script projects with the current version from this branch. This adds an authenticated, filename-specific download action while retaining the upload endpoint. Save and deploy a **new version** of each existing Web App deployment; keep the same Script Properties and each account's separate HMAC secret. Do not create a new deployment URL unless you also update the matching GitHub secret.
+2. Add GitHub Actions repository secret `RESTORE_TEST_DB_URL` using the PostgreSQL Session Pooler connection string for the isolated Supabase project `thzqamsxjktgrturrymo`. The pooler username must include `.thzqamsxjktgrturrymo`. Never use the production project connection string.
+3. Keep `BACKUP_ENCRYPTION_PASSPHRASE` and the four Drive bridge secrets configured as described above.
+4. Confirm the selected filename exists in the selected Drive folder and is the same backup that was uploaded to both accounts.
+5. Run the restore workflow manually, selecting that exact filename and one Drive account.
+
+The workflow has two independent target guards and accepts only the known isolated project reference. It downloads one named encrypted file, checks its SHA-256, decrypts it, validates the PostgreSQL archive, then performs a clean restore **only** into the isolated test project. It verifies that public tables exist. The workflow never targets the live production project and does not run against the app deployment.
+
+A successful run proves the database archive can be retrieved, decrypted, and restored to the isolated project. It does not prove Supabase Storage object files are backed up; those require a separate backup stage. Keep this workflow manual. Do not add a schedule or merge backup automation into the production branch until the end-to-end test is reviewed.
