@@ -157,7 +157,7 @@ jobs:
           # This is an isolated test database: these roles/functions do not provide login.
           docker run --rm -i --env RESTORE_TEST_DB_URL postgres:17-alpine \
             psql "$RESTORE_TEST_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
-          DO $
+          DO $$
           BEGIN
             IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon NOLOGIN; END IF;
             IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF;
@@ -165,7 +165,7 @@ jobs:
           END $;
           CREATE SCHEMA IF NOT EXISTS auth;
           CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid
-            LANGUAGE sql STABLE AS $
+            LANGUAGE sql STABLE AS $$
               SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid
             $;
           SQL
