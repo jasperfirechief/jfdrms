@@ -51,10 +51,17 @@ def object_exists(base, bucket, path):
 def restore_object(base, bucket, path, data, mime):
     h = storage_headers()
     h.update({"Content-Type": mime or "application/octet-stream", "x-upsert":"false"})
-    r = HTTP.post(f"{base}/storage/v1/object/{bucket}/{enc(path)}", headers=h, data=data, timeout=300)
-    r.raise_for_status()
-    check = HTTP.get(f"{base}/storage/v1/object/{bucket}/{enc(path)}", headers=storage_headers(), timeout=300)
-    check.raise_for_status()
+    url = f"{base}/storage/v1/object/{bucket}/{enc(path)}"
+    r = HTTP.post(url, headers=h, data=data, timeout=300)
+    if not r.ok:
+        # Include Supabase's response detail in Actions logs; HTTPError alone
+        # hides the actionable Storage API error message.
+        detail = (r.text or "")[:1000]
+        raise RuntimeError(f"Supabase Storage upload rejected ({r.status_code}): {detail}")
+    check = HTTP.get(url, headers=storage_headers(), timeout=300)
+    if not check.ok:
+        detail = (check.text or "")[:1000]
+        raise RuntimeError(f"Supabase Storage read-back failed ({check.status_code}): {detail}")
     return hashlib.sha256(check.content).hexdigest()
 
 def main():
