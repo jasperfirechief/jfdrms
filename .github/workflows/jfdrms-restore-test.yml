@@ -178,6 +178,17 @@ jobs:
           DECLARE
             obj record;
           BEGIN
+            -- Existing RLS policies can depend on tables being replaced (notably
+            -- public.users). Drop application policies first; pg_restore recreates them.
+            FOR obj IN
+              SELECT schemaname, tablename, policyname
+              FROM pg_policies
+              WHERE schemaname = 'public'
+            LOOP
+              EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I',
+                             obj.policyname, obj.schemaname, obj.tablename);
+            END LOOP;
+
             -- Foreign keys can prevent pg_restore from dropping referenced tables
             -- during its pre-data cleanup pass.
             FOR obj IN
