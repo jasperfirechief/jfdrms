@@ -1,0 +1,267 @@
+name: JFDRMS Daily Supabase to Neon Mirror
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+      timezone: 'America/Chicago'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jfdrms-neon-daily-sync
+  cancel-in-progress: false
+
+jobs:
+  neon-restore:
+    name: Refresh dedicated JFD RMS Neon mirror from production
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out backup scripts
+        uses: actions/checkout@v4
+
+      - name: Verify production source and Neon destination
+        shell: bash
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          NEON_RESTORE_DB_URL: ${{ secrets.NEON_RESTORE_DB_URL }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_DB_URL" || { echo "::error::Missing SUPABASE_DB_URL"; exit 1; }
+          test -n "$NEON_RESTORE_DB_URL" || { echo "::error::Missing NEON_RESTORE_DB_URL"; exit 1; }
+          python3 - "$SUPABASE_DB_URL" "$NEON_RESTORE_DB_URL" <<'PY'
+          import sys
+          from urllib.parse import urlparse, unquote
+          source, target = [urlparse(x) for x in sys.argv[1:]]
+          source_user = unquote(source.username or "")
+          source_host = (source.hostname or "").lower()
+          expected_project = "audgtwcctdoiptuekqvn"
+          source_direct = source_host == f"db.{expected_project}.supabase.co"
+          source_pooler = source_host.endswith(".pooler.supabase.com") and source_user == f"postgres.{expected_project}"
+          if source.scheme not in ("postgres", "postgresql") or not (source_direct or source_pooler):
+              raise SystemExit("Refusing sync: source is not positively identified as Jasper FD production.")
+          target_host = (target.hostname or "").lower()
+          expected_targets = {
+              "ep-still-cherry-bdt94wqc.c-8.us-east-2.aws.neon.tech",
+              "ep-still-cherry-bdt94wqc-pooler.c-8.us-east-2.aws.neon.tech",
+          }
+          if target.scheme not in ("postgres", "postgresql") or target_host not in expected_targets:
+              raise SystemExit("Refusing sync: destination is not the approved JFD RMS Neon mirror.")
+          if expected_project in sys.argv[2]:
+              raise SystemExit("Refusing sync: Neon destination URL contains the production Supabase project reference.")
+          print("Verified source: Jasper FD production Supabase.")
+          print("Verified destination: dedicated JFD RMS Neon mirror.")
+          PY
+
+      - name: Export current production database
+        shell: bash
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/jfdrms-restore"
+          docker run --rm --env SUPABASE_DB_URL \
+            --volume "$RUNNER_TEMP/jfdrms-restore:/restore" \
+            postgres:17-alpine \
+            sh -euc 'pg_dump --no-owner --no-acl --format=custom --file=/restore/jfdrms.dump "$SUPABASE_DB_URL"'
+          test -s "$RUNNER_TEMP/jfdrms-restore/jfdrms.dump"
+          echo "Exported current Jasper FD production database."
+
+      - name: Validate PostgreSQL archive and filter platform-only objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --volume "$RUNNER_TEMP/jfdrms-restore:/restore" postgres:17-alpine \
+            pg_restore --list /restore/jfdrms.dump > "$RUNNER_TEMP/jfdrms-restore/archive-list.txt"
+          test -s "$RUNNER_TEMP/jfdrms-restore/archive-list.txt"
+          docker run --rm --volume "$RUNNER_TEMP/jfdrms-restore:/restore" postgres:17-alpine \
+            pg_restore --schema=public --section=post-data --file=/restore/post-data.sql /restore/jfdrms.dump
+          python3 - "$RUNNER_TEMP/jfdrms-restore/archive-list.txt" \
+            "$RUNNER_TEMP/jfdrms-restore/post-data.sql" \
+            "$RUNNER_TEMP/jfdrms-restore/restore-list.txt" <<'PY'
+          import re
+          import sys
+          archive_path, sql_path, output_path = sys.argv[1:]
+          sql = open(sql_path, encoding="utf-8").read()
+          pattern = re.compile(
+              r'ALTER TABLE ONLY\\s+(?:public\\.)?("[^"]+"|[\\w.]+)\\s+'
+              r'ADD CONSTRAINT\\s+("[^"]+"|[^\\s]+)\\s+'
+              r'[^;]*?\\bREFERENCES\\s+auth\\.users\\b',
+              re.IGNORECASE | re.DOTALL,
+          )
+          excluded = set()
+          for match in pattern.finditer(sql):
+              excluded.add((match.group(1).split(".")[-1].strip('"'), match.group(2).strip('"')))
+          if not excluded:
+              raise SystemExit("Could not identify auth.users foreign keys; refusing unfiltered restore.")
+          kept = skipped = 0
+          with open(archive_path, encoding="utf-8") as source, open(output_path, "w", encoding="utf-8") as target:
+              for line in source:
+                  if " EVENT TRIGGER " in line:
+                      skipped += 1
+                      continue
+                  match = re.search(r"\\bFK CONSTRAINT public (\\S+) (\\S+)", line)
+                  if match and (match.group(1), match.group(2)) in excluded:
+                      skipped += 1
+                      continue
+                  target.write(line)
+                  kept += 1
+          if not kept:
+              raise SystemExit("Filtered PostgreSQL restore list is empty.")
+          print(f"Archive validated; excluded {len(excluded)} auth.users foreign keys and Supabase event triggers.")
+          PY
+          test -s "$RUNNER_TEMP/jfdrms-restore/restore-list.txt"
+
+      - name: Re-check target guard immediately before restore
+        env:
+          NEON_RESTORE_DB_URL: ${{ secrets.NEON_RESTORE_DB_URL }}
+        run: |
+          set -euo pipefail
+          python3 - "$NEON_RESTORE_DB_URL" <<'PY'
+          import sys
+          from urllib.parse import urlparse, unquote
+          u = urlparse(sys.argv[1])
+          user = unquote(u.username or "")
+          host = (u.hostname or "").lower()
+          expected_host = "ep-still-cherry-bdt94wqc.c-8.us-east-2.aws.neon.tech"
+          if host != expected_host:
+              raise SystemExit("Restore blocked: destination is not the approved JFD RMS Neon mirror endpoint.")
+          if "audgtwcctdoiptuekqvn" in sys.argv[1]:
+              raise SystemExit("Restore blocked: live production project reference detected.")
+          PY
+
+      - name: Restore into Neon backup mirror
+        env:
+          NEON_RESTORE_DB_URL: ${{ secrets.NEON_RESTORE_DB_URL }}
+        run: |
+          set -euo pipefail
+          # Neon is a database mirror, not a Supabase platform. Provide the minimum
+          # auth.uid() and role names required to recreate RLS policies and helper functions.
+          # These stubs do not authenticate users and this mirror is not app-connected.
+          docker run --rm -i --env NEON_RESTORE_DB_URL postgres:17-alpine \
+            psql "$NEON_RESTORE_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon NOLOGIN; END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN CREATE ROLE service_role NOLOGIN; END IF;
+          END $$;
+          CREATE SCHEMA IF NOT EXISTS auth;
+          CREATE SCHEMA IF NOT EXISTS private;
+          CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid
+            LANGUAGE sql STABLE AS $$
+              SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid
+            $$;
+          SQL
+          # Restore only the JFDRMS application schema. Supabase-managed schemas
+          # such as auth, storage, and realtime must remain under platform ownership.
+          # Remove dependencies left by earlier/partial test restores before pg_restore
+          # drops and recreates the application's tables.
+          # -i is required so the SQL heredoc reaches psql inside the container.
+          docker run --rm -i --env NEON_RESTORE_DB_URL postgres:17-alpine \
+            psql "$NEON_RESTORE_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE
+            obj record;
+          BEGIN
+            -- Existing RLS policies can depend on tables being replaced.
+            -- Drop application policies first; pg_restore recreates them.
+            FOR obj IN
+              SELECT schemaname, tablename, policyname
+              FROM pg_policies
+              WHERE schemaname = 'public'
+            LOOP
+              EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I',
+                             obj.policyname, obj.schemaname, obj.tablename);
+            END LOOP;
+
+            -- Foreign keys can prevent pg_restore from dropping referenced tables
+            -- during its pre-data cleanup pass.
+            FOR obj IN
+              SELECT n.nspname, t.relname, c.conname
+              FROM pg_constraint c
+              JOIN pg_class t ON t.oid = c.conrelid
+              JOIN pg_namespace n ON n.oid = t.relnamespace
+              WHERE n.nspname = 'public' AND c.contype = 'f'
+            LOOP
+              EXECUTE format('ALTER TABLE %I.%I DROP CONSTRAINT IF EXISTS %I',
+                             obj.nspname, obj.relname, obj.conname);
+            END LOOP;
+
+            -- Views can also block table removal. They are recreated from the backup.
+            FOR obj IN
+              SELECT v.schemaname, v.viewname
+              FROM pg_views v
+              JOIN pg_class c ON c.relname = v.viewname
+              JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = v.schemaname
+              WHERE v.schemaname = 'public'
+                -- Never drop extension-owned objects such as PostGIS geography_columns.
+                AND NOT EXISTS (
+                  SELECT 1 FROM pg_depend d
+                  WHERE d.classid = 'pg_class'::regclass AND d.objid = c.oid
+                    AND d.refclassid = 'pg_extension'::regclass AND d.deptype = 'e'
+                )
+            LOOP
+              EXECUTE format('DROP VIEW IF EXISTS %I.%I CASCADE',
+                             obj.schemaname, obj.viewname);
+            END LOOP;
+
+            FOR obj IN
+              SELECT m.schemaname, m.matviewname
+              FROM pg_matviews m
+              JOIN pg_class c ON c.relname = m.matviewname
+              JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = m.schemaname
+              WHERE m.schemaname = 'public'
+                -- Preserve materialized views installed as extension members too.
+                AND NOT EXISTS (
+                  SELECT 1 FROM pg_depend d
+                  WHERE d.classid = 'pg_class'::regclass AND d.objid = c.oid
+                    AND d.refclassid = 'pg_extension'::regclass AND d.deptype = 'e'
+                )
+            LOOP
+              EXECUTE format('DROP MATERIALIZED VIEW IF EXISTS %I.%I CASCADE',
+                             obj.schemaname, obj.matviewname);
+            END LOOP;
+          END
+          $$;
+          SQL
+          # Keep staged order: tables first, then data, then policies/indexes/constraints.
+          docker run --rm \
+            --env NEON_RESTORE_DB_URL \
+            --volume "$RUNNER_TEMP/jfdrms-restore:/restore:ro" \
+            postgres:17-alpine \
+            pg_restore --exit-on-error --verbose --clean --if-exists --no-owner --no-acl \
+              --schema=public --schema=private --section=pre-data --use-list=/restore/restore-list.txt \
+              --dbname="$NEON_RESTORE_DB_URL" /restore/jfdrms.dump
+          docker run --rm \
+            --env NEON_RESTORE_DB_URL \
+            --volume "$RUNNER_TEMP/jfdrms-restore:/restore:ro" \
+            postgres:17-alpine \
+            pg_restore --exit-on-error --verbose --no-owner --no-acl \
+              --schema=public --schema=private --section=data --use-list=/restore/restore-list.txt \
+              --dbname="$NEON_RESTORE_DB_URL" /restore/jfdrms.dump
+          docker run --rm \
+            --env NEON_RESTORE_DB_URL \
+            --volume "$RUNNER_TEMP/jfdrms-restore:/restore:ro" \
+            postgres:17-alpine \
+            pg_restore --exit-on-error --verbose --clean --if-exists --no-owner --no-acl \
+              --schema=public --schema=private --section=post-data --use-list=/restore/restore-list.txt \
+              --dbname="$NEON_RESTORE_DB_URL" /restore/jfdrms.dump
+
+      - name: Verify restored database contains JFDRMS tables
+        env:
+          NEON_RESTORE_DB_URL: ${{ secrets.NEON_RESTORE_DB_URL }}
+        run: |
+          set -euo pipefail
+          docker run --rm --env NEON_RESTORE_DB_URL postgres:17-alpine \
+            psql "$NEON_RESTORE_DB_URL" -v ON_ERROR_STOP=1 -Atc \
+              "SELECT count(*) > 0 FROM information_schema.tables WHERE table_schema IN ('public', 'private') AND table_type = 'BASE TABLE';" \
+            | grep -qx t
+          docker run --rm --env NEON_RESTORE_DB_URL postgres:17-alpine \
+            psql "$NEON_RESTORE_DB_URL" -v ON_ERROR_STOP=1 -Atc \
+              "SELECT 'application_tables=' || count(*) FROM information_schema.tables WHERE table_schema IN ('public', 'private') AND table_type = 'BASE TABLE';"
+
+      - name: Remove temporary sync files
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/jfdrms-restore"
