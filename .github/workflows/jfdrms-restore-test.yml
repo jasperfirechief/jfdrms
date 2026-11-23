@@ -205,7 +205,6 @@ jobs:
           docker run --rm \
             --env RESTORE_TEST_DB_URL \
             --volume "$RUNNER_TEMP/jfdrms-restore:/restore:ro" \
-            --volume "$RUNNER_TEMP/jfdrms-restore:/restore:ro" \
             postgres:17-alpine \
             pg_restore --exit-on-error --verbose --clean --if-exists --no-owner --no-acl \
               --schema=public --section=post-data --use-list=/restore/restore-list.txt \
