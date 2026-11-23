@@ -1,6 +1,6 @@
-# JFDRMS backup setup (staging branch)
+# JFDRMS encrypted database backup
 
-This work is isolated on branch `backup-automation-setup`. Nothing in `main` or the live Vercel deployment has been changed.
+The backup workflow runs from the repository's default branch. It is separate from the live Vercel application and does not deploy or modify the RMS.
 
 ## What this first stage backs up
 
@@ -17,7 +17,7 @@ The current database is PostgreSQL 17.6; the workflow uses a PostgreSQL 17 clien
 - The workflow is scheduled daily at 2:00 AM Central (`America/Chicago`) and can also be started manually with `workflow_dispatch`.
 - The Apps Script receiver source now includes rolling retention: one backup per day for the latest 30 distinct backup dates, plus one latest backup per month for the latest 12 distinct months. Expired matching backup files are moved to Drive Trash, not permanently deleted.
 - The retention change is not active in either Drive account until the updated `BackupBridge.gs` is copied into both Apps Script projects and each web-app deployment is updated to a new version.
-- Do not rely on backups until a real upload to both Drive accounts and a restore into an isolated Supabase project have been verified.
+- A recent encrypted backup was restored successfully into an isolated Supabase project. This verifies the database backup/restore path, but does not back up Supabase Storage file bytes or provide full Supabase Auth/Realtime/Edge Function failover.
 
 ## 1. Configure the Apps Script receiver in Drive Account 1
 
@@ -55,17 +55,9 @@ In the repository, open **Settings** → **Secrets and variables** → **Actions
 
 Never paste the database connection string or any of these secrets into this chat, a GitHub file, an issue, or a workflow log. Do not reset the Supabase database password just for this setup; if the existing password is unavailable, pause and decide on a credential rotation separately.
 
-## 4. Test before scheduling
+## 4. Run a manual backup test
 
-After the Apps Script deployments and all six GitHub secrets are configured:
-
-1. Open **Actions** in the repository.
-2. Select **JFDRMS Encrypted Database Backup**.
-3. Select **Run workflow** and choose branch `backup-automation-setup`.
-4. Confirm the run succeeds and that the same encrypted `.dump.gpg` file appears in both Drive accounts' `Database Backups` folders.
-5. Do not merge to `main` or enable the daily schedule until the test upload and a separate restore test have been reviewed.
-
-The automatic schedule is intentionally disabled during initial testing. After successful upload to both Drive accounts and a verified isolated restore, add a Central-time schedule in a separate reviewed change. This avoids activating recurring production database exports before the end-to-end path is proven.
+The workflow can still be started manually from **Actions → JFDRMS Encrypted Database Backup → Run workflow** on the default branch. Confirm both Drive uploads succeed in the run logs. The daily schedule is already enabled for 2:00 AM Central.
 
 ## Security notes
 
