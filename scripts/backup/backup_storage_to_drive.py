@@ -10,8 +10,6 @@ import hashlib
 import json
 import os
 import sys
-import time
-from datetime import datetime
 from io import BytesIO
 from zoneinfo import ZoneInfo
 
@@ -19,10 +17,12 @@ import requests
 from google.oauth2.service_account import Credentials
 from google.auth.transport.requests import Request
 
-BUCKETS = {
+EXPECTED_PRODUCTION_PROJECT_REF = "audgtwcctdoiptuekqvn"
+BUCKET_FOLDER_MAP = {
     "preplan-files": "Preplan Photos",
     "inspection-attachments": "Inspection Attachments",
 }
+DEFAULT_BUCKET_FOLDER = "Other RMS Files"
 DRIVE_API = "https://www.googleapis.com/drive/v3"
 DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3/files"
 CHUNK_SIZE = 5 * 1024 * 1024
@@ -157,7 +157,7 @@ def upload_bytes(name: str, parent_id: str, content: bytes, mime_type: str, dige
 
 def storage_headers() -> dict[str, str]:
     return {
-        "apikey": required("SUPABASE_SERVICE_ROLE_KEY"),
+        "apikey": required("JASPER_FD_SUPABASE_SERVICE_ROLE_KEY"),
         "Authorization": f"Bearer {required('SUPABASE_SERVICE_ROLE_KEY')}",
         "Content-Type": "application/json",
     }
@@ -235,7 +235,12 @@ def drive_subfolder_path(root_id: str, relative_path: str) -> str:
 
 
 def main() -> int:
-    base_url = required("SUPABASE_URL").rstrip("/")
+    base_url = required("JASPER_FD_SUPABASE_URL").rstrip("/")
+    expected_host = f"{EXPECTED_PRODUCTION_PROJECT_REF}.supabase.co"
+    from urllib.parse import urlparse
+    parsed = urlparse(base_url)
+    if parsed.scheme != "https" or parsed.hostname != expected_host:
+        raise RuntimeError("Refusing to back up: Supabase URL is not the verified Jasper FD production project.")
     parent_id = required("GOOGLE_DRIVE_BACKUP_FOLDER_ID")
     # Check the configured Drive destination before downloading any customer files.
     headers = drive_headers()
@@ -248,7 +253,18 @@ def main() -> int:
     manifest: list[dict] = []
     totals = {"objects": 0, "bytes": 0, "uploaded": 0, "already_present": 0}
 
-    for bucket, drive_category in BUCKETS.items():
+    # Discover every bucket in the verified production project; do not assume the test project's bucket list.
+    bucket_response = HTTP.get(f"{base_url}/storage/v1/bucket", headers=storage_headers(), timeout=120)
+    bucket_response.raise_for_status()
+    bucket_rows = bucket_response.json()
+    if not isinstance(bucket_rows, list):
+        raise RuntimeError("Unexpected Storage bucket-list response.")
+    buckets = sorted({str(row.get("name") or row.get("id") or "") for row in bucket_rows} - {""})
+    if not buckets:
+        raise RuntimeError("No Storage buckets were returned for Jasper FD production.")
+
+    for bucket in buckets:
+        drive_category = BUCKET_FOLDER_MAP.get(bucket, DEFAULT_BUCKET_FOLDER)
         category_id = find_folder(drive_category, parent_id)
         if not category_id:
             raise RuntimeError(f"Expected existing Drive subfolder {drive_category!r} was not found.")
@@ -279,8 +295,8 @@ def main() -> int:
 
     manifest_bytes = json.dumps({
         "backup_date": backup_date,
-        "project": "JFDRMS production",
-        "buckets": list(BUCKETS),
+        "project": "Jasper FD production",
+        "buckets": buckets,
         "totals": totals,
         "objects": manifest,
     }, indent=2, sort_keys=True).encode("utf-8")
