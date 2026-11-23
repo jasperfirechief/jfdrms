@@ -52,6 +52,31 @@ jobs:
             exit 1
           fi
 
+      - name: Verify database connection is Jasper FD production
+        shell: bash
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          from urllib.parse import urlparse, unquote
+          expected = "audgtwcctdoiptuekqvn"
+          value = urlparse(os.environ["SUPABASE_DB_URL"])
+          username = unquote(value.username or "")
+          direct_host = f"db.{expected}.supabase.co"
+          pooler_user = f"postgres.{expected}"
+          direct_match = (value.hostname or "").lower() == direct_host
+          pooler_match = (value.hostname or "").lower().endswith(".pooler.supabase.com") and username == pooler_user
+          if value.scheme not in ("postgres", "postgresql") or not (direct_match or pooler_match):
+              raise SystemExit(
+                  "Refusing to back up: SUPABASE_DB_URL cannot be positively identified "
+                  "as Jasper FD production. Use the production direct connection host "
+                  "or production-specific pooler username."
+              )
+          print("Verified database connection targets Jasper FD production.")
+          PY
+
       - name: Verify GPG is available
         run: gpg --version
 
