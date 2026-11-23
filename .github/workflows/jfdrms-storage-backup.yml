@@ -1,4 +1,4 @@
-name: JFDRMS Supabase Storage Backup
+name: Jasper FD Production Storage Backup
 
 on:
   schedule:
@@ -10,39 +10,44 @@ permissions:
   contents: read
 
 concurrency:
-  group: jfdrms-storage-backup
+  group: jasper-fd-production-storage-backup
   cancel-in-progress: false
 
 jobs:
   storage-backup:
-    name: Copy Supabase Storage objects to third Google Drive
+    name: Back up all Jasper FD production Storage objects
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
       - name: Check out backup scripts
         uses: actions/checkout@v4
 
-      - name: Verify required secrets exist
+      - name: Verify required production and Drive settings
         shell: bash
         env:
-          SUPABASE_URL: \${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: \${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON: \${{ secrets.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON }}
-          GOOGLE_DRIVE_BACKUP_FOLDER_ID: \${{ secrets.GOOGLE_DRIVE_BACKUP_FOLDER_ID }}
+          JASPER_FD_SUPABASE_URL: ${{ secrets.JASPER_FD_SUPABASE_URL }}
+          JASPER_FD_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JASPER_FD_SUPABASE_SERVICE_ROLE_KEY }}
+          GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_DRIVE_BACKUP_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_BACKUP_FOLDER_ID }}
         run: |
           set -euo pipefail
-          for name in SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON GOOGLE_DRIVE_BACKUP_FOLDER_ID; do
-            if [[ -z "\${!name:-}" ]]; then
-              echo "::error::Missing required GitHub Actions secret: \${name}"
+          for name in JASPER_FD_SUPABASE_URL JASPER_FD_SUPABASE_SERVICE_ROLE_KEY GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON GOOGLE_DRIVE_BACKUP_FOLDER_ID; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Missing required GitHub Actions secret: ${name}"
               exit 1
             fi
           done
           python - <<'PY'
           import json, os
+          from urllib.parse import urlparse
+          expected = "audgtwcctdoiptuekqvn.supabase.co"
+          parsed = urlparse(os.environ["JASPER_FD_SUPABASE_URL"])
+          if parsed.scheme != "https" or parsed.hostname != expected:
+              raise SystemExit("Refusing to run: configured Supabase URL is not Jasper FD production.")
           value = json.loads(os.environ["GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON"])
-          assert value.get("type") == "service_account"
-          assert value.get("client_email") and value.get("private_key")
-          print("Google Drive service-account JSON is structurally valid.")
+          if value.get("type") != "service_account" or not value.get("client_email") or not value.get("private_key"):
+              raise SystemExit("Google Drive service-account JSON is invalid.")
+          print("Verified Jasper FD production project URL and Google Drive service-account JSON.")
           PY
 
       - name: Set up Python
@@ -56,11 +61,10 @@ jobs:
             requests==2.32.5 \
             google-auth==2.41.1
 
-      - name: Back up all Storage objects
+      - name: Back up all production Storage buckets
         env:
-          SUPABASE_URL: \${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: \${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON: \${{ secrets.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON }}
-          GOOGLE_DRIVE_BACKUP_FOLDER_ID: \${{ secrets.GOOGLE_DRIVE_BACKUP_FOLDER_ID }}
+          JASPER_FD_SUPABASE_URL: ${{ secrets.JASPER_FD_SUPABASE_URL }}
+          JASPER_FD_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.JASPER_FD_SUPABASE_SERVICE_ROLE_KEY }}
+          GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_DRIVE_BACKUP_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_BACKUP_FOLDER_ID }}
         run: python scripts/backup/backup_storage_to_drive.py
-
