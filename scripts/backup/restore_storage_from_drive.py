@@ -49,6 +49,14 @@ def object_exists(base, bucket, path):
     if r.status_code == 404:
         return False
     if not r.ok:
+        # Supabase Storage may wrap a missing-object response as HTTP 400
+        # while preserving the actual 404 / NoSuchKey in its JSON body.
+        try:
+            payload = r.json()
+        except ValueError:
+            payload = {}
+        if str(payload.get("statusCode", "")) == "404" or payload.get("code") == "NoSuchKey":
+            return False
         detail = (r.text or "")[:1000]
         raise RuntimeError(f"Supabase Storage existence check failed ({r.status_code}): {detail}")
     return True
