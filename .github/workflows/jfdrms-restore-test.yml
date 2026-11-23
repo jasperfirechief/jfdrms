@@ -110,8 +110,8 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/jfdrms-restore"
           printf '%s' "$BACKUP_ENCRYPTION_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback \
-            --passphrase-fd 0 --decrypt "$RUNNER_TEMP/jfdrms.dump.gpg" \
-            --output "$RUNNER_TEMP/jfdrms-restore/jfdrms.dump"
+            --passphrase-fd 0 --output "$RUNNER_TEMP/jfdrms-restore/jfdrms.dump" \
+            --decrypt "$RUNNER_TEMP/jfdrms.dump.gpg"
           docker run --rm --volume "$RUNNER_TEMP/jfdrms-restore:/restore" postgres:17-alpine \
             pg_restore --list /restore/jfdrms.dump > "$RUNNER_TEMP/jfdrms-restore/archive-list.txt"
           test -s "$RUNNER_TEMP/jfdrms-restore/archive-list.txt"
