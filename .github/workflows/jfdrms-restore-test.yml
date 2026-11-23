@@ -120,6 +120,7 @@ jobs:
           grep -v ' EVENT TRIGGER ' "$RUNNER_TEMP/jfdrms-restore/archive-list.txt" \
             | grep -v ' FK CONSTRAINT public incident_details incident_details_report_by_fkey ' \
             | grep -v ' FK CONSTRAINT public neris_submissions neris_submissions_submitted_by_fkey ' \
+            | grep -v ' FK CONSTRAINT public personnel personnel_auth_user_id_fkey ' \
             > "$RUNNER_TEMP/jfdrms-restore/restore-list.txt"
           test -s "$RUNNER_TEMP/jfdrms-restore/restore-list.txt"
           echo "Encrypted backup decrypted and PostgreSQL archive validated; managed event triggers and the incident_details report_by FK to a missing auth.users account excluded."
