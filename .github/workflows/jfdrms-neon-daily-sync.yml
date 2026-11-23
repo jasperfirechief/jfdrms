@@ -86,7 +86,7 @@ jobs:
           archive_path, sql_path, output_path = sys.argv[1:]
           sql = open(sql_path, encoding="utf-8").read()
           pattern = re.compile(
-              r'ALTER TABLE ONLY\s+(?:public\\.)?("[^"]+"|[\w.]+)\s+'
+              r'ALTER TABLE ONLY\s+(?:public\.)?("[^"]+"|[\w.]+)\s+'
               r'ADD CONSTRAINT\s+("[^"]+"|[^\s]+)\s+'
               r'[^;]*?\bREFERENCES\s+auth\\.users\b',
               re.IGNORECASE | re.DOTALL,
@@ -102,7 +102,7 @@ jobs:
                   if " EVENT TRIGGER " in line:
                       skipped += 1
                       continue
-                  match = re.search(r"\bFK CONSTRAINT public (\\S+) (\\S+)", line)
+                  match = re.search(r"\bFK CONSTRAINT public (\S+) (\S+)", line)
                   if match and (match.group(1), match.group(2)) in excluded:
                       skipped += 1
                       continue
