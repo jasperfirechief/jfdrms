@@ -123,7 +123,7 @@ jobs:
             | grep -v ' FK CONSTRAINT public personnel personnel_auth_user_id_fkey ' \
             > "$RUNNER_TEMP/jfdrms-restore/restore-list.txt"
           test -s "$RUNNER_TEMP/jfdrms-restore/restore-list.txt"
-          echo "Encrypted backup decrypted and PostgreSQL archive validated; managed event triggers and the incident_details report_by FK to a missing auth.users account excluded."
+          echo "Encrypted backup decrypted and PostgreSQL archive validated; Supabase-managed event triggers and auth.users foreign keys excluded."
 
       - name: Re-check target guard immediately before restore
         env:
