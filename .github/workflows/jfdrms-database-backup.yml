@@ -1,6 +1,9 @@
 name: JFDRMS Encrypted Database Backup
 
 on:
+  schedule:
+    - cron: '0 2 * * *'
+      timezone: 'America/Chicago'
   workflow_dispatch:
 
 permissions:
