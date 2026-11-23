@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from datetime import datetime
 import sys
 from io import BytesIO
 from zoneinfo import ZoneInfo
@@ -133,32 +134,46 @@ def upload_bytes(name: str, parent_id: str, content: bytes, mime_type: str, dige
     session_url = start.headers.get("Location")
     if not session_url:
         raise RuntimeError("Google Drive did not return a resumable upload session.")
-    for offset in range(0, len(content), CHUNK_SIZE):
-        chunk = content[offset:offset + CHUNK_SIZE]
-        end = offset + len(chunk) - 1
+    if not content:
         response = HTTP.put(
             session_url,
             headers={
                 "Authorization": headers["Authorization"],
                 "Content-Type": mime_type or "application/octet-stream",
-                "Content-Length": str(len(chunk)),
-                "Content-Range": f"bytes {offset}-{end}/{len(content)}",
+                "Content-Length": "0",
+                "Content-Range": "bytes */0",
             },
-            data=chunk, timeout=300,
+            data=b"", timeout=300,
         )
-        if response.status_code not in (200, 201, 308):
-            response.raise_for_status()
-        if response.status_code in (200, 201):
-            break
-    if response.status_code not in (200, 201):
-        raise RuntimeError(f"Google Drive upload did not finalize (HTTP {response.status_code}).")
+        response.raise_for_status()
+    else:
+        response = None
+        for offset in range(0, len(content), CHUNK_SIZE):
+            chunk = content[offset:offset + CHUNK_SIZE]
+            end = offset + len(chunk) - 1
+            response = HTTP.put(
+                session_url,
+                headers={
+                    "Authorization": headers["Authorization"],
+                    "Content-Type": mime_type or "application/octet-stream",
+                    "Content-Length": str(len(chunk)),
+                    "Content-Range": f"bytes {offset}-{end}/{len(content)}",
+                },
+                data=chunk, timeout=300,
+            )
+            if response.status_code not in (200, 201, 308):
+                response.raise_for_status()
+            if response.status_code in (200, 201):
+                break
+        if response is None or response.status_code not in (200, 201):
+            raise RuntimeError(f"Google Drive upload did not finalize (HTTP {response.status_code if response else 'no response'}).")
     return "uploaded"
 
 
 def storage_headers() -> dict[str, str]:
     return {
         "apikey": required("JASPER_FD_SUPABASE_SERVICE_ROLE_KEY"),
-        "Authorization": f"Bearer {required('SUPABASE_SERVICE_ROLE_KEY')}",
+        "Authorization": f"Bearer {required('JASPER_FD_SUPABASE_SERVICE_ROLE_KEY')}",
         "Content-Type": "application/json",
     }
 
@@ -269,13 +284,15 @@ def main() -> int:
         if not category_id:
             raise RuntimeError(f"Expected existing Drive subfolder {drive_category!r} was not found.")
         date_id = ensure_folder(backup_date, category_id)
+        # Keep bucket names distinct when multiple buckets share a category folder.
+        bucket_id = ensure_folder(bucket, date_id)
         objects = list_bucket_objects(base_url, bucket)
         print(f"Discovered {len(objects)} object(s) in bucket {bucket}.")
         for item in objects:
             path = item["path"]
             data = download_object(base_url, bucket, path)
             digest = hashlib.sha256(data).hexdigest()
-            destination_id = drive_subfolder_path(date_id, path)
+            destination_id = drive_subfolder_path(bucket_id, path)
             name = path.split("/")[-1]
             result = upload_bytes(name, destination_id, data,
                                   (item.get("metadata") or {}).get("mimetype", "application/octet-stream"),
