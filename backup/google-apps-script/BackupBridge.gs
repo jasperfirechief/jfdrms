@@ -54,8 +54,20 @@ function doPost(e) {
         } catch (_) {}
       }
     }
-    const folder = DriveApp.getFolderById(folderId);
-    const file = folder.createFile(Utilities.newBlob(bytes, 'application/octet-stream', filename));
+    let folder;
+    try {
+      folder = DriveApp.getFolderById(folderId);
+    } catch (driveError) {
+      logDriveError_('getFolderById', driveError, folderId);
+      throw new Error('DRIVE');
+    }
+    let file;
+    try {
+      file = folder.createFile(Utilities.newBlob(bytes, 'application/octet-stream', filename));
+    } catch (driveError) {
+      logDriveError_('createFile', driveError, folderId);
+      throw new Error('DRIVE');
+    }
 
     stage = 'SAVE_RECEIPT';
     props.setProperty('JFD_LAST_BACKUP_SIGNATURE', signature);
@@ -171,6 +183,17 @@ function applyRetention_(folder) {
     }
   });
   return removed;
+}
+
+/**
+ * Log a concise Drive diagnostic without exposing folder IDs or backup contents.
+ */
+function logDriveError_(operation, err, folderId) {
+  const errorName = err && err.name ? String(err.name) : 'Error';
+  let message = err && err.message ? String(err.message) : String(err);
+  if (folderId) message = message.split(folderId).join('[redacted-folder-id]');
+  message = message.replace(/[\\r\\n\\t]+/g, ' ').substring(0, 500);
+  console.error('JFD backup Drive ' + operation + ' failed (' + errorName + '): ' + message);
 }
 
 function json_(value) {
