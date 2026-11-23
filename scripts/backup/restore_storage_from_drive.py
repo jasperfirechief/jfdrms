@@ -73,15 +73,32 @@ def main():
     manifests = find_folder("Manifests", root)
     if not manifests:
         raise RuntimeError("Drive Manifests folder not found.")
-    mf = list_drive_file(f"jfdrms-storage-manifest-{date}.json", manifests)
-    if len(mf) != 1:
-        raise RuntimeError(f"Expected exactly one manifest for {date}; found {len(mf)}.")
-    raw = drive_bytes(mf[0]["id"])
-    if (mf[0].get("appProperties") or {}).get("sha256") != hashlib.sha256(raw).hexdigest():
-        raise RuntimeError("Manifest checksum verification failed.")
-    manifest = json.loads(raw)
-    if manifest.get("project") != "Jasper FD production" or manifest.get("backup_date") != date:
-        raise RuntimeError("Manifest is not for the requested Jasper FD production backup date.")
+    # A prior empty manifest may already occupy the canonical filename. The
+    # backup uploader safely suffixes a changed-content file with its digest;
+    # inspect all canonical and digest-suffixed versions and select the newest
+    # valid manifest for this project/date with the greatest object count.
+    canonical = f"jfdrms-storage-manifest-{date}.json"
+    candidates = list_drive_file(canonical, manifests)
+    candidates += list_drive_file(canonical + ".", manifests)
+    valid_manifests = []
+    seen_ids = set()
+    for candidate in candidates:
+        if candidate["id"] in seen_ids:
+            continue
+        seen_ids.add(candidate["id"])
+        raw_candidate = drive_bytes(candidate["id"])
+        if (candidate.get("appProperties") or {}).get("sha256") != hashlib.sha256(raw_candidate).hexdigest():
+            continue
+        try:
+            parsed = json.loads(raw_candidate)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            continue
+        if parsed.get("project") == "Jasper FD production" and parsed.get("backup_date") == date and isinstance(parsed.get("objects"), list):
+            valid_manifests.append((len(parsed["objects"]), candidate.get("modifiedTime", ""), parsed))
+    if not valid_manifests:
+        raise RuntimeError(f"No checksum-valid Jasper FD production manifest found for {date}.")
+    valid_manifests.sort(key=lambda entry: (entry[0], entry[1]), reverse=True)
+    manifest = valid_manifests[0][2]
     objects = manifest.get("objects")
     if not isinstance(objects, list):
         raise RuntimeError("Manifest object list is invalid.")
