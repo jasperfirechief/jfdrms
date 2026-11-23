@@ -60,6 +60,13 @@ function doPost(e) {
     stage = 'SAVE_RECEIPT';
     props.setProperty('JFD_LAST_BACKUP_SIGNATURE', signature);
     props.setProperty('JFD_LAST_BACKUP_FILE_ID', file.getId());
+    // Retention is best-effort: a cleanup problem must never invalidate a good upload.
+    try {
+      const removed = applyRetention_(folder);
+      console.log('JFD backup retention moved ' + removed + ' expired backup file(s) to Trash.');
+    } catch (cleanupError) {
+      console.warn('JFD backup retention cleanup failed: ' + String(cleanupError));
+    }
     return json_({ok:true, name:file.getName(), size:file.getSize()});
   } catch (err) {
     const allowed = ['CONFIG','REQUEST_INVALID','JSON_INVALID','AUTH_FAILED',
@@ -117,6 +124,53 @@ function doGet(e) {
     console.error('JFD backup download rejection code: ' + code);
     return json_({ok:false, code:code, error:'Encrypted backup download rejected.'});
   }
+}
+
+
+/**
+ * Retain one backup per day for the latest 30 distinct backup dates,
+ * plus one latest backup per month for the latest 12 distinct months.
+ * Only files matching the JFDRMS encrypted-backup filename are touched.
+ * Expired files are moved to Drive Trash (recoverable), never hard-deleted.
+ */
+function applyRetention_(folder) {
+  const pattern = /^jfdrms-db-(\\d{4}-\\d{2}-\\d{2})T(\\d{6})Z\\.dump\\.gpg$/;
+  const files = [];
+  const iterator = folder.getFiles();
+  while (iterator.hasNext()) {
+    const file = iterator.next();
+    const name = file.getName();
+    if (pattern.test(name)) files.push({file:file, name:name, date:name.substring(10,20), month:name.substring(10,17)});
+  }
+  files.sort(function(a,b) { return a.name < b.name ? 1 : (a.name > b.name ? -1 : 0); });
+
+  const keep = {};
+  const keptDays = {};
+  const keptMonths = {};
+  let dayCount = 0;
+  let monthCount = 0;
+
+  files.forEach(function(item) {
+    if (!keptDays[item.date] && dayCount < 30) {
+      keptDays[item.date] = true;
+      dayCount++;
+      keep[item.name] = true;
+    }
+    if (!keptMonths[item.month] && monthCount < 12) {
+      keptMonths[item.month] = true;
+      monthCount++;
+      keep[item.name] = true;
+    }
+  });
+
+  let removed = 0;
+  files.forEach(function(item) {
+    if (!keep[item.name] && !item.file.isTrashed()) {
+      item.file.setTrashed(true);
+      removed++;
+    }
+  });
+  return removed;
 }
 
 function json_(value) {
