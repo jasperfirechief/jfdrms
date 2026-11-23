@@ -4,14 +4,16 @@ on:
   workflow_dispatch:
     inputs:
       backup_filename:
-        description: Exact encrypted backup filename in the primary Drive folder
+        description: Exact encrypted backup filename in the selected Drive folder
         required: true
         type: string
-        default: jfdrms-db-2026-11-22T032028Z.dump.gpg
-      confirm_isolated_target:
-        description: Confirm the target is the separate JFD RMS test project, not the live Jasper FD project
+      drive_account:
+        description: Which independently stored copy to restore
         required: true
-        type: boolean
+        type: choice
+        options:
+          - primary
+          - secondary
 
 permissions:
   contents: read
@@ -21,105 +23,144 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  restore-test:
-    name: Validate and restore into isolated JFD RMS project
-    if: ${{ inputs.confirm_isolated_target == true }}
+  isolated-restore:
+    name: Restore into isolated JFD RMS test project only
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
     steps:
       - name: Check out backup scripts
         uses: actions/checkout@v4
 
-      - name: Verify settings and enforce isolated target
+      - name: Validate restore target and required settings
         shell: bash
         env:
-          RESTORE_TEST_SUPABASE_DB_URL: ${{ secrets.RESTORE_TEST_SUPABASE_DB_URL }}
+          RESTORE_TEST_DB_URL: ${{ secrets.RESTORE_TEST_DB_URL }}
           BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
-          DRIVE_BRIDGE_URL_PRIMARY: ${{ secrets.DRIVE_BRIDGE_URL_PRIMARY }}
-          DRIVE_BRIDGE_HMAC_SECRET_PRIMARY: ${{ secrets.DRIVE_BRIDGE_HMAC_SECRET_PRIMARY }}
           BACKUP_FILENAME: ${{ inputs.backup_filename }}
         run: |
           set -euo pipefail
-          for name in RESTORE_TEST_SUPABASE_DB_URL BACKUP_ENCRYPTION_PASSPHRASE DRIVE_BRIDGE_URL_PRIMARY DRIVE_BRIDGE_HMAC_SECRET_PRIMARY; do
-            if [[ -z "${!name:-}" ]]; then
-              echo "::error::Missing required GitHub secret: ${name}"
-              exit 1
-            fi
-          done
-          python3 -c 'import os; from urllib.parse import urlparse; u=urlparse(os.environ["RESTORE_TEST_SUPABASE_DB_URL"]); assert u.scheme in ("postgres","postgresql") and u.hostname == "aws-0-us-east-2.pooler.supabase.com" and u.username == "postgres.thzqamsxjktgrturrymo" and u.port == 5432 and bool(u.password), "Refusing: restore URL is not the isolated JFD RMS session-pooler database"'
+          test -n "$RESTORE_TEST_DB_URL" || { echo "::error::Missing RESTORE_TEST_DB_URL"; exit 1; }
+          test -n "$BACKUP_ENCRYPTION_PASSPHRASE" || { echo "::error::Missing BACKUP_ENCRYPTION_PASSPHRASE"; exit 1; }
           if (( ${#BACKUP_ENCRYPTION_PASSPHRASE} < 32 )); then
-            echo "::error::Backup encryption passphrase is missing or too short."
-            exit 1
+            echo "::error::Encryption passphrase is too short."; exit 1
           fi
-          if [[ ! "$BACKUP_FILENAME" =~ ^jfdrms-db-[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{6}Z\.dump\.gpg$ ]]; then
-            echo "::error::Backup filename format is invalid."
-            exit 1
-          fi
+          python3 - "$RESTORE_TEST_DB_URL" "$BACKUP_FILENAME" <<'PY'
+          import sys
+          from urllib.parse import urlparse, unquote
+          import re
+          raw, filename = sys.argv[1], sys.argv[2]
+          parsed = urlparse(raw)
+          username = unquote(parsed.username or "")
+          host = (parsed.hostname or "").lower()
+          expected_ref = "thzqamsxjktgrturrymo"
+          # Accept the direct project DB host or the Supabase session-pooler username
+          # that explicitly embeds the project ref. Reject the live project and all others.
+          safe = host == f"db.{expected_ref}.supabase.co" or (
+              host.endswith(".pooler.supabase.com") and username.endswith("." + expected_ref)
+          )
+          if not safe or "audgtwcctdoiptuekqvn" in raw:
+              raise SystemExit("Refusing restore: target URL is not the isolated test project thzqamsxjktgrturrymo.")
+          if not re.fullmatch(r"jfdrms-db-\d{4}-\d{2}-\d{2}T\d{6}Z\.dump\.gpg", filename):
+              raise SystemExit("Refusing restore: invalid exact backup filename.")
+          print("Restore target guard passed: isolated test project only.")
+          PY
 
-      - name: Download encrypted archive from primary Drive
+      - name: Select Drive bridge credentials
+        id: bridge
+        shell: bash
         env:
           DRIVE_BRIDGE_URL_PRIMARY: ${{ secrets.DRIVE_BRIDGE_URL_PRIMARY }}
           DRIVE_BRIDGE_HMAC_SECRET_PRIMARY: ${{ secrets.DRIVE_BRIDGE_HMAC_SECRET_PRIMARY }}
+          DRIVE_BRIDGE_URL_SECONDARY: ${{ secrets.DRIVE_BRIDGE_URL_SECONDARY }}
+          DRIVE_BRIDGE_HMAC_SECRET_SECONDARY: ${{ secrets.DRIVE_BRIDGE_HMAC_SECRET_SECONDARY }}
+          DRIVE_ACCOUNT: ${{ inputs.drive_account }}
+        run: |
+          set -euo pipefail
+          if [[ "$DRIVE_ACCOUNT" == "primary" ]]; then
+            test -n "$DRIVE_BRIDGE_URL_PRIMARY" && test -n "$DRIVE_BRIDGE_HMAC_SECRET_PRIMARY"
+            echo "url=$DRIVE_BRIDGE_URL_PRIMARY" >> "$GITHUB_OUTPUT"
+            echo "secret_name=DRIVE_BRIDGE_HMAC_SECRET_PRIMARY" >> "$GITHUB_OUTPUT"
+          elif [[ "$DRIVE_ACCOUNT" == "secondary" ]]; then
+            test -n "$DRIVE_BRIDGE_URL_SECONDARY" && test -n "$DRIVE_BRIDGE_HMAC_SECRET_SECONDARY"
+            echo "url=$DRIVE_BRIDGE_URL_SECONDARY" >> "$GITHUB_OUTPUT"
+            echo "secret_name=DRIVE_BRIDGE_HMAC_SECRET_SECONDARY" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Invalid Drive account."; exit 1
+          fi
+
+      - name: Download exact encrypted backup from selected Drive
+        env:
+          BRIDGE_URL: ${{ steps.bridge.outputs.url }}
           BACKUP_FILENAME: ${{ inputs.backup_filename }}
+          DRIVE_BRIDGE_HMAC_SECRET_PRIMARY: ${{ secrets.DRIVE_BRIDGE_HMAC_SECRET_PRIMARY }}
+          DRIVE_BRIDGE_HMAC_SECRET_SECONDARY: ${{ secrets.DRIVE_BRIDGE_HMAC_SECRET_SECONDARY }}
+          DRIVE_ACCOUNT: ${{ inputs.drive_account }}
+        run: |
+          set -euo pipefail
+          if [[ "$DRIVE_ACCOUNT" == "primary" ]]; then SECRET_NAME=DRIVE_BRIDGE_HMAC_SECRET_PRIMARY
+          else SECRET_NAME=DRIVE_BRIDGE_HMAC_SECRET_SECONDARY; fi
+          python3 scripts/backup/download_from_drive.py \
+            --url "$BRIDGE_URL" --secret-env "$SECRET_NAME" \
+            --filename "$BACKUP_FILENAME" --output "$RUNNER_TEMP/jfdrms.dump.gpg"
+
+      - name: Decrypt and validate PostgreSQL archive
+        env:
+          BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/jfdrms-restore"
-          python3 scripts/backup/download_from_drive.py \
-            --filename "$BACKUP_FILENAME" \
-            --url "$DRIVE_BRIDGE_URL_PRIMARY" \
-            --secret-env DRIVE_BRIDGE_HMAC_SECRET_PRIMARY \
-            --output "$RUNNER_TEMP/jfdrms-restore/backup.dump.gpg"
-
-      - name: Decrypt archive, validate it, and prepare a Supabase-safe restore list
-        shell: bash
-        env:
-          BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
-        run: |
-          set -euo pipefail
           printf '%s' "$BACKUP_ENCRYPTION_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback \
-            --passphrase-fd 0 --decrypt \
-            --output "$RUNNER_TEMP/jfdrms-restore/backup.dump" \
-            "$RUNNER_TEMP/jfdrms-restore/backup.dump.gpg"
-          docker run --rm \
-            --volume "$RUNNER_TEMP/jfdrms-restore:/restore" \
-            postgres:17-alpine \
-            sh -euc '
-              pg_restore --list /restore/backup.dump > /restore/archive-list.txt
-              test -s /restore/archive-list.txt
-              grep -v " EVENT TRIGGER " /restore/archive-list.txt \
-                | grep -vE " SCHEMA (- )?(public|auth|storage|realtime|extensions|graphql|graphql_public|net|pgbouncer|pgsodium|supabase_functions|supabase_migrations|vault|cron)( |$)" \
-                | grep -v " EXTENSION " \
-                > /restore/restore-list.txt
-              test -s /restore/restore-list.txt
-              excluded_triggers=$(grep -c " EVENT TRIGGER " /restore/archive-list.txt || true)
-              excluded_managed_schemas=$(grep -Ec " SCHEMA (- )?(public|auth|storage|realtime|extensions|graphql|graphql_public|net|pgbouncer|pgsodium|supabase_functions|supabase_migrations|vault|cron)( |$)" /restore/archive-list.txt || true)
-              excluded_extensions=$(grep -c " EXTENSION " /restore/archive-list.txt || true)
-              echo "Encrypted archive validated; excluded $excluded_triggers platform event triggers, $excluded_managed_schemas managed schema definitions, and $excluded_extensions extension entries."
-            '
+            --passphrase-fd 0 --decrypt "$RUNNER_TEMP/jfdrms.dump.gpg" \
+            --output "$RUNNER_TEMP/jfdrms-restore/jfdrms.dump"
+          docker run --rm --volume "$RUNNER_TEMP/jfdrms-restore:/restore" postgres:17-alpine \
+            pg_restore --list /restore/jfdrms.dump > "$RUNNER_TEMP/jfdrms-restore/archive-list.txt"
+          test -s "$RUNNER_TEMP/jfdrms-restore/archive-list.txt"
+          echo "Encrypted backup decrypted and PostgreSQL archive validated."
 
-      - name: Restore into isolated JFD RMS database
-        shell: bash
+      - name: Re-check target guard immediately before restore
         env:
-          RESTORE_TEST_SUPABASE_DB_URL: ${{ secrets.RESTORE_TEST_SUPABASE_DB_URL }}
+          RESTORE_TEST_DB_URL: ${{ secrets.RESTORE_TEST_DB_URL }}
         run: |
           set -euo pipefail
-          echo "Restoring only to the separately verified JFD RMS test project."
+          python3 - "$RESTORE_TEST_DB_URL" <<'PY'
+          import sys
+          from urllib.parse import urlparse, unquote
+          u = urlparse(sys.argv[1])
+          user = unquote(u.username or "")
+          host = (u.hostname or "").lower()
+          ref = "thzqamsxjktgrturrymo"
+          if not (host == f"db.{ref}.supabase.co" or
+                  (host.endswith(".pooler.supabase.com") and user.endswith("." + ref))):
+              raise SystemExit("Restore blocked: destination is not the isolated test project.")
+          if "audgtwcctdoiptuekqvn" in sys.argv[1]:
+              raise SystemExit("Restore blocked: live production project reference detected.")
+          PY
+
+      - name: Restore into isolated test database
+        env:
+          RESTORE_TEST_DB_URL: ${{ secrets.RESTORE_TEST_DB_URL }}
+        run: |
+          set -euo pipefail
           docker run --rm \
-            --env RESTORE_TEST_SUPABASE_DB_URL \
+            --env RESTORE_TEST_DB_URL \
             --volume "$RUNNER_TEMP/jfdrms-restore:/restore:ro" \
             postgres:17-alpine \
-            sh -euc 'pg_restore --use-list=/restore/restore-list.txt --exclude-schema=auth --exclude-schema=storage --exclude-schema=realtime --exclude-schema=extensions --exclude-schema=graphql --exclude-schema=graphql_public --exclude-schema=net --exclude-schema=pgbouncer --exclude-schema=pgsodium --exclude-schema=supabase_functions --exclude-schema=supabase_migrations --exclude-schema=vault --exclude-schema=cron --verbose --no-owner --no-acl --exit-on-error --dbname="$RESTORE_TEST_SUPABASE_DB_URL" /restore/backup.dump'
+            pg_restore --exit-on-error --verbose --clean --if-exists --no-owner --no-acl \
+              --dbname="$RESTORE_TEST_DB_URL" /restore/jfdrms.dump
 
-      - name: Verify restored database responds
-        shell: bash
+      - name: Verify restored database contains JFDRMS tables
         env:
-          RESTORE_TEST_SUPABASE_DB_URL: ${{ secrets.RESTORE_TEST_SUPABASE_DB_URL }}
+          RESTORE_TEST_DB_URL: ${{ secrets.RESTORE_TEST_DB_URL }}
         run: |
           set -euo pipefail
-          docker run --rm --env RESTORE_TEST_SUPABASE_DB_URL postgres:17-alpine \
-            sh -euc 'psql "$RESTORE_TEST_SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -Atc "select current_database(), current_setting('\''server_version'\'');"'
+          docker run --rm --env RESTORE_TEST_DB_URL postgres:17-alpine \
+            psql "$RESTORE_TEST_DB_URL" -v ON_ERROR_STOP=1 -Atc \
+              "SELECT count(*) > 0 FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE';" \
+            | grep -qx t
+          docker run --rm --env RESTORE_TEST_DB_URL postgres:17-alpine \
+            psql "$RESTORE_TEST_DB_URL" -v ON_ERROR_STOP=1 -Atc \
+              "SELECT 'public_tables=' || count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE';"
 
       - name: Remove temporary restore files
         if: always()
-        shell: bash
-        run: rm -rf "$RUNNER_TEMP/jfdrms-restore"
+        run: rm -rf "$RUNNER_TEMP/jfdrms.dump.gpg" "$RUNNER_TEMP/jfdrms-restore"
