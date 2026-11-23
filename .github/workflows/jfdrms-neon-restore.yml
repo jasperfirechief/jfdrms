@@ -124,7 +124,7 @@ jobs:
           excluded = {
               match.group(1).strip('"')
               for match in re.finditer(
-                  r'ADD CONSTRAINT\\s+("[^"]+"|[^\\s]+)\\s+[^;]*?\\bREFERENCES\\s+auth\\.users\\b',
+                  r'ADD CONSTRAINT\s+("[^"]+"|[^\s]+)\s+[^;]*?\bREFERENCES\s+auth\.users\b',
                   sql,
                   re.IGNORECASE | re.DOTALL,
               )
@@ -139,7 +139,7 @@ jobs:
                       skipped += 1
                       continue
                   if " FK CONSTRAINT " in line and any(
-                      re.search(r"\\b" + re.escape(name) + r"\\b", line) for name in excluded
+                      re.search(r"\b" + re.escape(name) + r"\b", line) for name in excluded
                   ):
                       skipped += 1
                       continue
