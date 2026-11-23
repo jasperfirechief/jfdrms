@@ -1,0 +1,42 @@
+name: Verify Database Backup Target
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-target:
+    name: Identify SupABASE database target without backing it up
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify database URL points to Jasper FD production
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          python - <<'PY'
+          import os
+          from urllib.parse import urlparse, unquote
+
+          expected = "audgtwcctdoiptuekqvn"
+          raw = os.environ.get("SUPABASE_DB_URL", "")
+          if not raw:
+              raise SystemExit("SUPABASE_DB_URL is not configured.")
+
+          parsed = urlparse(raw)
+          host = (parsed.hostname or "").lower()
+          username = unquote(parsed.username or "")
+          # Supabase direct connections identify the project in the host;
+          # pooler connections commonly identify it in the database username.
+          candidates = [host, username.lower()]
+          found = expected if any(expected in value for value in candidates) else None
+
+          print(f"Database host: {host or '(not identifiable)'}")
+          print(f"Database username: {'postgres.<project-ref>' if expected in username.lower() else ('postgres (project ref not exposed)' if username.lower() == 'postgres' else 'configured username (redacted)')}")
+          if found:
+              print(f"Verified project: {found} (Jasper FD production)")
+          else:
+              print("Could not verify the production project ID from the connection URL.")
+              raise SystemExit("STOP: no database backup was performed. Inspect the Supabase connection string in GitHub Secrets.")
+          PY
