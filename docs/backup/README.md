@@ -14,8 +14,9 @@ The current database is PostgreSQL 17.6; the workflow uses a PostgreSQL 17 clien
 ## Important limits — not yet a complete disaster-recovery system
 
 - This database stage does **not** copy the actual bytes of files stored in Supabase Storage. A database dump can include Storage metadata, but it does not include the objects themselves. Preplan photos and inspection attachments need a separate file-backup stage to Account 3.
-- This does not yet create monthly archives, retention cleanup, or a restore test.
-- The workflow is staged on this branch. Its automatic schedule is intentionally disabled until upload and restore tests pass. After it is reviewed and merged to `main`, it can be run manually with `workflow_dispatch`.
+- The workflow is scheduled daily at 2:00 AM Central (`America/Chicago`) and can also be started manually with `workflow_dispatch`.
+- The Apps Script receiver source now includes rolling retention: one backup per day for the latest 30 distinct backup dates, plus one latest backup per month for the latest 12 distinct months. Expired matching backup files are moved to Drive Trash, not permanently deleted.
+- The retention change is not active in either Drive account until the updated `BackupBridge.gs` is copied into both Apps Script projects and each web-app deployment is updated to a new version.
 - Do not rely on backups until a real upload to both Drive accounts and a restore into an isolated Supabase project have been verified.
 
 ## 1. Configure the Apps Script receiver in Drive Account 1
@@ -73,3 +74,17 @@ The automatic schedule is intentionally disabled during initial testing. After s
 - The Apps Script receiver accepts only encrypted backup filenames, validates the HMAC and SHA-256 checksum, limits the decoded file to 32 MiB, and does not log the request body.
 - The workflow uses no GitHub artifact storage for database contents.
 - GitHub-hosted runners are temporary. The workflow deletes its local working backup files at the end of the job.
+
+
+## 5. Enable rolling retention in both Google Drive backup accounts
+
+The updated `backup/google-apps-script/BackupBridge.gs` adds conservative rolling retention inside each configured `Database Backups` folder:
+
+- Keep the latest 30 distinct backup dates (one file per date).
+- Also keep the latest backup from each of the latest 12 distinct months.
+- Move only older files whose names match the JFDRMS encrypted-backup filename to Google Drive Trash. Nothing is permanently deleted.
+- Retention runs only after a new encrypted backup has been successfully created and its receipt saved. Cleanup errors do not invalidate the new backup.
+
+To activate it, open both existing Apps Script projects (`JFD RMS Backup Bridge` and `JFD RMS Backup Bridge 2`), replace the contents of `BackupBridge.gs` with the updated repository version, then select **Deploy → Manage deployments → Edit** for the existing web app deployment and choose **New version → Deploy**. Keep the existing script properties and web-app URLs unchanged. Repeat for the second account. Do not create new script properties or rotate the HMAC secrets for this code-only update.
+
+This retention applies only to matching backup files in the two configured `Database Backups` folders. It does not delete or reorganize other Drive folders.
