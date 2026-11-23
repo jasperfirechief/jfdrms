@@ -78,8 +78,15 @@ def main():
     # inspect all canonical and digest-suffixed versions and select the newest
     # valid manifest for this project/date with the greatest object count.
     canonical = f"jfdrms-storage-manifest-{date}.json"
-    candidates = list_drive_file(canonical, manifests)
-    candidates += list_drive_file(canonical + ".", manifests)
+    query = (
+        "trashed=false and "
+        f"name contains '{canonical}' and '{manifests}' in parents"
+    )
+    response = drive_request(
+        "GET", f"{DRIVE_API}/files",
+        params={"q": query, "pageSize": 100, "fields": "files(id,name,appProperties,modifiedTime)"},
+    ).json()
+    candidates = response.get("files", [])
     valid_manifests = []
     seen_ids = set()
     for candidate in candidates:
