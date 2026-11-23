@@ -150,7 +150,8 @@ jobs:
           # such as auth, storage, and realtime must remain under platform ownership.
           # Remove dependencies left by earlier/partial test restores before pg_restore
           # drops and recreates the application's tables.
-          docker run --rm --env RESTORE_TEST_DB_URL postgres:17-alpine \
+          # -i is required so the SQL heredoc reaches psql inside the container.
+          docker run --rm -i --env RESTORE_TEST_DB_URL postgres:17-alpine \
             psql "$RESTORE_TEST_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
           DO $$
           DECLARE
