@@ -146,28 +146,29 @@ jobs:
           RESTORE_TEST_DB_URL: ${{ secrets.RESTORE_TEST_DB_URL }}
         run: |
           set -euo pipefail
-          # Restore in stages so post-data policies are cleaned only after their
-          # tables have been recreated. This also recovers cleanly from a partial run.
+          # Restore only the JFDRMS application schema. Supabase-managed schemas
+          # such as auth, storage, and realtime must remain under platform ownership.
+          # Keep the staged order so post-data objects are applied after tables/data.
           docker run --rm \
             --env RESTORE_TEST_DB_URL \
             --volume "$RUNNER_TEMP/jfdrms-restore:/restore:ro" \
             postgres:17-alpine \
             pg_restore --exit-on-error --verbose --clean --if-exists --no-owner --no-acl \
-              --section=pre-data --use-list=/restore/restore-list.txt \
+              --schema=public --section=pre-data --use-list=/restore/restore-list.txt \
               --dbname="$RESTORE_TEST_DB_URL" /restore/jfdrms.dump
           docker run --rm \
             --env RESTORE_TEST_DB_URL \
             --volume "$RUNNER_TEMP/jfdrms-restore:/restore:ro" \
             postgres:17-alpine \
             pg_restore --exit-on-error --verbose --no-owner --no-acl \
-              --section=data --use-list=/restore/restore-list.txt \
+              --schema=public --section=data --use-list=/restore/restore-list.txt \
               --dbname="$RESTORE_TEST_DB_URL" /restore/jfdrms.dump
           docker run --rm \
             --env RESTORE_TEST_DB_URL \
             --volume "$RUNNER_TEMP/jfdrms-restore:/restore:ro" \
             postgres:17-alpine \
             pg_restore --exit-on-error --verbose --clean --if-exists --no-owner --no-acl \
-              --section=post-data --use-list=/restore/restore-list.txt \
+              --schema=public --section=post-data --use-list=/restore/restore-list.txt \
               --dbname="$RESTORE_TEST_DB_URL" /restore/jfdrms.dump
 
       - name: Verify restored database contains JFDRMS tables
