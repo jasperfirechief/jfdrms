@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Restore missing JFDRMS Storage objects from a dated Google Drive backup."""
 from __future__ import annotations
-import hashlib, json, os, re, sys
+import hashlib, json, mimetypes, os, re, sys
 from urllib.parse import quote, urlparse
 import requests
 from backup_storage_to_drive import (
@@ -101,7 +101,8 @@ def main():
         data = drive_bytes(file_id)
         if hashlib.sha256(data).hexdigest() != digest:
             raise RuntimeError(f"Drive file checksum failed: {bucket}/{path}")
-        actual = restore_object(base, bucket, path, data, (item.get("metadata") or {}).get("mimetype", "application/octet-stream"))
+        mime = (item.get("metadata") or {}).get("mimetype") or mimetypes.guess_type(path)[0] or "application/octet-stream"
+        actual = restore_object(base, bucket, path, data, mime)
         if actual != digest:
             raise RuntimeError(f"Restored file checksum failed: {bucket}/{path}")
         print(f"Restored and verified: {bucket}/{path} ({len(data)} bytes)")
