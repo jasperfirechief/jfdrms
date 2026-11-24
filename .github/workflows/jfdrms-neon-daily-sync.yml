@@ -275,6 +275,19 @@ jobs:
             LANGUAGE sql STABLE AS $body$ SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '') $body$;
           CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid
             LANGUAGE sql STABLE AS $body$ SELECT NULLIF(auth.user_id(), '')::uuid $body$;
+          -- Map Neon Auth UUIDs back to stable JFDRMS user IDs by verified account email.
+          -- This preserves personnel.auth_user_id references and existing role policies.
+          CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid
+            LANGUAGE sql STABLE SECURITY DEFINER
+            SET search_path = pg_catalog, public, neon_auth
+            AS $function$
+              SELECT u.user_id
+              FROM public.users AS u
+              JOIN neon_auth."user" AS nu ON lower(nu.email) = lower(u.email)
+              WHERE nu.id = NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid
+                AND u.active IS TRUE
+              LIMIT 1
+            $function$;
           GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
           GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
           ALTER DEFAULT PRIVILEGES FOR ROLE neondb_owner IN SCHEMA public
