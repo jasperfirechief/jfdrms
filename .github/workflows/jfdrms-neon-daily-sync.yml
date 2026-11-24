@@ -1,7 +1,9 @@
-name: JFDRMS Neon Database Mirror (Manual Test Only)
+name: JFDRMS Neon Database Mirror (Nightly Sync)
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "0 8 * * *" # 2:00 AM Central Standard Time; 3:00 AM during daylight time
 
 permissions:
   contents: read
@@ -12,7 +14,7 @@ concurrency:
 
 jobs:
   neon-restore:
-    name: Manual database-only mirror test (not full disaster recovery)
+    name: Nightly database mirror refresh (database only; not full disaster recovery)
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
