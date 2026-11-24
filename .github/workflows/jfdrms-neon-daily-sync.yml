@@ -251,6 +251,33 @@ jobs:
               --schema=public --schema=private --section=post-data --use-list=/restore/restore-list.txt \
               --dbname="$NEON_RESTORE_DB_URL" /restore/jfdrms.dump
 
+      - name: Reapply Neon Data API permissions after restore
+        env:
+          NEON_RESTORE_DB_URL: ${{ secrets.NEON_RESTORE_DB_URL }}
+        run: |
+          set -euo pipefail
+          docker run --rm -i --env NEON_RESTORE_DB_URL postgres:17-alpine \
+            psql "$NEON_RESTORE_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          -- Neon Data API authenticates through Managed Better Auth and runs as
+          -- the PostgreSQL authenticated role. Keep grants aligned after pg_restore
+          -- recreates the application tables and policies.
+          DO $ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+              CREATE ROLE authenticated NOLOGIN;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+              CREATE ROLE anon NOLOGIN;
+            END IF;
+          END $;
+          GRANT USAGE ON SCHEMA public, auth, private TO authenticated;
+          GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
+          GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
+          ALTER DEFAULT PRIVILEGES FOR ROLE neondb_owner IN SCHEMA public
+            GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;
+          ALTER DEFAULT PRIVILEGES FOR ROLE neondb_owner IN SCHEMA public
+            GRANT USAGE, SELECT ON SEQUENCES TO authenticated;
+          SQL
+
       - name: Verify restored database contains JFDRMS tables
         env:
           NEON_RESTORE_DB_URL: ${{ secrets.NEON_RESTORE_DB_URL }}
