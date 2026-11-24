@@ -272,6 +272,11 @@ jobs:
             END IF;
           END $grant$;
           GRANT USAGE ON SCHEMA public, auth, private TO authenticated;
+          -- Neon Data API uses auth.user_id(); retain auth.uid() for the existing Supabase-era RLS policies.
+          CREATE OR REPLACE FUNCTION auth.user_id() RETURNS text
+            LANGUAGE sql STABLE AS $body$ SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '') $body$;
+          CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid
+            LANGUAGE sql STABLE AS $body$ SELECT NULLIF(auth.user_id(), '')::uuid $body$;
           GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
           GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
           ALTER DEFAULT PRIVILEGES FOR ROLE neondb_owner IN SCHEMA public
