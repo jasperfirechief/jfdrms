@@ -261,14 +261,14 @@ jobs:
           -- Neon Data API authenticates through Managed Better Auth and runs as
           -- the PostgreSQL authenticated role. Keep grants aligned after pg_restore
           -- recreates the application tables and policies.
-          DO $ BEGIN
+          DO $grant$ BEGIN
             IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
               CREATE ROLE authenticated NOLOGIN;
             END IF;
             IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
               CREATE ROLE anon NOLOGIN;
             END IF;
-          END $;
+          END $grant$;
           GRANT USAGE ON SCHEMA public, auth, private TO authenticated;
           GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
           GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
