@@ -1,6 +1,8 @@
 name: JFDRMS Neon Database Mirror (Nightly Sync)
 
 on:
+  push:
+    branches: [neon-refresh-now]
   workflow_dispatch:
   schedule:
     - cron: "0 8 * * *" # 2:00 AM Central Standard Time; 3:00 AM during daylight time
