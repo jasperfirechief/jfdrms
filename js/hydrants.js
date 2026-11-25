@@ -5,7 +5,7 @@
   const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   let map = null, markerLayer = null, assets = [], schedules = [], inspections = [], flowTests = [], selected = null, mode = "inspection", initialized = false, loading = false;
   const todayISO = () => (typeof today === "function" ? today() : new Date().toISOString().slice(0,10));
-  const allowed = () => typeof profile!=="undefined" && profile && ["admin","officer"].includes(String(profile.app_role||"").toLowerCase());
+  const allowed = () => typeof profile!=="undefined" && profile && (String(profile.app_role||"").toLowerCase()==="admin" || (["officer","firefighter"].includes(String(profile.app_role||"").toLowerCase()) && Array.isArray(crew) && crew.length>0));
   function status(msg, bad=false){const n=$("hydrantStatus");if(n){n.textContent=msg;n.className="text-sm mt-2 "+(bad?"text-red-700":"text-slate-600")}}
   function monthValue(){return Number($("hydrantMonth")?.value||new Date().getMonth()+1)}
   function yearValue(){return Number($("hydrantYear")?.value||new Date().getFullYear())}
@@ -135,7 +135,7 @@
     list.innerHTML='<div class="space-y-2"><h3 class="font-bold text-sm">Annual inspections · '+inspectionTasks.length+' hydrants</h3>'+inspectionHtml+'</div><div class="space-y-2 mt-4"><h3 class="font-bold text-sm">Flow-test pairings · '+flowTasks.length+' scheduled tests</h3>'+flowHtml+'</div>';
   }
   async function refresh(){
-    if(!allowed())return status("Hydrants access is limited to administrators and officers.",true);
+    if(!allowed())return status("Hydrant records are available to administrators and on-duty officers and firefighters.",true);
     if(loading)return;loading=true;status("Loading hydrant inventory and history…");
     try{
       if(!window.L){await new Promise((resolve,reject)=>{if(typeof window.jfdLoadLeaflet==="function"){window.jfdLoadLeaflet().then(resolve,reject)}else{const s=document.createElement("script");s.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";s.onload=resolve;s.onerror=()=>reject(new Error("Map library failed to load."));document.head.appendChild(s)}})}
@@ -154,7 +154,7 @@
     }).join(""):'<p class="text-sm text-slate-500">No hydrant records have been entered yet.</p>';
   }
   function openForm(id,kind,flowOverride,pairOrder){
-    if(!allowed())return alert("Only administrators and officers can enter hydrant records.");
+    if(!allowed())return alert("Only administrators and on-duty officers or firefighters can enter hydrant records.");
     let scheduledPair=null;
     if(kind==="flow_test"){const candidates=currentSchedule().filter(x=>x.task_type==="flow_test"&&assetKey(x.test_hydrant_id)===assetKey(id));if(pairOrder)scheduledPair=candidates.find(x=>Number(x.pair_order)===Number(pairOrder)&&(!flowOverride?!x.flow_hydrant_id:assetKey(x.flow_hydrant_id)===assetKey(flowOverride)))||null;if(!scheduledPair&&flowOverride)scheduledPair=candidates.find(x=>assetKey(x.flow_hydrant_id)===assetKey(flowOverride))||null;if(!scheduledPair)scheduledPair=currentSchedule().find(x=>x.task_type==="flow_test"&&(assetKey(x.test_hydrant_id)===assetKey(id)||assetKey(x.flow_hydrant_id)===assetKey(id)))||null;}
     const testId=kind==="flow_test"?(scheduledPair?.test_hydrant_id||""):"";
@@ -213,7 +213,7 @@
     return {rate:rate===null?null:Math.round(rate),flow:flow===null?null:Math.round(flow),coefficient:c};
   }
   async function saveRecord(ev){
-    ev.preventDefault();if(!allowed())return alert("Only administrators and officers can enter hydrant records.");
+    ev.preventDefault();if(!allowed())return alert("Only administrators and on-duty officers or firefighters can enter hydrant records.");
     const id=$("hydrantRecordHydrant").value,kind=$("hydrantRecordType").value,date=$("hydrantRecordDate").value,person=$("hydrantRecordInspector").value.trim();const testHydrantId=$("hf_testHydrant")?.value||"";
     if(!id||!date||!person)return alert("Hydrant, date, and inspector/tester are required.");
     $("hydrantSaveButton").disabled=true;$("hydrantSaveButton").textContent="Saving…";
@@ -288,7 +288,7 @@
   window.jfdHydrantCloseHistory=()=> $("hydrantHistoryModal")?.classList.add("hiddenx");
   window.jfdHydrantCloseForm=()=> $("hydrantRecordForm")?.classList.add("hiddenx");
   function currentCalendarShift(){const date=new Date(),todayDate=new Date(date.getFullYear(),date.getMonth(),date.getDate()),anchor=new Date(2027,0,1),days=Math.round((todayDate-anchor)/86400000),mod=((days%3)+3)%3;return ["C","A","B"][mod];}
-  window.jfdHydrantTabEntered=async function(){if(!allowed())return alert("Hydrants are available to administrators and officers.");if(!window.jfdHydrantShiftInitialized){$("hydrantShift").value=currentCalendarShift();$("hydrantMonth").value=String(new Date().getMonth()+1);$("hydrantYear").value=String(new Date().getFullYear());window.jfdHydrantShiftInitialized=true;}if(!initialized||!map||!map.getContainer().isConnected)await refresh();else{await loadRecords();ensureMap();renderScheduleSummary();renderSelected();renderHydrantRecordList();}};
+  window.jfdHydrantTabEntered=async function(){if(!allowed())return alert("Hydrants are available to administrators and on-duty officers and firefighters.");if(!window.jfdHydrantShiftInitialized){$("hydrantShift").value=currentCalendarShift();$("hydrantMonth").value=String(new Date().getMonth()+1);$("hydrantYear").value=String(new Date().getFullYear());window.jfdHydrantShiftInitialized=true;}if(!initialized||!map||!map.getContainer().isConnected)await refresh();else{await loadRecords();ensureMap();renderScheduleSummary();renderSelected();renderHydrantRecordList();}};
   window.jfdHydrantFiltersChanged=async function(){if(!allowed())return;await loadRecords();ensureMap();renderScheduleSummary();renderSelected();renderHydrantRecordList();};
   document.addEventListener("DOMContentLoaded",()=>{
     const form=$("hydrantRecordInnerForm");form?.addEventListener("submit",saveRecord);
