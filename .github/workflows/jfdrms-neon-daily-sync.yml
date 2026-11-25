@@ -87,7 +87,7 @@ jobs:
           pattern = re.compile(
               r'ALTER TABLE ONLY\s+(?:public\.)?("[^"]+"|[\w.]+)\s+'
               r'ADD CONSTRAINT\s+("[^"]+"|[^\s]+)\s+'
-              r'[^;]*?\bREFERENCES\s+auth\\.users\b',
+              r'[^;]*?\bREFERENCES\s+auth\.users\b',
               re.IGNORECASE | re.DOTALL,
           )
           excluded = set()
