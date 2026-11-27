@@ -2,7 +2,7 @@ name: Jasper FD Production Storage Backup
 
 on:
   schedule:
-    - cron: '21 16 * * *'
+    - cron: '21 8 * * *'
       timezone: 'America/Chicago'
   workflow_dispatch:
 
