@@ -4,7 +4,6 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "49 8 * * *"
-      timezone: "America/Chicago" # target schedule: 2:49 AM Central
 
 permissions:
   contents: read
