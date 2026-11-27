@@ -3,7 +3,8 @@ name: JFDRMS Neon Database Mirror (Nightly Sync)
 on:
   workflow_dispatch:
   schedule:
-    - cron: "49 8 * * *" # 2:49 AM Central Standard Time; 3:49 AM during daylight time
+    - cron: "49 16 * * *"
+      timezone: "America/Chicago" # 10 hours early to compensate for observed schedule delay; target completion window 2:49 AM Central
 
 permissions:
   contents: read
