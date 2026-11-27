@@ -470,7 +470,7 @@ export default async function handler(req,res) {
       const utcHour=now.getUTCHours();
       const localHour=chicagoHour(now);
       const chicagoUtcOffset=(utcHour-localHour+24)%24;
-      const expectedUtcHour=chicagoUtcOffset===6?5:chicagoUtcOffset===5?4:null;
+      const expectedUtcHour=chicagoUtcOffset===6?15:chicagoUtcOffset===5?14:null;
       if(utcHour!==expectedUtcHour) return res.status(200).json({ok:true,skipped:true,reason:"Outside the scheduled UTC delivery window.",utc_hour:utcHour,chicago_utc_offset_hours:chicagoUtcOffset});
     }
     const reinspectionReminders=testMva?{sent:0,skipped:0}:await sendReinspectionReminders(now);
