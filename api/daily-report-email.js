@@ -58,6 +58,9 @@ function chicagoHour(date = new Date()) { return Number(chicagoParts(date).hour)
 function previousDate(iso) {
   const d = new Date(iso + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10);
 }
+function nextDate(iso) {
+  const d = new Date(iso + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10);
+}
 function zoned7amUtc(isoDate) {
   const naive = new Date(isoDate + "T07:00:00Z");
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -463,12 +466,19 @@ export default async function handler(req,res) {
   if(testMva && (req.query?.cad||"")!=="2026-22608") return res.status(400).json({error:"Invalid test request"});
   try {
     const now=new Date();
-    if(!testMva && chicagoHour(now)!==9) return res.status(200).json({ok:true,skipped:true,reason:"Outside 9 AM America/Chicago delivery window."});
+    if(!testMva) {
+      const utcHour=now.getUTCHours();
+      const localHour=chicagoHour(now);
+      const chicagoUtcOffset=(utcHour-localHour+24)%24;
+      const expectedUtcHour=chicagoUtcOffset===6?5:chicagoUtcOffset===5?4:null;
+      if(utcHour!==expectedUtcHour) return res.status(200).json({ok:true,skipped:true,reason:"Outside the scheduled UTC delivery window.",utc_hour:utcHour,chicago_utc_offset_hours:chicagoUtcOffset});
+    }
     const reinspectionReminders=testMva?{sent:0,skipped:0}:await sendReinspectionReminders(now);
     const specialEventReminders=testMva?{sent:0,skipped:0}:await sendSpecialEventReminders(now);
     if(!testMva && process.env.RMS_EMAILS_ENABLED!=="true") return res.status(200).json({ok:true,shift_packet_skipped:true,reason:"Automatic RMS shift-package emails are disabled until the department authorizes go-live.",reinspection_reminders:reinspectionReminders,special_event_reminders:specialEventReminders});
     if(!SUPABASE_SERVICE_KEY) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured in Vercel.");
-    const shiftEnd=chicagoDate(now),shiftStart=previousDate(shiftEnd);
+    const shiftStart=chicagoDate(now);
+    const shiftEnd=nextDate(shiftStart);
     const startUtc=zoned7amUtc(shiftStart).toISOString(),endUtc=zoned7amUtc(shiftEnd).toISOString();
     const staffing=await supa("daily_staffing?select=*&staffing_date=eq."+shiftStart+"&order=shift");
     const staffingIds=(staffing||[]).map(x=>x.staffing_id).filter(Boolean);
@@ -536,8 +546,16 @@ export default async function handler(req,res) {
       attachments.push({content:Buffer.from(pdf).toString("base64"),filename:String(attachmentNumber++).padStart(2,"0")+" - Standalone - "+label+".pdf"});
       reportCount++;
     }
+    if(reportCount===0) {
+      await sendDepartmentMail({
+        to:"firechief@jaspercity.com",
+        subject:"Jasper Fire Department - No Daily Reports Available - "+shiftStart,
+        text:"No daily incident or standalone reports were available for the shift covering "+shiftStart+" through "+shiftEnd+".\\n\\nNo daily report package was attached.\\n\\nJasper Fire Department RMS"
+      });
+      return res.status(200).json({ok:true,no_daily_reports:true,shift_start:shiftStart,shift_end:shiftEnd,incidents:(incidents||[]).length,reports:0,notification_sent_to:"firechief@jaspercity.com",reinspection_reminders:reinspectionReminders,special_event_reminders:specialEventReminders});
+    }
     await sendEmail(attachments,shiftStart,shiftEnd,(incidents||[]).length,reportCount,activitySummary,(training||[]).length);
-    return res.status(200).json({ok:true,shift_start:shiftStart,shift_end:shiftEnd,incidents:(incidents||[]).length,reports:reportCount,training_reports:(training||[]).length,attachments:attachments.length,reinspection_reminders:reinspectionReminders,special_event_reminders:specialEventReminders});
+    return res.status(200).json({ok:true,shift_start:shiftStart,shift_end:shiftEnd,incidents:(incidents||[]).length,reports:reportCount,training_reports:(training||[]).length,attachments:attachments.length,recipient:"firechief@jaspercity.com",reinspection_reminders:reinspectionReminders,special_event_reminders:specialEventReminders});
   } catch(e) {
     console.error("Daily report email error",e);
     return res.status(500).json({ok:false,error:e?.message||"Daily report email failed."});
